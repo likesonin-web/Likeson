@@ -1737,8 +1737,12 @@ const PlatformFeeSection = ({ doctor, dispatch, loading }) => {
     dispatch(updateDoctorPlatformFee({ id: doctor._id, platformFee: pf }));
   };
 
-  return (
+return (
     <div className="space-y-3">
+      <p className="flex items-start gap-1.5 text-[10px] text-base-content/45 leading-relaxed">
+        <Info size={11} className="shrink-0 mt-0.5" />
+        Note: priority order is Doctor override → Hospital override → Likeson global default. Setting a value here always wins over hospital/global.
+      </p>
       <Toggle
         label="Clear override (revert to global default)"
         note="Global platform pricing config applies when cleared."
@@ -1842,6 +1846,13 @@ const PricingTab = ({ hospital, dispatch, loading }) => {
         </button>
       }
     >
+     <div className="flex items-start gap-2 p-3 mb-4 bg-info/10 border border-info/30 rounded-xl">
+        <Info size={13} className="text-info shrink-0 mt-0.5" />
+        <p className="text-[11px] text-base-content/60 leading-relaxed">
+          Note: this is <strong>hospital-wide</strong> pricing — it applies to every doctor linked
+          to this hospital. There is no per-doctor fee override for hospital-manager type hospitals.
+        </p>
+      </div>
       <div className="mb-5 space-y-2">
         <p className="text-xs font-bold text-base-content/60 uppercase tracking-wider">Consultation Types Offered</p>
         <div className="flex flex-wrap gap-5">

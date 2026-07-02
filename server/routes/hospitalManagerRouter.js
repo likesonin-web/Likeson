@@ -6,12 +6,15 @@ import bcrypt         from 'bcryptjs';
 import crypto         from 'crypto';
 
 import { protect, authorize } from '../middleware/authMiddleware.js';
-import Hospital      from '../models/Hospital.js';
-import DoctorProfile from '../models/DoctorProfile.js';
-import User          from '../models/User.js';
-import Notification  from '../models/Notification.js';
-import SystemLog     from '../models/SystemLog.js';
-import sendEmail     from '../utils/sendEmail.js';
+import Hospital              from '../models/Hospital.js';
+import DoctorProfile         from '../models/DoctorProfile.js';
+import User                  from '../models/User.js';
+import Notification          from '../models/Notification.js';
+import SystemLog             from '../models/SystemLog.js';
+import Booking                from '../models/Booking.js';
+import OutPatientRecord       from '../models/OutPatientRecord.js';
+import PlatformPricingConfig  from '../models/PlatformPricingConfig.js';
+import sendEmail             from '../utils/sendEmail.js';
 import {
   transactionalTemplate,
   welcomeTemplate,
@@ -101,10 +104,13 @@ const deleteFromImageKit = async (fileId) => {
 
 /**
  * asyncHandler — wraps async route handlers to forward errors to Express.
+ * Mongoose ValidationError (thrown by our pre-validate hooks, e.g.
+ * "honorarium cannot exceed fee") is treated as a 400, not a 500 — those
+ * are client input problems, not server failures.
  */
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch((err) => {
-    const status = err.statusCode || 500;
+    const status = err.statusCode || (err.name === 'ValidationError' ? 400 : 500);
     res.status(status).json({ success: false, message: err.message });
   });
 
@@ -112,9 +118,7 @@ const asyncHandler = (fn) => (req, res, next) =>
 // §1  HOSPITAL PROFILE
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * GET /hospital-manager/profile
- */
+// GET current manager's hospital profile, populated with owner user + linked doctors.
 router.get(
   '/profile',
   asyncHandler(async (req, res) => {
@@ -133,9 +137,7 @@ router.get(
   })
 );
 
-/**
- * PATCH /hospital-manager/profile/basic
- */
+// PATCH non-pricing, non-location basic profile fields (name, contact, facility flags, etc.).
 router.patch(
   '/profile/basic',
   asyncHandler(async (req, res) => {
@@ -171,9 +173,7 @@ router.patch(
   })
 );
 
-/**
- * PATCH /hospital-manager/profile/location
- */
+// PATCH geo-coordinates + optional address merge for the map pin.
 router.patch(
   '/profile/location',
   asyncHandler(async (req, res) => {
@@ -197,6 +197,7 @@ router.patch(
 // §2  IMAGE & DOCUMENT UPLOADS
 // ═════════════════════════════════════════════════════════════════════════════
 
+// POST single logo file → ImageKit → hospital.logo.
 router.post(
   '/upload/logo',
   upload.single('logo'),
@@ -211,6 +212,7 @@ router.post(
   })
 );
 
+// POST up to 5 gallery images per call, capped at 20 total.
 router.post(
   '/upload/images',
   upload.array('images', 5),
@@ -233,6 +235,7 @@ router.post(
   })
 );
 
+// DELETE a single gallery image by its stored URL.
 router.delete(
   '/upload/images',
   asyncHandler(async (req, res) => {
@@ -250,6 +253,7 @@ router.delete(
   })
 );
 
+// POST license/registration document (PDF or image) → ImageKit → registrationDetails.documentUrl.
 router.post(
   '/upload/license-document',
   upload.single('document'),
@@ -270,6 +274,7 @@ router.post(
 // §3  OPERATING HOURS
 // ═════════════════════════════════════════════════════════════════════════════
 
+// GET the weekly operating-hours table + 24x7 flag.
 router.get(
   '/operating-hours',
   asyncHandler(async (req, res) => {
@@ -278,6 +283,7 @@ router.get(
   })
 );
 
+// PUT (replace) the entire weekly operating-hours table, with time-format + ordering validation.
 router.put(
   '/operating-hours',
   asyncHandler(async (req, res) => {
@@ -303,100 +309,142 @@ router.put(
 );
 
 // ═════════════════════════════════════════════════════════════════════════════
-// §4  DOCTOR PRICING MANAGEMENT
+// §4  HOSPITAL-WIDE CONSULTATION PRICING
+// ─────────────────────────────────────────────────────────────────────────────
+// ARCHITECTURE FIX: this used to be a PER-DOCTOR endpoint that wrote into
+// DoctorProfile.fees — the exact bug DoctorProfile.resolveEffectivePricing()
+// had (Problem 2): for a hospital-manager hospital, pricing is NOT per
+// doctor, it lives on Hospital.consultationPricing and applies to every
+// linked doctor uniformly. The old /doctors/:doctorProfileId/pricing routes
+// are kept below as deprecated stubs (410) that point callers here, so any
+// existing client integration fails loudly instead of silently writing to
+// the wrong pricing source.
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * GET /hospital-manager/doctors/:doctorProfileId/pricing
- * View the current fee structure for a specific linked doctor.
- */
+// GET the hospital's current consultation pricing (source of truth for ALL linked doctors)
+// plus the read-only platform fee Likeson charges this hospital.
 router.get(
-  '/doctors/:doctorProfileId/pricing',
+  '/pricing',
   asyncHandler(async (req, res) => {
-    const { doctorProfileId } = req.params;
-    const hospital = await resolveHospital(req.user._id, 'linkedDoctors managementModel name');
+    const hospital = await resolveHospital(req.user._id, 'consultationPricing name settlementCycle');
+    const pricingConfig = await PlatformPricingConfig.getGlobal();
+    const platformFee = PlatformPricingConfig.resolveHospitalPlatformFee(pricingConfig, hospital);
 
-    if (!hospital.linkedDoctors.map(String).includes(doctorProfileId)) {
-      return res.status(404).json({ success: false, message: 'Doctor not linked to your hospital.' });
-    }
-
-    const doctor = await DoctorProfile.findById(doctorProfileId).select('fees platformFee');
-    if (!doctor) return res.status(404).json({ success: false, message: 'Doctor profile not found.' });
-
-    // Hide platformFee from hospital manager
-    const pricingData = doctor.fees ? doctor.fees.toObject() : {};
-    
-    res.json({ success: true, data: pricingData });
+    res.json({
+      success: true,
+      data: {
+        consultationPricing: hospital.consultationPricing,
+        platformFee,          // read-only — set by Likeson admin unless hospital has its own override
+        settlementCycle: hospital.settlementCycle || pricingConfig.hospital.settlementCycle,
+        note: 'This pricing applies to every doctor linked to this hospital. Per-doctor pricing is not available for hospital-managed hospitals.',
+      },
+    });
   })
 );
 
-/**
- * PATCH /hospital-manager/doctors/:doctorProfileId/pricing
- * Update consultation fees & honorariums for a specific linked doctor.
- * The hospital manager can change these fields; platform fees are protected.
- */
+// PATCH the hospital's consultation pricing. Archives the previous version into
+// pricingHistory (handled by the Hospital model's pre-save hook) and bumps
+// pricingVersion so bookings can always trace which version priced them.
 router.patch(
-  '/doctors/:doctorProfileId/pricing',
+  '/pricing',
   asyncHandler(async (req, res) => {
-    const { doctorProfileId } = req.params;
-    const hospital = await resolveHospital(req.user._id, 'linkedDoctors managementModel name');
+   const hospital = await resolveHospital(req.user._id, 'consultationPricing name pricingHistory');
 
-    if (hospital.managementModel !== 'hospital-manager') {
-      return res.status(403).json({
-        success: false,
-        message: 'Pricing is managed by the doctor themselves in an owner-operated facility.',
-      });
-    }
-
-    if (!hospital.linkedDoctors.map(String).includes(doctorProfileId)) {
-      return res.status(404).json({ success: false, message: 'Doctor not linked to your hospital.' });
-    }
-
-    const doctor = await DoctorProfile.findById(doctorProfileId);
-    if (!doctor) return res.status(404).json({ success: false, message: 'Doctor profile not found.' });
-
-    if (req.body.platformFee !== undefined) {
-      return res.status(403).json({ success: false, message: 'platformFee can only be set by a superadmin.' });
-    }
-
-    // Initialize fees object if it doesn't exist
-    if (!doctor.fees) doctor.fees = {};
-
-const pricingFields = [
-      'consultationFee', 'consultationHonorarium',
-      'inPersonFee', 'inPersonHonorarium',
-      'videoFee', 'videoHonorarium',
-      'homeVisitFee', 'homeVisitHonorarium',
+    const editableFields = [
+      'inPersonFee', 'videoFee', 'homeVisitFee',
+      'inPersonHonorarium', 'videoHonorarium', 'homeVisitHonorarium',
       'followUpFee', 'followUpDiscountPercent', 'followUpValidDays',
+      'consultationTypes',
     ];
 
-    pricingFields.forEach((field) => {
+    if (!hospital.consultationPricing) hospital.consultationPricing = {};
+
+    editableFields.forEach((field) => {
       if (req.body[field] !== undefined) {
-        doctor.fees[field] = req.body[field];
+        hospital.consultationPricing[field] = req.body[field];
       }
     });
 
-    doctor.updatedBy = req.user._id;
-    await doctor.save();
+    // Version bump — model's pre-save archives the pre-image into
+    // pricingHistory; we own bumping the forward-looking version number here
+    // so it's explicit at the call site that made the change.
+    const prevVersion = hospital.consultationPricing.pricingVersion || 1;
+    hospital.consultationPricing.pricingVersion = prevVersion + 1;
+    hospital.consultationPricing.lastUpdatedBy     = req.user._id;
+    hospital.consultationPricing.lastUpdatedByRole = req.user.role;
+    hospital.updatedBy = req.user._id;
+
+    await hospital.save(); // throws ValidationError (→ 400 via asyncHandler) if honorarium > fee, etc.
 
     await SystemLog.createLog({
       level:    'info',
       category: 'payment',
-      message:  `Doctor pricing updated by hospital manager`,
+      message:  `Hospital consultation pricing updated to v${hospital.consultationPricing.pricingVersion} by manager`,
       actor:    { userId: req.user._id, name: req.user.name, role: req.user.role },
-      relatedEntity: { model: 'DoctorProfile', entityId: doctor._id, label: doctorProfileId },
+      relatedEntity: { model: 'Hospital', entityId: hospital._id, label: hospital.name },
       request:  { method: 'PATCH', path: req.originalUrl, statusCode: 200 },
+      metadata: { pricingVersion: hospital.consultationPricing.pricingVersion },
     });
 
-    res.json({ success: true, message: 'Doctor pricing updated.', data: doctor.fees });
+    res.json({ success: true, message: 'Consultation pricing updated.', data: hospital.consultationPricing });
   })
 );
 
+// ── Deprecated per-doctor pricing routes — kept as loud 410s, not silent no-ops ──
+
+// DEPRECATED: per-doctor pricing read. Hospital-managed pricing is hospital-wide now.
+router.get(
+  '/doctors/:doctorProfileId/pricing',
+  asyncHandler(async (_req, res) => {
+    res.status(410).json({
+      success: false,
+      message: 'Per-doctor pricing was removed for hospital-managed hospitals. Use GET /hospital-manager/pricing instead — it applies to every linked doctor.',
+    });
+  })
+);
+
+// DEPRECATED: per-doctor pricing write. Hospital-managed pricing is hospital-wide now.
+router.patch(
+  '/doctors/:doctorProfileId/pricing',
+  asyncHandler(async (_req, res) => {
+    res.status(410).json({
+      success: false,
+      message: 'Per-doctor pricing was removed for hospital-managed hospitals. Use PATCH /hospital-manager/pricing instead — it applies to every linked doctor.',
+    });
+  })
+);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// §4b  PLATFORM FEE (READ-ONLY)
+// ═════════════════════════════════════════════════════════════════════════════
+
+// GET the effective platform fee Likeson charges this hospital (hospital override → global default).
+// Read-only: only superadmin/admin can change it, mirrors the priority chain in
+// DoctorProfile.resolveEffectivePricing's platformFeeSource logic.
+router.get(
+  '/platform-fee',
+  asyncHandler(async (req, res) => {
+    const hospital = await resolveHospital(req.user._id, 'name settlementCycle consultationPricing');
+    const pricingConfig = await PlatformPricingConfig.getGlobal();
+    const effectiveFee = PlatformPricingConfig.resolveHospitalPlatformFee(pricingConfig, hospital);
+
+    res.json({
+      success: true,
+      data: {
+        platformFee: effectiveFee, // { type: 'fixed'|'percentage', value }
+        settlementCycle: hospital.settlementCycle || pricingConfig.hospital.settlementCycle,
+        note: 'Set by Likeson admin (or this hospital\'s override). Applied to completed bookings during settlement.',
+      },
+    });
+  })
+);
 
 // ═════════════════════════════════════════════════════════════════════════════
 // §5  DOCTOR MANAGEMENT
 // ═════════════════════════════════════════════════════════════════════════════
 
+// GET doctors NOT yet linked to this hospital, searchable by name/email/specialization —
+// used for the "link an existing doctor" picker.
 router.get(
   '/doctors/search',
   asyncHandler(async (req, res) => {
@@ -434,6 +482,7 @@ router.get(
   })
 );
 
+// GET headline doctor counts (total/verified/active/online) + specialization breakdown.
 router.get(
   '/doctors/stats',
   asyncHandler(async (req, res) => {
@@ -456,6 +505,9 @@ router.get(
   })
 );
 
+// POST create a brand-new doctor User + DoctorProfile and link it to this hospital
+// in one transaction. Note: doctor.fees is intentionally left at schema defaults —
+// this hospital is 'hospital-manager', so pricing comes from /pricing, not the doctor.
 router.post(
   '/doctors/create-and-link',
   asyncHandler(async (req, res) => {
@@ -513,6 +565,7 @@ router.post(
   })
 );
 
+// GET paginated, filterable list of doctors already linked to this hospital.
 router.get(
   '/doctors',
   asyncHandler(async (req, res) => {
@@ -540,6 +593,7 @@ router.get(
   })
 );
 
+// GET full detail for one linked doctor (must belong to this hospital).
 router.get(
   '/doctors/:doctorProfileId',
   asyncHandler(async (req, res) => {
@@ -554,6 +608,7 @@ router.get(
   })
 );
 
+// DELETE the hospital↔doctor link (does not delete the doctor account).
 router.delete(
   '/doctors/:doctorProfileId/unlink',
   asyncHandler(async (req, res) => {
@@ -575,6 +630,7 @@ router.delete(
   })
 );
 
+// GET a linked doctor's weekly availability schedule.
 router.get(
   '/doctors/:doctorProfileId/availability',
   asyncHandler(async (req, res) => {
@@ -591,6 +647,7 @@ router.get(
 // §6  REGISTRATION / LEGAL
 // ═════════════════════════════════════════════════════════════════════════════
 
+// PATCH license/GST/PAN registration fields for the hospital.
 router.patch(
   '/registration',
   asyncHandler(async (req, res) => {
@@ -609,6 +666,7 @@ router.patch(
 // §7  ONBOARDING STATUS
 // ═════════════════════════════════════════════════════════════════════════════
 
+// GET a checklist-style onboarding progress summary for the hospital dashboard.
 router.get(
   '/onboarding',
   asyncHandler(async (req, res) => {
@@ -635,6 +693,7 @@ router.get(
 // §8  NOTIFICATIONS
 // ═════════════════════════════════════════════════════════════════════════════
 
+// GET paginated in-app notifications for the manager's user account.
 router.get(
   '/notifications',
   asyncHandler(async (req, res) => {
@@ -653,6 +712,7 @@ router.get(
   })
 );
 
+// PATCH mark one/many/all notifications as read.
 router.patch(
   '/notifications/mark-read',
   asyncHandler(async (req, res) => {
@@ -669,6 +729,7 @@ router.patch(
 // §9  SECURITY — SESSION & ACCOUNT MANAGEMENT
 // ═════════════════════════════════════════════════════════════════════════════
 
+// GET all active login sessions for this account.
 router.get('/security/sessions', asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).select('auditSessions');
   const sessions = (user.auditSessions || []).map((s) => ({
@@ -677,6 +738,7 @@ router.get('/security/sessions', asyncHandler(async (req, res) => {
   res.json({ success: true, data: sessions, total: sessions.length });
 }));
 
+// DELETE (revoke) one specific session by id — cannot revoke the current one.
 router.delete('/security/sessions/:sessionId', asyncHandler(async (req, res) => {
   const { sessionId } = req.params;
   if (sessionId === req.user.sessionId) return res.status(400).json({ success: false, message: 'Cannot revoke current session.' });
@@ -691,6 +753,7 @@ router.delete('/security/sessions/:sessionId', asyncHandler(async (req, res) => 
   res.json({ success: true, message: 'Session revoked.' });
 }));
 
+// DELETE (revoke) every session except the current one — "log out everywhere else".
 router.delete('/security/sessions', asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).select('auditSessions deviceTokens');
   const otherSessions = user.auditSessions.filter((s) => s._id.toString() !== req.user.sessionId);
@@ -702,11 +765,13 @@ router.delete('/security/sessions', asyncHandler(async (req, res) => {
   res.json({ success: true, message: `${otherSessions.length} session(s) revoked.` });
 }));
 
+// GET registered push/device tokens for this account.
 router.get('/security/device-tokens', asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).select('deviceTokens');
   res.json({ success: true, data: user.deviceTokens });
 }));
 
+// DELETE one device token (e.g. sign out a specific phone from push notifications).
 router.delete('/security/device-tokens/:tokenId', asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).select('deviceTokens');
   user.deviceTokens = user.deviceTokens.filter((t) => t._id.toString() !== req.params.tokenId);
@@ -714,6 +779,7 @@ router.delete('/security/device-tokens/:tokenId', asyncHandler(async (req, res) 
   res.json({ success: true, message: 'Token removed.' });
 }));
 
+// PATCH change password (requires current password confirmation).
 router.patch('/security/change-password', asyncHandler(async (req, res) => {
   const { currentPassword, newPassword, confirmPassword } = req.body;
   if (!currentPassword || !newPassword || !confirmPassword) return res.status(400).json({ success: false, message: 'Missing fields.' });
@@ -729,6 +795,7 @@ router.patch('/security/change-password', asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Password changed.' });
 }));
 
+// PATCH notification channel preferences (sms/email/push/whatsapp) — echoes input back.
 router.patch('/security/notification-preferences', asyncHandler(async (req, res) => {
   const { sms, email, push, whatsapp } = req.body;
   res.json({ success: true, message: 'Preferences saved.', data: { sms, email, push, whatsapp } });
@@ -738,38 +805,100 @@ router.patch('/security/notification-preferences', asyncHandler(async (req, res)
 // §10  DASHBOARD SUMMARY
 // ═════════════════════════════════════════════════════════════════════════════
 
+// GET the hospital-manager landing-page summary: doctor counts, booking counts,
+// this-month revenue split, recent bookings, and effective platform fee — all
+// in one round trip via Promise.all.
 router.get(
   '/dashboard',
   asyncHandler(async (req, res) => {
-    const hospital = await Hospital.findOne({ managedBy: req.user._id, managementModel: 'hospital-manager' })
-      .select('name slug hospitalType isVerified isActive onboarding rating linkedDoctors address contact logo');
+    const hospital = await resolveHospital(
+      req.user._id,
+      'name slug hospitalType isVerified isActive onboarding rating linkedDoctors address contact logo settlementCycle'
+    );
 
-    if (!hospital) return res.status(404).json({ success: false, message: 'Hospital not found.' });
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
 
-    const [doctorCount, verifiedDoctors, unreadNotifications, onlineDoctors] = await Promise.all([
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const [
+      doctorCount,
+      verifiedDoctors,
+      onlineDoctors,
+      unreadNotifications,
+      totalBookings,
+      todayBookings,
+      pendingBookings,
+      monthAgg,
+      recentBookings,
+      totalConsultations,
+      pricingConfig,
+    ] = await Promise.all([
       DoctorProfile.countDocuments({ _id: { $in: hospital.linkedDoctors } }),
       DoctorProfile.countDocuments({ _id: { $in: hospital.linkedDoctors }, isVerified: true }),
-      Notification.countDocuments({ recipient: req.user._id, isRead: false }),
       DoctorProfile.countDocuments({ _id: { $in: hospital.linkedDoctors }, isOnline: true }),
+      Notification.countDocuments({ recipient: req.user._id, isRead: false }),
+      Booking.countDocuments({ hospital: hospital._id }),
+      Booking.countDocuments({ hospital: hospital._id, createdAt: { $gte: startOfToday } }),
+      Booking.countDocuments({ hospital: hospital._id, status: { $in: ['pending', 'confirmed'] } }),
+      Booking.aggregate([
+        { $match: { hospital: hospital._id, status: 'completed', completedAt: { $gte: startOfMonth } } },
+        {
+          $group: {
+            _id: null,
+            revenue: { $sum: '$fareBreakdown.totalAmount' },
+            hospitalShare: { $sum: '$fareBreakdown.hospitalShare' },
+            platformFee: { $sum: '$fareBreakdown.platformFee' },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      Booking.find({ hospital: hospital._id })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select('bookingCode bookingType status scheduledAt fareBreakdown.totalAmount patientInfo.name doctorSnapshot.name')
+        .lean(),
+      OutPatientRecord.countDocuments({ hospital: hospital._id }),
+      PlatformPricingConfig.getGlobal(),
     ]);
+
+    const monthStats = monthAgg[0] || { revenue: 0, hospitalShare: 0, platformFee: 0, count: 0 };
+    const effectivePlatformFee = PlatformPricingConfig.resolveHospitalPlatformFee(pricingConfig, hospital);
 
     res.json({
       success: true,
       data: {
         hospital: {
-          id:           hospital._id,
-          name:         hospital.name,
-          slug:         hospital.slug,
-          hospitalType: hospital.hospitalType,
-          isVerified:   hospital.isVerified,
-          isActive:     hospital.isActive,
-          logo:         hospital.logo,
-          address:      hospital.address,
-          contact:      hospital.contact,
-          rating:       hospital.rating,
-          onboarding:   hospital.onboarding,
+          id:              hospital._id,
+          name:            hospital.name,
+          slug:            hospital.slug,
+          hospitalType:    hospital.hospitalType,
+          isVerified:      hospital.isVerified,
+          isActive:        hospital.isActive,
+          logo:            hospital.logo,
+          address:         hospital.address,
+          contact:         hospital.contact,
+          rating:          hospital.rating,
+          onboarding:      hospital.onboarding,
+          settlementCycle: hospital.settlementCycle,
         },
         doctors: { total: doctorCount, verified: verifiedDoctors, online: onlineDoctors },
+        bookings: {
+          total:             totalBookings,
+          today:              todayBookings,
+          pending:            pendingBookings,
+          totalConsultations,
+          recent:             recentBookings,
+        },
+        revenue: {
+          thisMonth:                  monthStats.revenue,
+          hospitalShareThisMonth:     monthStats.hospitalShare,
+          platformFeeThisMonth:       monthStats.platformFee,
+          completedBookingsThisMonth: monthStats.count,
+        },
+        platformFee: effectivePlatformFee, // read-only, from PlatformPricingConfig
         unreadNotifications,
       },
     });
@@ -780,11 +909,13 @@ router.get(
 // §11  ACCOUNT SETTINGS
 // ═════════════════════════════════════════════════════════════════════════════
 
+// GET the manager's own user-account fields (name/email/phone/avatar).
 router.get('/settings/account', asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).select('name email phone avatar role isEmailVerified createdAt');
   res.json({ success: true, data: user });
 }));
 
+// PATCH the manager's own name/phone.
 router.patch('/settings/account', asyncHandler(async (req, res) => {
   const { name, phone } = req.body;
   const user = await User.findById(req.user._id);
@@ -794,6 +925,7 @@ router.patch('/settings/account', asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Account updated.', data: { name: user.name, phone: user.phone, email: user.email } });
 }));
 
+// POST replace the manager's own avatar image.
 router.post('/settings/avatar', upload.single('avatar'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded.' });
   const result = await uploadToImageKit(req.file.buffer, req.file.originalname, `/hospital-managers/${req.user._id}/avatar`);
@@ -805,6 +937,7 @@ router.post('/settings/avatar', upload.single('avatar'), asyncHandler(async (req
 // §12  IMAGEKIT AUTH ENDPOINT
 // ═════════════════════════════════════════════════════════════════════════════
 
+// GET short-lived ImageKit client-upload auth params (for direct browser → ImageKit uploads).
 router.get('/imagekit-auth', asyncHandler(async (_req, res) => {
   res.json({ success: true, data: imagekit.getAuthenticationParameters() });
 }));

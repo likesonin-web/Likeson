@@ -12,12 +12,16 @@ import {
   AlertCircle, Clock, ChevronRight, Activity, Star,
   BellRing, MapPin, Phone, Zap, ArrowUpRight, ArrowDownRight,
   CalendarDays, DollarSign, Heart, RefreshCw,
+  TrendingUp, Wallet, Receipt, Percent, ClipboardList,
 } from 'lucide-react';
 import {
   fetchDashboard,
   fetchDoctorStats,
   fetchNotifications,
   selectDashboard,
+  selectDashboardBookings,
+  selectDashboardRevenue,
+  selectDashboardPlatformFee,
   selectDoctorStats,
   selectNotifications,
   isLoading,
@@ -153,7 +157,9 @@ const StatCard = ({ icon: Icon, label, value, delta, deltaLabel, color, delay })
 };
 
 // ─── Pricing Card ────────────────────────────────────────────────────────────
-const PricingCard = ({ label, fee, honorarium, icon: PIcon, color }) => (
+// FIX: hardcoded "Honorarium:" made this unusable for revenue/platform-fee data.
+// Now takes a generic subLabel.
+const PricingCard = ({ label, fee, subLabel, icon: PIcon, color }) => (
   <div className="rounded-xl p-4 border border-[color:var(--color-base-300)] bg-[color:var(--color-base-200)] hover:border-current transition-colors duration-200">
     <div className="flex items-center gap-2 mb-2">
       <div className="w-7 h-7 rounded-lg flex items-center justify-center"
@@ -165,21 +171,24 @@ const PricingCard = ({ label, fee, honorarium, icon: PIcon, color }) => (
       </span>
     </div>
     <p className="font-black text-[color:var(--color-base-content)]" style={{ ...POPPINS, fontSize: 20 }}>
-      {fee === 0 ? 'Free' : `₹${fee}`}
+      ₹{fee ?? 0}
     </p>
     <p style={{ ...POPPINS, fontSize: 10, color: 'color-mix(in oklch, var(--color-base-content) 40%, transparent)' }} className="mt-1">
-      Honorarium: {honorarium != null ? `₹${honorarium}` : '—'}
+      {subLabel ?? '—'}
     </p>
   </div>
 );
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Overview() {
-  const dispatch    = useDispatch();
-  const dashboard   = useSelector(selectDashboard);
-  const doctorStats = useSelector(selectDoctorStats);
-  const notifications = useSelector(selectNotifications);
-  const loading     = useSelector(isLoading(fetchDashboard));
+  const dispatch        = useDispatch();
+  const dashboard       = useSelector(selectDashboard);
+  const doctorStats     = useSelector(selectDoctorStats);
+  const notifications   = useSelector(selectNotifications);
+  const bookings        = useSelector(selectDashboardBookings) ?? {};
+  const revenue         = useSelector(selectDashboardRevenue)  ?? {};
+  const dashPlatformFee = useSelector(selectDashboardPlatformFee);
+  const loading         = useSelector(isLoading(fetchDashboard));
 
   useEffect(() => {
     dispatch(fetchDashboard());
@@ -188,10 +197,12 @@ export default function Overview() {
     dispatch(fetchNotifications({ limit: 10, page: 1 }));
   }, [dispatch]);
 
-  const hospital = dashboard?.hospital;
+const hospital = dashboard?.hospital;
   const doctors  = dashboard?.doctors  ?? {};
-  const pricing  = dashboard?.pricing;
-  const cp       = pricing; // consultationPricing alias
+  // FIX: dashboard.pricing never existed on the API — /dashboard has never returned
+  // per-consultation-type fees. Every cp?.xFee reference below rendered against a
+  // field that doesn't exist. Real fee data lives on fetchDoctorPricing (per-doctor).
+  // Dashboard now sources real fields: bookings, revenue, platformFee.
 
   // ── Specialty radial data from real doctorStats ───────────────────────────
   const specialtyData = useMemo(() =>
@@ -205,16 +216,7 @@ export default function Overview() {
     [doctorStats]
   );
 
-  // ── Consultation trend: derive from consultationTypes if available ─────────
-  // Doctor stats has no time-series — show capacity breakdown instead
-  // BUG NOTE: no time-series bookings endpoint exists yet; chart is structural only.
-  // Replace with real bookings API when available.
-  const consultTypes = pricing?.consultationTypes;
-  const capacityData = useMemo(() => [
-    { label: 'In-Person',  enabled: consultTypes?.inPerson,  fee: cp?.inPersonFee  ?? 0, honorarium: cp?.inPersonHonorarium  ?? 0 },
-    { label: 'Video',      enabled: consultTypes?.video,     fee: cp?.videoFee     ?? 0, honorarium: cp?.videoHonorarium     ?? 0 },
-    { label: 'Home Visit', enabled: consultTypes?.homeVisit, fee: cp?.homeVisitFee ?? 0, honorarium: cp?.homeVisitHonorarium ?? 0 },
-  ], [cp, consultTypes]);
+ 
 
   // ── Recent activity from real notifications ───────────────────────────────
   const recentActivity = useMemo(() =>
@@ -250,13 +252,13 @@ export default function Overview() {
   const onlineDocs     = doctorStats?.online   ?? doctors.online   ?? 0;
   const unreadNotifs   = dashboard?.unreadNotifications ?? 0;
 
-  const stats = [
-    { icon: Users,      label: 'Total Doctors',   value: totalDoctors, delta: 0,  deltaLabel: 'linked to hospital',      color: 'var(--color-primary)'  },
-    { icon: BadgeCheck, label: 'Verified Doctors', value: verifiedDocs, delta: 0,  deltaLabel: 'KYC approved',            color: 'var(--color-success)'  },
-    { icon: Wifi,       label: 'Doctors Online',   value: onlineDocs,   delta: 0,  deltaLabel: 'currently active',        color: 'var(--color-accent)'   },
-    { icon: DollarSign, label: 'In-Person Fee',    value: cp?.inPersonFee != null ? `₹${cp.inPersonFee}` : '—', delta: 0, deltaLabel: 'per consultation', color: 'var(--color-warning)' },
-    { icon: Star,       label: 'Avg Rating',       value: hospital?.rating?.averageRating?.toFixed(1) ?? '—', delta: 0,  deltaLabel: `${hospital?.rating?.totalRatings ?? 0} ratings`, color: 'var(--color-chart-4)' },
-    { icon: Heart,      label: 'Unread Alerts',    value: unreadNotifs, delta: 0,  deltaLabel: 'pending notifications',   color: 'var(--color-error)'    },
+const stats = [
+    { icon: Users,        label: 'Total Doctors',    value: totalDoctors, delta: 0, deltaLabel: 'linked to hospital',      color: 'var(--color-primary)'  },
+    { icon: BadgeCheck,   label: 'Verified Doctors',  value: verifiedDocs, delta: 0, deltaLabel: 'KYC approved',            color: 'var(--color-success)'  },
+    { icon: Wifi,         label: 'Doctors Online',    value: onlineDocs,   delta: 0, deltaLabel: 'currently active',        color: 'var(--color-accent)'   },
+    { icon: CalendarDays, label: "Today's Bookings",  value: bookings.today ?? 0, delta: 0, deltaLabel: `${bookings.pending ?? 0} pending`, color: 'var(--color-warning)' },
+    { icon: TrendingUp,   label: 'Revenue (Month)',   value: `₹${revenue.thisMonth ?? 0}`, delta: 0, deltaLabel: `${revenue.completedBookingsThisMonth ?? 0} completed`, color: 'var(--color-chart-4)' },
+    { icon: Heart,        label: 'Unread Alerts',     value: unreadNotifs, delta: 0, deltaLabel: 'pending notifications',   color: 'var(--color-error)'    },
   ];
 
   // ── Specialty bar data for BarChart (cleaner than radial for small counts) -
@@ -394,48 +396,57 @@ export default function Overview() {
       {/* ── Row 2: Doctor capacity + Recent activity ──────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 mb-5">
 
-        {/* Doctor capacity by consultation type — real from pricing */}
+       {/* Recent bookings — real data from Booking collection via dashboard.bookings.recent */}
         <motion.div variants={fadeUp} custom={1} initial="hidden" whileInView="visible" viewport={{ once: true }}
           className="xl:col-span-2 rounded-xl border border-[color:var(--color-base-300)] bg-[color:var(--color-base-100)] p-5 shadow-sm">
           <SectionHeader
-            title="Consultation Fee Structure"
-            subtitle="Hospital-set pricing per type — from consultationPricing"
+            title="Recent Bookings"
+            subtitle={`${bookings.total ?? 0} total · ${bookings.totalConsultations ?? 0} consultations recorded`}
           />
-          <div className="grid grid-cols-3 gap-3 mt-2">
-            {capacityData.map((ct, i) => (
-              <div key={ct.label}
-                className={`rounded-xl p-3 border transition-colors ${ct.enabled ? 'border-[color:var(--color-base-300)] bg-[color:var(--color-base-200)]' : 'border-dashed border-[color:var(--color-base-300)] opacity-50'}`}>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span className="w-2 h-2 rounded-full" style={{ background: CHART_COLORS[i] }} />
-                  <span style={{ ...POPPINS, fontSize: 10, color: 'color-mix(in oklch, var(--color-base-content) 55%, transparent)', fontWeight: 600 }}>
-                    {ct.label}
-                  </span>
-                  {!ct.enabled && <span style={{ fontSize: 9, color: 'var(--color-warning)', fontWeight: 700 }}>OFF</span>}
-                </div>
-                <p className="font-black text-[color:var(--color-base-content)]" style={{ ...POPPINS, fontSize: 18 }}>
-                  {ct.fee === 0 ? 'Free' : `₹${ct.fee}`}
-                </p>
-                <p style={{ ...POPPINS, fontSize: 10, color: 'color-mix(in oklch, var(--color-base-content) 40%, transparent)' }} className="mt-0.5">
-                  Honorarium: {ct.honorarium ? `₹${ct.honorarium}` : '—'}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Doctor online/active summary bar */}
-          <div className="mt-5 pt-4 border-t border-[color:var(--color-base-300)] grid grid-cols-3 gap-3">
-            {[
-              { label: 'Total',    value: doctorStats?.total    ?? 0, color: 'var(--color-primary)' },
-              { label: 'Active',   value: doctorStats?.active   ?? 0, color: 'var(--color-success)' },
-              { label: 'Online',   value: doctorStats?.online   ?? 0, color: 'var(--color-accent)'  },
-            ].map(m => (
-              <div key={m.label} className="flex flex-col">
-                <span style={{ ...POPPINS, fontSize: 10, color: 'color-mix(in oklch, var(--color-base-content) 50%, transparent)' }}>{m.label}</span>
-                <span className="font-black mt-0.5" style={{ ...POPPINS, fontSize: 20, color: m.color }}>{m.value}</span>
-                <span style={{ fontSize: 10, color: 'color-mix(in oklch, var(--color-base-content) 35%, transparent)' }}>doctors</span>
-              </div>
-            ))}
-          </div>
+          {(bookings.recent ?? []).length === 0 ? (
+            <div className="flex items-center justify-center h-44 text-[color:var(--color-base-content)]/30" style={{ fontSize: 12 }}>
+              No bookings yet
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {bookings.recent.map((b, i) => {
+                const statusColor =
+                  b.status === 'completed' ? 'var(--color-success)' :
+                  b.status === 'cancelled' ? 'var(--color-error)'   :
+                  'var(--color-warning)';
+                return (
+                  <motion.div key={b._id}
+                    initial={{ opacity: 0, x: -12 }} whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }} transition={{ delay: i * 0.04 }}
+                    className="flex items-center justify-between rounded-lg p-2.5 border border-[color:var(--color-base-300)] bg-[color:var(--color-base-200)]">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'color-mix(in oklch, var(--color-primary) 15%, transparent)' }}>
+                        <ClipboardList size={13} style={{ color: 'var(--color-primary)' }} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[color:var(--color-base-content)] truncate" style={{ ...POPPINS, fontSize: 11 }}>
+                          {b.bookingCode} · {b.patientInfo?.name ?? 'Patient'}
+                        </p>
+                        <p style={{ ...POPPINS, fontSize: 10, color: 'color-mix(in oklch, var(--color-base-content) 45%, transparent)' }} className="truncate">
+                          {b.bookingType?.replace(/_/g, ' ')} {b.doctorSnapshot?.name ? `· Dr. ${b.doctorSnapshot.name}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-2">
+                      <p className="font-bold text-[color:var(--color-base-content)]" style={{ ...POPPINS, fontSize: 12 }}>
+                        ₹{b.fareBreakdown?.totalAmount ?? 0}
+                      </p>
+                      <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded-full font-semibold"
+                        style={{ fontSize: 9, color: statusColor, background: `color-mix(in oklch, ${statusColor} 12%, transparent)` }}>
+                        {b.status}
+                      </span>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
         </motion.div>
 
         {/* Recent activity — from real notifications */}
@@ -480,21 +491,34 @@ export default function Overview() {
         </motion.div>
       </div>
 
-      {/* ── Pricing Summary ───────────────────────────────────────────────── */}
+{/* ── Revenue & Platform Fee ───────────────────────────────────────── */}
       <motion.div variants={fadeUp} custom={1} initial="hidden" whileInView="visible" viewport={{ once: true }}
         className="rounded-xl border border-[color:var(--color-base-300)] bg-[color:var(--color-base-100)] p-5 shadow-sm">
-        <SectionHeader title="Full Pricing Summary" subtitle="Hospital-controlled consultation pricing" />
+        <SectionHeader title="Revenue & Platform Fee" subtitle="This month · from completed bookings" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <PricingCard label="In-Person"  fee={cp?.inPersonFee  ?? 0} honorarium={cp?.inPersonHonorarium}  icon={Users}        color="var(--color-chart-1)" />
-          <PricingCard label="Video"      fee={cp?.videoFee     ?? 0} honorarium={cp?.videoHonorarium}     icon={Activity}     color="var(--color-chart-2)" />
-          <PricingCard label="Home Visit" fee={cp?.homeVisitFee ?? 0} honorarium={cp?.homeVisitHonorarium} icon={MapPin}       color="var(--color-chart-3)" />
-          <PricingCard label="Follow-Up"  fee={cp?.followUpFee  ?? 0} honorarium={null}                    icon={CalendarDays} color="var(--color-chart-4)" />
+          <PricingCard label="Total Revenue"     fee={revenue.thisMonth ?? 0}              subLabel="gross, completed bookings" icon={DollarSign} color="var(--color-chart-1)" />
+          <PricingCard label="Hospital Share"    fee={revenue.hospitalShareThisMonth ?? 0} subLabel="after doctor honorarium"   icon={Wallet}      color="var(--color-chart-2)" />
+          <PricingCard label="Platform Fee Paid" fee={revenue.platformFeeThisMonth ?? 0}   subLabel="deducted at settlement"    icon={Receipt}     color="var(--color-chart-3)" />
+          <div className="rounded-xl p-4 border border-[color:var(--color-base-300)] bg-[color:var(--color-base-200)]">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{ background: 'color-mix(in oklch, var(--color-chart-4) 15%, transparent)' }}>
+                <Percent size={13} style={{ color: 'var(--color-chart-4)' }} />
+              </div>
+              <span className="font-semibold" style={{ ...POPPINS, fontSize: 11, color: 'color-mix(in oklch, var(--color-base-content) 60%, transparent)' }}>
+                Platform Fee Rate
+              </span>
+            </div>
+            <p className="font-black text-[color:var(--color-base-content)]" style={{ ...POPPINS, fontSize: 20 }}>
+              {dashPlatformFee
+                ? dashPlatformFee.type === 'percentage' ? `${dashPlatformFee.value}%` : `₹${dashPlatformFee.value}`
+                : '—'}
+            </p>
+            <p style={{ ...POPPINS, fontSize: 10, color: 'color-mix(in oklch, var(--color-base-content) 40%, transparent)' }} className="mt-1">
+              Set by Likeson admin · {hospital?.settlementCycle ?? 'monthly'} settlement
+            </p>
+          </div>
         </div>
-        {cp?.followUpValidDays && (
-          <p className="mt-3" style={{ ...POPPINS, fontSize: 10, color: 'color-mix(in oklch, var(--color-base-content) 40%, transparent)' }}>
-            Follow-up valid for {cp.followUpValidDays} days · {cp.followUpDiscountPercent}% discount on full fee
-          </p>
-        )}
       </motion.div>
     </div>
   );

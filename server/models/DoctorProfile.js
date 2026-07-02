@@ -79,10 +79,21 @@ const platformFeeSchema = new Schema(
   { _id: false }
 );
 
+/**
+ * doctorFeesSchema
+ * -----------------
+ * Only authoritative when the doctor's PRIMARY hospital has
+ * managementModel === 'doctor-owner'. When managementModel is
+ * 'hospital-manager', these fields are stored (a doctor may float between
+ * a doctor-owner clinic and a hospital-manager hospital in otherHospitals)
+ * but MUST be ignored by the pricing engine in favor of
+ * Hospital.consultationPricing. See resolveEffectivePricing below —
+ * that is the one and only place this rule is enforced.
+ */
 const doctorFeesSchema = new Schema(
   {
-    consultationFee:  { type: Number, default: 600, min: 0 }, // if that inperson , video , homevist not have any fee defaults use this it have use that only 
-    consultationHonorarium:  { type: Number, default: 600, min: 0 }, 
+    consultationFee:         { type: Number, default: 600, min: 0 }, // fallback when a per-type fee is unset
+    consultationHonorarium:  { type: Number, default: 600, min: 0 },
 
     // Per-type fee overrides (optional — falls back to consultationFee if unset)
     inPersonFee:   { type: Number, default: null, min: 0 },
@@ -96,6 +107,12 @@ const doctorFeesSchema = new Schema(
     followUpFee:             { type: Number, default: 0,  min: 0  },
     followUpDiscountPercent: { type: Number, default: 20, min: 0, max: 100 },
     followUpValidDays: { type: Number, default: 7, min: [1, 'Min 1'], max: [90, 'Max 90'] },
+
+    // Effective dating + versioning — mirrors Hospital.consultationPricing
+    // so both pricing sources support Problem 9 / Problem 3 symmetrically.
+    effectiveFrom:  { type: Date, default: Date.now },
+    effectiveUntil: { type: Date, default: null },
+    pricingVersion: { type: Number, default: 1, min: 1 },
   },
   { _id: false }
 );
@@ -137,6 +154,8 @@ const doctorProfileSchema = new Schema(
     },
 
     fees: { type: doctorFeesSchema, default: () => ({}) },
+    // Doctor-level platform fee override — top of the priority chain
+    // (Problem 5): Doctor override → Hospital override → Global config → Default.
     platformFee: { type: platformFeeSchema, default: null },
 
     partnershipStatus: { type: String, enum: ['Pending', 'Active', 'Inactive', 'Suspended'], default: 'Pending', index: true },
@@ -154,11 +173,11 @@ const doctorProfileSchema = new Schema(
       phone: { type: String },
       email: { type: String, lowercase: true, trim: true },
     },
-    
+
     earnings: {
-      pendingPayout: { type: Number, default: 0, min: 0 }, 
-      totalPaid: { type: Number, default: 0, min: 0 },     
-      lifetimeEarnings: { type: Number, default: 0, min: 0 }, 
+      pendingPayout: { type: Number, default: 0, min: 0 },
+      totalPaid: { type: Number, default: 0, min: 0 },
+      lifetimeEarnings: { type: Number, default: 0, min: 0 },
       lastPayoutAt: { type: Date }
     },
 
@@ -241,7 +260,7 @@ doctorProfileSchema.pre('validate', function () {
     }
   }
 
-if (this.isModified('fees') && this.fees) {
+  if (this.isModified('fees') && this.fees) {
     if (this.fees.consultationHonorarium > this.fees.consultationFee) {
       throw new Error('consultationHonorarium cannot exceed consultationFee');
     }
@@ -258,6 +277,9 @@ if (this.isModified('fees') && this.fees) {
 
     if (this.fees.followUpValidDays < 1 || this.fees.followUpValidDays > 90) throw new Error('followUpValidDays must be between 1 and 90');
     if (this.fees.followUpDiscountPercent < 0 || this.fees.followUpDiscountPercent > 100) throw new Error('followUpDiscountPercent must be between 0 and 100');
+    if (this.fees.effectiveUntil && this.fees.effectiveFrom && this.fees.effectiveUntil <= this.fees.effectiveFrom) {
+      throw new Error('fees.effectiveUntil must be after fees.effectiveFrom');
+    }
   }
 });
 
@@ -291,38 +313,122 @@ doctorProfileSchema.pre('save', function () {
 
 // ── Static Helpers ────────────────────────────────────────────────────────────
 
-doctorProfileSchema.statics.resolveEffectivePricing = async function (doctorProfileId, consultationType = 'inPerson', isFollowUp = false, followUpFee = 0, session = null) {
-  let query = this.findById(doctorProfileId).select('fees platformFee consultationTypes').lean();
-  if (session) query = query.session(session);
-  const doctor = await query;
+/**
+ * resolveEffectivePricing
+ * ------------------------
+ * THE FIX (Problem 2): this used to unconditionally return doctor pricing,
+ * never checking who actually owns pricing for this doctor's hospital.
+ * It now walks the required flow:
+ *
+ *   Booking → Doctor → Hospital → managementModel
+ *     'doctor-owner'     → Doctor.fees is the pricing source
+ *     'hospital-manager' → Hospital.consultationPricing is the pricing source
+ *
+ * This function is a resolver, not the full engine — for a real system,
+ * PricingEngine.resolve() should be the only caller of this (and of the
+ * equivalent Hospital-side resolver), and it alone is responsible for
+ * applying discounts/tax/GST/settlement math and freezing the immutable
+ * pricingSnapshot on the Booking. Kept here as a static so DoctorProfile
+ * remains a valid, correct pricing SOURCE even before the full engine
+ * lands — it must never again silently ignore the hospital.
+ *
+ * @param {ObjectId|string} doctorProfileId
+ * @param {string} consultationType - 'inPerson' | 'video' | 'homeVisit'
+ * @param {boolean} isFollowUp
+ * @param {number} followUpFeeOverride
+ * @param {ClientSession|null} session - mongoose session for transactional reads
+ * @returns {Promise<{
+ *   source: 'doctor'|'hospital',
+ *   pricingOwnerId: ObjectId,
+ *   pricingVersion: number,
+ *   fees: object,
+ *   calculated: { baseFee: number, doctorShare: number, grossHospitalShare: number },
+ *   platformFee: { type: string, value: number } | null,
+ *   platformFeeSource: 'doctor-override'|'hospital-override'|'global-config'|'unset',
+ *   note: string,
+ * }>}
+ */
+doctorProfileSchema.statics.resolveEffectivePricing = async function (
+  doctorProfileId,
+  consultationType = 'inPerson',
+  isFollowUp = false,
+  followUpFeeOverride = 0,
+  session = null
+) {
+  const Hospital = mongoose.model('Hospital');
+
+  let doctorQuery = this.findById(doctorProfileId)
+    .select('fees platformFee consultationTypes primaryHospital')
+    .lean();
+  if (session) doctorQuery = doctorQuery.session(session);
+  const doctor = await doctorQuery;
   if (!doctor) throw new Error('DoctorProfile not found');
-
-  const docFees = doctor.fees || {};
-
-  // Resolve per-type fee or fall back to base
-  const feeKey = `${consultationType}Fee`;         // e.g. inPersonFee
-  const honKey = `${consultationType}Honorarium`;  // e.g. inPersonHonorarium
-
-  let baseFee    = docFees[feeKey]    ?? docFees.consultationFee    ?? 600;
-  let doctorShare = docFees[honKey]   ?? docFees.consultationHonorarium ?? baseFee;
-  let hospitalShare = 0;
-
-  if (isFollowUp) {
-    baseFee = followUpFee || docFees.followUpFee || 0;
-    const stdFee = docFees[feeKey] ?? docFees.consultationFee ?? 1;
-    const stdHon = docFees[honKey] ?? docFees.consultationHonorarium ?? 0
-    doctorShare = Math.round(baseFee * (stdHon / stdFee));
-    hospitalShare = Math.max(0, baseFee - doctorShare);
-  } else {
-    hospitalShare = Math.max(0, baseFee - doctorShare);
+  if (!doctor.primaryHospital) {
+    throw new Error(`DoctorProfile ${doctorProfileId} has no primaryHospital — cannot resolve pricing source`);
   }
 
+  let hospitalQuery = Hospital.findById(doctor.primaryHospital)
+    .select('managementModel consultationPricing hospitalType')
+    .lean();
+  if (session) hospitalQuery = hospitalQuery.session(session);
+  const hospital = await hospitalQuery;
+  if (!hospital) throw new Error(`Primary hospital ${doctor.primaryHospital} not found for doctor ${doctorProfileId}`);
+  if (!hospital.managementModel) {
+    throw new Error(`Hospital ${hospital._id} has no managementModel set — cannot resolve pricing source`);
+  }
+
+  const feeKey = `${consultationType}Fee`;        // e.g. inPersonFee
+  const honKey = `${consultationType}Honorarium`; // e.g. inPersonHonorarium
+
+  const isHospitalManaged = hospital.managementModel === 'hospital-manager';
+  const pricingSource = isHospitalManaged ? hospital.consultationPricing : doctor.fees;
+  const source = isHospitalManaged ? 'hospital' : 'doctor';
+  const pricingOwnerId = isHospitalManaged ? hospital._id : doctor._id;
+
+  if (!pricingSource) {
+    throw new Error(`No consultationPricing/fees configured for ${source} (owner ${pricingOwnerId})`);
+  }
+
+  let baseFee = pricingSource[feeKey] ?? pricingSource.consultationFee ?? 600;
+  let doctorShare = pricingSource[honKey] ?? pricingSource.consultationHonorarium ?? baseFee;
+  let grossHospitalShare = 0;
+
+  if (isFollowUp) {
+    baseFee = followUpFeeOverride || pricingSource.followUpFee || 0;
+    const stdFee = pricingSource[feeKey] ?? pricingSource.consultationFee ?? 1;
+    const stdHon = pricingSource[honKey] ?? pricingSource.consultationHonorarium ?? 0;
+    doctorShare = Math.round(baseFee * (stdHon / stdFee));
+    grossHospitalShare = Math.max(0, baseFee - doctorShare);
+  } else {
+    grossHospitalShare = Math.max(0, baseFee - doctorShare);
+  }
+
+  // ── Platform fee priority chain (Problem 5) ──────────────────────────────
+  // Doctor override → Hospital override → (global config resolved by caller,
+  // since DoctorProfile has no business reaching into PlatformPricingConfig)
+  let platformFee = null;
+  let platformFeeSource = 'unset';
+  if (doctor.platformFee?.value != null) {
+    platformFee = doctor.platformFee;
+    platformFeeSource = 'doctor-override';
+  } else if (isHospitalManaged && hospital.consultationPricing?.platformFeeOverride?.value != null) {
+    platformFee = hospital.consultationPricing.platformFeeOverride;
+    platformFeeSource = 'hospital-override';
+  }
+  // If still null, caller (PricingEngine) must fall back to
+  // PlatformPricingConfig.getGlobal() → hospital/doctor default fee.
+
   return {
-    source: 'doctor',
-    fees: docFees,
-    calculated: { baseFee, doctorShare, hospitalShare },
-    platformFee: doctor.platformFee ?? null,
-    note: 'Fees strictly managed at the doctor profile level.',
+    source,
+    pricingOwnerId,
+    pricingVersion: pricingSource.pricingVersion ?? 1,
+    fees: pricingSource,
+    calculated: { baseFee, doctorShare, grossHospitalShare },
+    platformFee,
+    platformFeeSource,
+    note: isHospitalManaged
+      ? 'Hospital manages consultation pricing; doctor.fees ignored per managementModel.'
+      : 'Doctor owns consultation pricing (doctor-owner hospital type).',
   };
 };
 

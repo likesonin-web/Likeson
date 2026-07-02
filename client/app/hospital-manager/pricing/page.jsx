@@ -1,6 +1,6 @@
 'use client';
- 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector }          from 'react-redux';
 import { motion, AnimatePresence }           from 'framer-motion';
 import {
@@ -11,18 +11,18 @@ import {
   IndianRupee, Stethoscope, RefreshCw, Save,
   AlertTriangle, CheckCircle2, Info, Edit3,
   TrendingUp, Percent, Clock, ChevronDown,
-  Loader2, ShieldCheck, Users, SearchX,
-  UserCheck, Activity, Wifi, BadgeCheck,
+  Loader2, Users, SearchX,
   MonitorSmartphone, Home, Building2, Video,
-  ChevronRight, CircleDot,
+  ChevronRight, Landmark, ToggleLeft, ToggleRight,
 } from 'lucide-react';
 
 import {
   fetchLinkedDoctors,
-  fetchDoctorPricing,
-  updateDoctorPricing,
+  fetchHospitalPricing,
+  updateHospitalPricing,
   selectLinkedDoctors,
-  selectDoctorPricing,
+  selectHospitalPricing,
+  selectHospitalPricingPlatformFee,
   isLoading,
   getError,
 } from '@/store/slices/hospitalManagerSlice';
@@ -37,14 +37,7 @@ const fadeUp = {
   }),
 };
 
-const stagger = {
-  visible: { transition: { staggerChildren: 0.06 } },
-};
-
-const slideIn = {
-  hidden:  { opacity: 0, x: 16 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } },
-};
+const stagger = { visible: { transition: { staggerChildren: 0.06 } } };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,25 +49,22 @@ const fmt = (n) =>
 const clamp = (val, min, max) => Math.min(Math.max(Number(val) || 0, min), max);
 
 const marginPct = (fee, hon) =>
-  fee > 0 ? ((1 - hon / fee) * 100).toFixed(1) : '0.0';
+  fee > 0 ? ((1 - (hon ?? 0) / fee) * 100).toFixed(1) : '0.0';
 
-const avatarInitials = (name = '') =>
-  name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+const fmtPlatformFee = (pf) => {
+  if (!pf?.value) return '—';
+  return pf.type === 'percentage' ? `${pf.value}%` : fmt(pf.value);
+};
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
-/**
- * KpiCard — stat-card pattern from global.css
- */
 function KpiCard({ icon: Icon, label, value, sub, accentVar, index = 0 }) {
   return (
     <motion.div variants={fadeUp} custom={index} className="card p-5 flex flex-col gap-3">
       <div className="flex items-start justify-between">
         <span
           className="flex h-10 w-10 items-center justify-center rounded-[var(--r-field)]"
-          style={{
-            background: `color-mix(in srgb, ${accentVar}, transparent 85%)`,
-          }}
+          style={{ background: `color-mix(in srgb, ${accentVar}, transparent 85%)` }}
         >
           <Icon size={17} style={{ color: accentVar }} />
         </span>
@@ -86,17 +76,12 @@ function KpiCard({ icon: Icon, label, value, sub, accentVar, index = 0 }) {
         <p className="font-montserrat text-[1.6rem] font-black text-base-content leading-none">
           {value}
         </p>
-        {sub && (
-          <p className="mt-1 text-[10px] text-base-content/50">{sub}</p>
-        )}
+        {sub && <p className="mt-1 text-[10px] text-base-content/50">{sub}</p>}
       </div>
     </motion.div>
   );
 }
 
-/**
- * SectionTitle — icon + heading + optional description
- */
 function SectionTitle({ icon: Icon, title, desc }) {
   return (
     <div className="flex items-start gap-3 mb-5">
@@ -107,17 +92,12 @@ function SectionTitle({ icon: Icon, title, desc }) {
         <h3 className="font-montserrat text-sm font-bold text-base-content leading-snug">
           {title}
         </h3>
-        {desc && (
-          <p className="text-[10px] text-base-content/50 mt-0.5 leading-relaxed">{desc}</p>
-        )}
+        {desc && <p className="text-[10px] text-base-content/50 mt-0.5 leading-relaxed">{desc}</p>}
       </div>
     </div>
   );
 }
 
-/**
- * RupeeInput — styled number input with ₹ prefix
- */
 function RupeeInput({ label, value, onChange, min = 0, max = 99999, disabled = false, helper, error }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -143,7 +123,7 @@ function RupeeInput({ label, value, onChange, min = 0, max = 99999, disabled = f
           max={max}
           value={value ?? ''}
           disabled={disabled}
-          onChange={(e) => onChange(clamp(e.target.value, min, max))}
+          onChange={(e) => onChange(e.target.value === '' ? null : clamp(e.target.value, min, max))}
           className="flex-1 h-10 bg-transparent px-3 text-xs font-semibold text-base-content outline-none
                      [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none
                      [&::-webkit-outer-spin-button]:appearance-none"
@@ -155,9 +135,6 @@ function RupeeInput({ label, value, onChange, min = 0, max = 99999, disabled = f
   );
 }
 
-/**
- * PercentInput — % field
- */
 function PercentInput({ label, value, onChange, min = 0, max = 100, error }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -191,9 +168,6 @@ function PercentInput({ label, value, onChange, min = 0, max = 100, error }) {
   );
 }
 
-/**
- * DaysInput — number field for days
- */
 function DaysInput({ label, value, onChange, error }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -227,9 +201,6 @@ function DaysInput({ label, value, onChange, error }) {
   );
 }
 
-/**
- * ChartTooltip
- */
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
@@ -248,116 +219,67 @@ function ChartTooltip({ active, payload, label }) {
   );
 }
 
-/**
- * DoctorCard — sidebar list item
- */
-function DoctorCard({ doctor, isSelected, onClick }) {
-  const name        = doctor.user?.name ?? 'Doctor';
-  const spec        = doctor.specialization ?? '—';
-  const isVerified  = doctor.isVerified;
-  const isActive    = doctor.isActive;
-  const isOnline    = doctor.isOnline;
-
-  return (
-    <button
-      onClick={onClick}
-      className={[
-        'w-full text-left flex items-center gap-3 px-4 py-3 border-b border-base-300/50',
-        'transition-colors duration-150 focus-visible:outline-none',
-        isSelected
-          ? 'bg-primary/10 border-r-[3px] border-r-primary'
-          : 'hover:bg-primary/5',
-      ].join(' ')}
-    >
-      {/* avatar */}
-      <div className="relative shrink-0">
-        {doctor.profilePhotoUrl ? (
-          <img
-            src={doctor.profilePhotoUrl}
-            alt={name}
-            className="h-10 w-10 rounded-full object-cover"
-          />
-        ) : (
-          <div className="h-10 w-10 rounded-full flex items-center justify-center
-                          font-bold text-sm text-primary-content"
-               style={{ background: 'linear-gradient(135deg, var(--primary), var(--secondary))' }}>
-            {avatarInitials(name)}
-          </div>
-        )}
-        {isOnline && (
-          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-success
-                           border-2 border-base-100" />
-        )}
-      </div>
-
-      {/* info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span className="text-sm font-semibold text-base-content truncate">
-            Dr. {name}
-          </span>
-          {isVerified && (
-            <BadgeCheck size={12} className="text-success shrink-0" />
-          )}
-        </div>
-        <p className="text-[11px] text-base-content/50 truncate">{spec}</p>
-      </div>
-
-      {/* active dot */}
-      <span
-        className={[
-          'h-2 w-2 rounded-full shrink-0',
-          isActive ? 'bg-success' : 'bg-base-300',
-        ].join(' ')}
-      />
-    </button>
-  );
-}
-
-// ─── per-type fee row ─────────────────────────────────────────────────────────
+// ─── per-type fee row (fee + honorarium + enabled toggle) ────────────────────
 
 const CONSULTATION_TYPES = [
-  { key: 'inPerson',  label: 'In-Person',   Icon: Building2 },
-  { key: 'video',     label: 'Video',        Icon: Video },
-  { key: 'homeVisit', label: 'Home Visit',   Icon: Home },
+  { key: 'inPerson',  label: 'In-Person',  Icon: Building2 },
+  { key: 'video',     label: 'Video',      Icon: Video },
+  { key: 'homeVisit', label: 'Home Visit', Icon: Home },
 ];
 
 function PerTypeRow({ typeKey, label, Icon, form, set, errors }) {
-  const feeKey = `${typeKey}Fee`;
-  const honKey = `${typeKey}Honorarium`;
+  const feeKey     = `${typeKey}Fee`;
+  const honKey     = `${typeKey}Honorarium`;
+  const enabledKey = typeKey; // consultationTypes[typeKey]
 
-  const fee = form[feeKey];
-  const hon = form[honKey];
+  const fee     = form[feeKey];
+  const hon     = form[honKey];
+  const enabled = form.consultationTypes?.[enabledKey] ?? false;
 
   const margin = fee != null && hon != null ? Math.max(0, fee - hon) : null;
 
   return (
-    <div className="rounded-[var(--r-field)] border border-base-300 bg-base-200/40 p-4">
+    <div className={[
+      'rounded-[var(--r-field)] border p-4 transition-opacity',
+      enabled ? 'border-base-300 bg-base-200/40' : 'border-base-300 bg-base-200/20 opacity-60',
+    ].join(' ')}>
       <div className="flex items-center gap-2 mb-4">
         <span className="flex h-7 w-7 items-center justify-center rounded-[var(--r-field)] bg-secondary/10">
           <Icon size={13} className="text-secondary" />
         </span>
         <span className="text-xs font-bold text-base-content">{label}</span>
-        <span className="text-[10px] text-base-content/40 ml-auto">
-          Optional — defaults to Standard Pricing
-        </span>
+
+        <button
+          type="button"
+          onClick={() => set('consultationTypes', { ...form.consultationTypes, [enabledKey]: !enabled })}
+          className="ml-auto flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider"
+        >
+          {enabled
+            ? <ToggleRight size={22} className="text-success" />
+            : <ToggleLeft size={22} className="text-base-content/30" />}
+          <span className={enabled ? 'text-success' : 'text-base-content/40'}>
+            {enabled ? 'Offered' : 'Not Offered'}
+          </span>
+        </button>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <RupeeInput
-          label="Total Patient Fee"
-          value={fee ?? ''}
-          onChange={(v) => set(feeKey, v === '' ? null : v)}
+          label="Patient Fee"
+          value={fee}
+          onChange={(v) => set(feeKey, v)}
           min={0}
-          helper="Leave empty to use Standard Pricing"
+          disabled={!enabled}
+          helper="Required if this visit type is offered"
           error={errors[feeKey]}
         />
         <RupeeInput
-          label="Doctor's Payout"
-          value={hon ?? ''}
-          onChange={(v) => set(honKey, v === '' ? null : v)}
+          label="Doctor's Payout (Honorarium)"
+          value={hon}
+          onChange={(v) => set(honKey, v)}
           min={0}
-          helper="Cannot be more than the Patient Fee"
+          disabled={!enabled}
+          helper="Cannot exceed the Patient Fee"
           error={errors[honKey]}
         />
       </div>
@@ -376,52 +298,34 @@ function PerTypeRow({ typeKey, label, Icon, form, set, errors }) {
   );
 }
 
-// ─── empty pane ───────────────────────────────────────────────────────────────
-
-function EmptyPane() {
-  return (
-    <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/8">
-        <Stethoscope size={28} className="text-primary/60" />
-      </div>
-      <div className="text-center">
-        <h3 className="font-montserrat font-bold text-base text-base-content mb-1">
-          Select a Doctor
-        </h3>
-        <p className="text-xs text-base-content/50 max-w-xs leading-relaxed">
-          Choose a doctor from the list on the left to set up their consultation fees and payout rules.
-        </p>
-      </div>
-    </div>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
+// Note: pricing here is HOSPITAL-WIDE, not per-doctor. Hospital.consultationPricing
+// is the single source of truth and applies uniformly to every doctor linked to
+// this hospital (managementModel === 'hospital-manager'). There is no per-doctor
+// fee override for this hospital type — the linked-doctor list below is shown
+// purely as an informational "this pricing applies to N doctors" reference.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function Pricing() {
   const dispatch = useDispatch();
 
   // ── redux ──────────────────────────────────────────────────────────────────
-  const doctors        = useSelector(selectLinkedDoctors);
-  const pricingData    = useSelector(selectDoctorPricing);
-  const loadingDocs    = useSelector(isLoading(fetchLinkedDoctors));
-  const loadingPricing = useSelector(isLoading(fetchDoctorPricing));
-  const saving         = useSelector(isLoading(updateDoctorPricing));
-  const error          = useSelector(getError(fetchDoctorPricing));
+  const doctors      = useSelector(selectLinkedDoctors);
+  const pricingData  = useSelector(selectHospitalPricing); // { consultationPricing, platformFee, settlementCycle, note }
+  const platformFee  = useSelector(selectHospitalPricingPlatformFee); // { type: 'fixed'|'percentage', value } — read-only, set by Likeson admin
+  const loadingDocs  = useSelector(isLoading(fetchLinkedDoctors));
+  const loadingPrice = useSelector(isLoading(fetchHospitalPricing));
+  const saving       = useSelector(isLoading(updateHospitalPricing));
+  const error        = useSelector(getError(fetchHospitalPricing));
 
   // ── local state ────────────────────────────────────────────────────────────
-  const [selectedId,      setSelectedId]      = useState('');
-  const [search,          setSearch]          = useState('');
-  const [dirty,           setDirty]           = useState(false);
-  const [saved,           setSaved]           = useState(false);
-  const [validationErrs,  setValidationErrs]  = useState({});
-  const [showChart,       setShowChart]       = useState(true);
+  const [dirty,          setDirty]          = useState(false);
+  const [saved,          setSaved]          = useState(false);
+  const [validationErrs, setValidationErrs] = useState({});
+  const [showChart,      setShowChart]      = useState(true);
 
   const EMPTY_FORM = {
-    consultationFee:         600,
-    consultationHonorarium:  400,
     inPersonFee:             null,
     inPersonHonorarium:      null,
     videoFee:                null,
@@ -431,64 +335,41 @@ export default function Pricing() {
     followUpFee:             0,
     followUpDiscountPercent: 20,
     followUpValidDays:       7,
+    consultationTypes: { inPerson: true, video: false, homeVisit: false },
   };
 
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const selectedDoctor = useMemo(
-    () => doctors?.find(d => d._id === selectedId) ?? null,
-    [doctors, selectedId]
-  );
-
-  const filteredDoctors = useMemo(() => {
-    if (!search.trim()) return doctors ?? [];
-    const q = search.toLowerCase();
-    return (doctors ?? []).filter(
-      d =>
-        d.user?.name?.toLowerCase().includes(q) ||
-        d.specialization?.toLowerCase().includes(q)
-    );
-  }, [doctors, search]);
+  const hydrateForm = useCallback((cp) => ({
+    inPersonFee:             cp?.inPersonFee             ?? null,
+    inPersonHonorarium:      cp?.inPersonHonorarium      ?? null,
+    videoFee:                cp?.videoFee                ?? null,
+    videoHonorarium:         cp?.videoHonorarium         ?? null,
+    homeVisitFee:            cp?.homeVisitFee            ?? null,
+    homeVisitHonorarium:     cp?.homeVisitHonorarium     ?? null,
+    followUpFee:             cp?.followUpFee             ?? 0,
+    followUpDiscountPercent: cp?.followUpDiscountPercent ?? 20,
+    followUpValidDays:       cp?.followUpValidDays       ?? 7,
+    consultationTypes: {
+      inPerson:  cp?.consultationTypes?.inPerson  ?? true,
+      video:     cp?.consultationTypes?.video     ?? false,
+      homeVisit: cp?.consultationTypes?.homeVisit ?? false,
+    },
+  }), []);
 
   // ── effects ────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     dispatch(fetchLinkedDoctors({ limit: 200 }));
+    dispatch(fetchHospitalPricing());
   }, [dispatch]);
 
   useEffect(() => {
-    if (doctors?.length && !selectedId) {
-      setSelectedId(doctors[0]._id);
-    }
-  }, [doctors, selectedId]);
-
-  useEffect(() => {
-    if (selectedId) {
-      dispatch(fetchDoctorPricing(selectedId));
-      setDirty(false);
-      setSaved(false);
-      setValidationErrs({});
-    }
-  }, [dispatch, selectedId]);
-
-  useEffect(() => {
-    if (pricingData && selectedId) {
-      setForm({
-        consultationFee:         pricingData.consultationFee         ?? 600,
-        consultationHonorarium:  pricingData.consultationHonorarium  ?? 400,
-        inPersonFee:             pricingData.inPersonFee             ?? null,
-        inPersonHonorarium:      pricingData.inPersonHonorarium      ?? null,
-        videoFee:                pricingData.videoFee                ?? null,
-        videoHonorarium:         pricingData.videoHonorarium         ?? null,
-        homeVisitFee:            pricingData.homeVisitFee            ?? null,
-        homeVisitHonorarium:     pricingData.homeVisitHonorarium     ?? null,
-        followUpFee:             pricingData.followUpFee             ?? 0,
-        followUpDiscountPercent: pricingData.followUpDiscountPercent ?? 20,
-        followUpValidDays:       pricingData.followUpValidDays       ?? 7,
-      });
+    if (pricingData?.consultationPricing) {
+      setForm(hydrateForm(pricingData.consultationPricing));
       setDirty(false);
     }
-  }, [pricingData, selectedId]);
+  }, [pricingData, hydrateForm]);
 
   // ── field helpers ──────────────────────────────────────────────────────────
 
@@ -499,29 +380,28 @@ export default function Pricing() {
     setValidationErrs(e => { const n = { ...e }; delete n[key]; return n; });
   }, []);
 
-  // ── validation ─────────────────────────────────────────────────────────────
+  // ── validation (mirrors Hospital model pre-validate) ─────────────────────────
 
   const validate = () => {
     const errs = {};
+    CONSULTATION_TYPES.forEach(({ key }) => {
+      const enabled = form.consultationTypes?.[key];
+      const fee = form[`${key}Fee`];
+      const hon = form[`${key}Honorarium`];
 
-    if (form.consultationHonorarium > form.consultationFee) {
-      errs.consultationHonorarium = 'Cannot exceed the patient fee';
-    }
+      if (enabled && (fee == null || fee <= 0)) {
+        errs[`${key}Fee`] = 'Required when this visit type is offered';
+      }
+      if (fee != null && hon != null && hon > fee) {
+        errs[`${key}Honorarium`] = `Cannot exceed ${key} patient fee`;
+      }
+    });
     if (form.followUpValidDays < 1 || form.followUpValidDays > 90) {
       errs.followUpValidDays = 'Must be between 1 and 90 days';
     }
     if (form.followUpDiscountPercent < 0 || form.followUpDiscountPercent > 100) {
       errs.followUpDiscountPercent = 'Must be between 0% and 100%';
     }
-
-    CONSULTATION_TYPES.forEach(({ key }) => {
-      const fee = form[`${key}Fee`];
-      const hon = form[`${key}Honorarium`];
-      if (fee != null && hon != null && hon > fee) {
-        errs[`${key}Honorarium`] = `Cannot exceed ${key} patient fee`;
-      }
-    });
-
     return errs;
   };
 
@@ -531,10 +411,7 @@ export default function Pricing() {
     const errs = validate();
     if (Object.keys(errs).length) { setValidationErrs(errs); return; }
 
-    const result = await dispatch(updateDoctorPricing({
-      doctorProfileId: selectedId,
-      payload: form,
-    }));
+    const result = await dispatch(updateHospitalPricing(form));
 
     if (!result.error) {
       setSaved(true);
@@ -544,20 +421,8 @@ export default function Pricing() {
   };
 
   const handleReset = () => {
-    if (pricingData) {
-      setForm({
-        consultationFee:         pricingData.consultationFee         ?? 600,
-        consultationHonorarium:  pricingData.consultationHonorarium  ?? 400,
-        inPersonFee:             pricingData.inPersonFee             ?? null,
-        inPersonHonorarium:      pricingData.inPersonHonorarium      ?? null,
-        videoFee:                pricingData.videoFee                ?? null,
-        videoHonorarium:         pricingData.videoHonorarium         ?? null,
-        homeVisitFee:            pricingData.homeVisitFee            ?? null,
-        homeVisitHonorarium:     pricingData.homeVisitHonorarium     ?? null,
-        followUpFee:             pricingData.followUpFee             ?? 0,
-        followUpDiscountPercent: pricingData.followUpDiscountPercent ?? 20,
-        followUpValidDays:       pricingData.followUpValidDays       ?? 7,
-      });
+    if (pricingData?.consultationPricing) {
+      setForm(hydrateForm(pricingData.consultationPricing));
       setDirty(false);
       setValidationErrs({});
     }
@@ -566,10 +431,7 @@ export default function Pricing() {
   // ── chart data ─────────────────────────────────────────────────────────────
 
   const chartData = useMemo(() => {
-    const margin = Math.max(0, form.consultationFee - form.consultationHonorarium);
-    const rows = [
-      { name: 'Standard Pricing', 'Patient Fee': form.consultationFee, "Doctor's Payout": form.consultationHonorarium, "Hospital Profit": margin },
-    ];
+    const rows = [];
     CONSULTATION_TYPES.forEach(({ key, label }) => {
       const fee = form[`${key}Fee`];
       const hon = form[`${key}Honorarium`];
@@ -578,52 +440,28 @@ export default function Pricing() {
           name: label,
           'Patient Fee': fee,
           "Doctor's Payout": hon ?? 0,
-          "Hospital Profit": Math.max(0, fee - (hon ?? 0)),
+          'Hospital Profit': Math.max(0, fee - (hon ?? 0)),
         });
       }
     });
     return rows;
   }, [form]);
 
-  // ── doctor stats bar ───────────────────────────────────────────────────────
-
-  const docStats = selectedDoctor
-    ? [
-        { id: 'activity',    icon: Activity,    val: selectedDoctor.isActive   ? 'Active'   : 'Inactive', ok: selectedDoctor.isActive },
-        { id: 'connection',  icon: Wifi,        val: selectedDoctor.isOnline   ? 'Online'   : 'Offline',  ok: selectedDoctor.isOnline },
-        { id: 'verification',icon: ShieldCheck, val: selectedDoctor.isVerified ? 'Verified' : 'Pending',  ok: selectedDoctor.isVerified },
-        { id: 'partnership', icon: UserCheck,   val: selectedDoctor.partnershipStatus ?? '—',             ok: selectedDoctor.partnershipStatus === 'Active' },
-      ]
-    : [];
+  const primaryFee = form.inPersonFee ?? form.videoFee ?? form.homeVisitFee ?? 0;
+  const primaryHon = form.inPersonHonorarium ?? form.videoHonorarium ?? form.homeVisitHonorarium ?? 0;
 
   // ─────────────────────────────────────────────────────────────────────────
-  // RENDER STATES
+  // RENDER
   // ─────────────────────────────────────────────────────────────────────────
 
-  if (loadingDocs) {
+  if (loadingDocs || loadingPrice) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <Loader2 size={30} className="text-primary animate-spin" />
-        <p className="text-xs text-base-content/50 font-medium">Loading doctors…</p>
+        <p className="text-xs text-base-content/50 font-medium">Loading pricing…</p>
       </div>
     );
   }
-
-  if (!doctors?.length) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-        <SearchX size={44} className="text-base-300" />
-        <h3 className="font-montserrat font-bold text-lg text-base-content">No Doctors Linked</h3>
-        <p className="text-xs text-base-content/55 text-center max-w-xs leading-relaxed">
-          Link doctors to your hospital first before configuring consultation pricing.
-        </p>
-      </div>
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // MAIN RENDER
-  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <motion.div
@@ -632,463 +470,335 @@ export default function Pricing() {
       animate="visible"
       variants={stagger}
     >
-
       {/* ══════════════════════════════════════════════════════════════════════
-          SIDEBAR — doctor list
+          SIDEBAR — informational only: linked doctors this pricing applies to
       ═════════════════════════════════════════════════════════════════════ */}
       <motion.aside
         variants={fadeUp}
         className="w-72 shrink-0 flex flex-col bg-base-100 border-r border-base-300
                    overflow-hidden xl:w-80"
       >
-        {/* header */}
         <div className="px-4 pt-4 pb-3 border-b border-base-300 shrink-0">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-1">
             <Users size={14} className="text-primary" />
             <span className="font-montserrat font-black text-sm text-base-content">
               Linked Doctors
             </span>
             <span className="badge badge-primary badge-xs ml-auto">
-              {doctors.length}
+              {doctors?.length ?? 0}
             </span>
           </div>
-          {/* search */}
-          <div className="relative">
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search by name or specialty…"
-              className="input-field text-xs py-2 pr-3 pl-8 h-9"
-            />
-            <Users size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-base-content/35 pointer-events-none" />
-          </div>
+          <p className="text-[10px] text-base-content/45 leading-relaxed">
+            Note: pricing below is hospital-wide and applies to every doctor
+            listed here. There is no per-doctor pricing for this hospital type.
+          </p>
         </div>
 
-        {/* list */}
         <div className="flex-1 overflow-y-auto scrollbar-thin">
-          {filteredDoctors.length === 0 ? (
+          {!doctors?.length ? (
             <div className="flex flex-col items-center justify-center py-12 gap-2">
               <SearchX size={28} className="text-base-300" />
-              <p className="text-xs text-base-content/45">No doctors match</p>
+              <p className="text-xs text-base-content/45">No doctors linked yet</p>
             </div>
           ) : (
-            filteredDoctors.map(doctor => (
-              <DoctorCard
+            doctors.map(doctor => (
+              <div
                 key={doctor._id}
-                doctor={doctor}
-                isSelected={selectedId === doctor._id}
-                onClick={() => setSelectedId(doctor._id)}
-              />
+                className="flex items-center gap-3 px-4 py-3 border-b border-base-300/50"
+              >
+                <div className="h-9 w-9 rounded-full flex items-center justify-center shrink-0
+                                font-bold text-xs text-primary-content"
+                     style={{ background: 'linear-gradient(135deg, var(--primary), var(--secondary))' }}>
+                  {(doctor.user?.name ?? '').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-base-content truncate">
+                    Dr. {doctor.user?.name ?? '—'}
+                  </p>
+                  <p className="text-[11px] text-base-content/50 truncate">
+                    {doctor.specialization ?? '—'}
+                  </p>
+                </div>
+              </div>
             ))
           )}
         </div>
       </motion.aside>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          DETAIL PANE
+          DETAIL PANE — hospital-wide pricing form
       ═════════════════════════════════════════════════════════════════════ */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
-        {!selectedId ? (
-          <EmptyPane />
-        ) : (
-          <>
-            {/* ── top bar ────────────────────────────────────────────────────── */}
-            <div className="flex items-center justify-between gap-4 px-6 py-3.5 bg-base-100
-                            border-b border-base-300 shrink-0">
-              {/* doctor identity */}
-              <div className="flex items-center gap-3 min-w-0">
-                {selectedDoctor?.profilePhotoUrl ? (
-                  <img
-                    src={selectedDoctor.profilePhotoUrl}
-                    alt=""
-                    className="h-9 w-9 rounded-full object-cover shrink-0"
-                  />
-                ) : (
-                  <div className="h-9 w-9 rounded-full flex items-center justify-center shrink-0
-                                  font-bold text-xs text-primary-content"
-                       style={{ background: 'linear-gradient(135deg, var(--primary), var(--secondary))' }}>
-                    {avatarInitials(selectedDoctor?.user?.name ?? '')}
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <p className="font-montserrat font-black text-sm text-base-content truncate">
-                    Dr. {selectedDoctor?.user?.name ?? '—'}
-                  </p>
-                  <p className="text-[10px] text-base-content/50 truncate">
-                    {selectedDoctor?.specialization ?? '—'} ·{' '}
-                    {selectedDoctor?.experienceYears ?? 0} yrs exp
-                  </p>
-                </div>
-
-                {/* status chips */}
-                <div className="hidden md:flex items-center gap-2 ml-2">
-                  {docStats.map(({ id, icon: Icon, val, ok }) => (
-                    <span
-                      key={id}
-                      className={ok ? 'badge badge-success badge-xs' : 'badge badge-xs'}
-                      style={!ok ? { background: 'var(--base-300)', color: 'var(--base-content)', borderColor: 'var(--base-300)' } : {}}
-                    >
-                      <Icon size={9} />
-                      {val}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* action buttons */}
-              <div className="flex items-center gap-2 shrink-0">
-                <AnimatePresence>
-                  {saved && !dirty && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--r-field)]
-                                 bg-success/10 border border-success/30"
-                    >
-                      <CheckCircle2 size={12} className="text-success" />
-                      <span className="text-[10px] font-semibold text-success">Saved</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <AnimatePresence>
-                  {dirty && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.92 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="flex items-center gap-2"
-                    >
-                      <button
-                        onClick={handleReset}
-                        className="btn btn-sm btn-ghost text-xs"
-                      >
-                        <RefreshCw size={12} />
-                        Reset
-                      </button>
-                      <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="btn btn-sm btn-primary text-xs"
-                      >
-                        {saving
-                          ? <Loader2 size={12} className="animate-spin" />
-                          : <Save size={12} />}
-                        {saving ? 'Saving…' : 'Save Changes'}
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+        {/* ── top bar ────────────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between gap-4 px-6 py-3.5 bg-base-100
+                        border-b border-base-300 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-full flex items-center justify-center shrink-0 bg-primary/10">
+              <Stethoscope size={16} className="text-primary" />
             </div>
+            <div className="min-w-0">
+              <p className="font-montserrat font-black text-sm text-base-content truncate">
+                Hospital Consultation Pricing
+              </p>
+              <p className="text-[10px] text-base-content/50 truncate">
+                Applies to all {doctors?.length ?? 0} linked doctor(s)
+              </p>
+            </div>
+          </div>
 
-            {/* ── dirty warning stripe ────────────────────────────────────── */}
+          <div className="flex items-center gap-2 shrink-0">
             <AnimatePresence>
-              {dirty && (
+              {saved && !dirty && (
                 <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="bg-warning/10 border-b border-warning/30 overflow-hidden shrink-0"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--r-field)]
+                             bg-success/10 border border-success/30"
                 >
-                  <div className="flex items-center gap-2 px-6 py-2">
-                    <AlertTriangle size={12} className="text-warning" />
-                    <span className="text-[10px] font-semibold text-warning">
-                      You have unsaved changes
-                    </span>
-                  </div>
+                  <CheckCircle2 size={12} className="text-success" />
+                  <span className="text-[10px] font-semibold text-success">Saved</span>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* ── scrollable content ─────────────────────────────────────── */}
-            <div className="flex-1 overflow-y-auto scrollbar-thin">
-              {loadingPricing ? (
-                <div className="flex flex-col items-center justify-center h-48 gap-3">
-                  <Loader2 size={22} className="text-primary animate-spin" />
-                  <p className="text-xs text-base-content/45">Loading fee structure…</p>
-                </div>
-              ) : error ? (
-                <div className="m-6 flex flex-col items-center gap-3 rounded-[var(--r-box)]
-                                border border-error/20 bg-error/5 py-12">
-                  <AlertTriangle size={22} className="text-error" />
-                  <p className="text-xs text-error font-medium text-center">{error}</p>
-                </div>
-              ) : (
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={selectedId}
-                    initial="hidden"
-                    animate="visible"
-                    variants={stagger}
-                    className="p-6 space-y-6 pb-24"
+            <AnimatePresence>
+              {dirty && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.92 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-2"
+                >
+                  <button onClick={handleReset} className="btn btn-sm btn-ghost text-xs">
+                    <RefreshCw size={12} />
+                    Reset
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="btn btn-sm btn-primary text-xs"
                   >
+                    {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                    {saving ? 'Saving…' : 'Save Changes'}
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
 
-                    {/* ── info notice ─────────────────────────────────── */}
-                    <motion.div variants={fadeUp} className="alert alert-info rounded-[var(--r-box)] border-none">
-                      <Info size={16} className="text-info shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-bold text-base-content">How Pricing Works</p>
-                        <p className="text-xs text-base-content/70 mt-1 leading-relaxed">
-                          The <strong>Standard Pricing</strong> acts as your baseline rate. You can set custom rates for specific visit types like Video or Home Visits below. If you leave a custom visit type blank, the system will automatically charge the standard pricing.
-                        </p>
-                      </div>
-                    </motion.div>
+        {/* ── dirty warning stripe ────────────────────────────────────── */}
+        <AnimatePresence>
+          {dirty && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-warning/10 border-b border-warning/30 overflow-hidden shrink-0"
+            >
+              <div className="flex items-center gap-2 px-6 py-2">
+                <AlertTriangle size={12} className="text-warning" />
+                <span className="text-[10px] font-semibold text-warning">
+                  You have unsaved changes — this updates pricing for every linked doctor
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-                    {/* ── KPI bar ─────────────────────────────────────── */}
-                    <motion.div
-                      variants={stagger}
-                      className="grid grid-cols-2 lg:grid-cols-4 gap-4"
-                    >
-                      <KpiCard
-                        icon={IndianRupee}
-                        label="Patient Pays"
-                        value={fmt(form.consultationFee)}
-                        sub="Standard total fee charged"
-                        accentVar="var(--primary)"
-                        index={0}
-                      />
-                      <KpiCard
-                        icon={Stethoscope}
-                        label="Doctor Earns"
-                        value={fmt(form.consultationHonorarium)}
-                        sub="Standard payout to doctor"
-                        accentVar="var(--secondary)"
-                        index={1}
-                      />
-                      <KpiCard
-                        icon={TrendingUp}
-                        label="Hospital Margin"
-                        value={fmt(Math.max(0, form.consultationFee - form.consultationHonorarium))}
-                        sub={`${marginPct(form.consultationFee, form.consultationHonorarium)}% standard profit`}
-                        accentVar="var(--success)"
-                        index={2}
-                      />
-                      <KpiCard
-                        icon={RefreshCw}
-                        label="Follow-Up"
-                        value={form.followUpFee === 0 ? 'Free' : fmt(form.followUpFee)}
-                        sub={`Valid for ${form.followUpValidDays} days`}
-                        accentVar="var(--accent)"
-                        index={3}
-                      />
-                    </motion.div>
+        {/* ── scrollable content ─────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto scrollbar-thin">
+          {error ? (
+            <div className="m-6 flex flex-col items-center gap-3 rounded-[var(--r-box)]
+                            border border-error/20 bg-error/5 py-12">
+              <AlertTriangle size={22} className="text-error" />
+              <p className="text-xs text-error font-medium text-center">{error}</p>
+            </div>
+          ) : (
+            <motion.div initial="hidden" animate="visible" variants={stagger} className="p-6 space-y-6 pb-24">
 
-                    {/* ── two-column grid ──────────────────────────────── */}
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {/* ── info notice ─────────────────────────────────── */}
+              <motion.div variants={fadeUp} className="alert alert-info rounded-[var(--r-box)] border-none">
+                <Info size={16} className="text-info shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-base-content">How Pricing Works Here</p>
+                  <p className="text-xs text-base-content/70 mt-1 leading-relaxed">
+                    This hospital manages pricing centrally — one set of fees applies to
+                    <strong> every doctor linked to this hospital</strong>. There is no
+                    per-doctor override. Toggle a visit type "Offered" and set its Patient
+                    Fee and Doctor's Payout below.
+                  </p>
+                  <p className="text-[10px] text-base-content/50 mt-2 flex items-center gap-1.5">
+                    <Landmark size={11} className="text-base-content/40 shrink-0" />
+                    Note: Likeson platform fee ({fmtPlatformFee(platformFee)}) is deducted
+                    separately from the hospital's share at settlement — read-only, set by
+                    Likeson admin, does not affect the doctor's payout above.
+                  </p>
+                </div>
+              </motion.div>
 
-                      {/* LEFT column */}
-                      <div className="space-y-6">
+              {/* ── KPI bar ─────────────────────────────────────── */}
+              <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <KpiCard
+                  icon={IndianRupee}
+                  label="Primary Visit Fee"
+                  value={fmt(primaryFee)}
+                  sub="First enabled visit type"
+                  accentVar="var(--primary)"
+                  index={0}
+                />
+                <KpiCard
+                  icon={Stethoscope}
+                  label="Doctor Payout"
+                  value={fmt(primaryHon)}
+                  sub="Honorarium, same visit type"
+                  accentVar="var(--secondary)"
+                  index={1}
+                />
+                <KpiCard
+                  icon={RefreshCw}
+                  label="Follow-Up"
+                  value={form.followUpFee === 0 ? 'Free' : fmt(form.followUpFee)}
+                  sub={`Valid for ${form.followUpValidDays} days`}
+                  accentVar="var(--accent)"
+                  index={2}
+                />
+                <KpiCard
+                  icon={Landmark}
+                  label="Platform Fee"
+                  value={fmtPlatformFee(platformFee)}
+                  sub="Set by Likeson · read-only"
+                  accentVar="var(--warning)"
+                  index={3}
+                />
+              </motion.div>
 
-                        {/* unified fee editor */}
-                        <motion.div variants={fadeUp} className="card p-6 border border-base-300">
-                          <SectionTitle
-                            icon={Edit3}
-                            title="Standard Pricing"
-                            desc="The default base cost charged to patients and the standard payout to the doctor."
-                          />
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
-                          <div className="grid grid-cols-2 gap-4 mb-4">
-                            <RupeeInput
-                              label="Total Patient Fee"
-                              value={form.consultationFee}
-                              onChange={v => set('consultationFee', v)}
-                            />
-                            <RupeeInput
-                              label="Doctor's Payout"
-                              value={form.consultationHonorarium}
-                              onChange={v => set('consultationHonorarium', v)}
-                              helper="Cannot be more than the Patient Fee"
-                              error={validationErrs.consultationHonorarium}
-                            />
-                          </div>
-
-                          {/* margin summary */}
-                          <div className="flex items-center gap-2 rounded-[var(--r-field)]
-                                          bg-success/10 border border-success/30 p-3">
-                            <TrendingUp size={14} className="text-success shrink-0" />
-                            <p className="text-xs text-base-content/80">
-                              Hospital Profit per standard visit:{' '}
-                              <strong className="text-base-content text-sm ml-1">
-                                {fmt(Math.max(0, form.consultationFee - form.consultationHonorarium))}
-                              </strong>
-                              <span className="text-base-content/60 font-medium ml-1">
-                                ({marginPct(form.consultationFee, form.consultationHonorarium)}%)
-                              </span>
-                            </p>
-                          </div>
-                        </motion.div>
-
-                        {/* per-type overrides */}
-                        <motion.div variants={fadeUp} className="card p-6 border border-base-300">
-                          <SectionTitle
-                            icon={MonitorSmartphone}
-                            title="Custom Pricing by Visit Type"
-                            desc="Set different rates for specific visit types. If you leave these blank, they will automatically use the Standard Pricing above."
-                          />
-                          <div className="space-y-4 mt-2">
-                            {CONSULTATION_TYPES.map(ct => (
-                              <PerTypeRow
-                                key={ct.key}
-                                typeKey={ct.key}
-                                label={ct.label}
-                                Icon={ct.Icon}
-                                form={form}
-                                set={set}
-                                errors={validationErrs}
-                              />
-                            ))}
-                          </div>
-                        </motion.div>
-
-                      </div>
-
-                      {/* RIGHT column */}
-                      <div className="space-y-6">
-
-                        {/* follow-up policy */}
-                        <motion.div variants={fadeUp} className="card p-6 border border-base-300">
-                          <SectionTitle
-                            icon={RefreshCw}
-                            title="Follow-Up Visit Rules"
-                            desc="Define how much patients pay when returning to see this doctor, and how long the offer lasts."
-                          />
-
-                          <div className="grid grid-cols-2 gap-4 mb-4">
-                            <RupeeInput
-                              label="Follow-Up Cost"
-                              value={form.followUpFee}
-                              onChange={v => set('followUpFee', v)}
-                              helper="Enter 0 to make follow-ups free"
-                            />
-                            <PercentInput
-                              label="Discount (%)"
-                              value={form.followUpDiscountPercent}
-                              onChange={v => set('followUpDiscountPercent', v)}
-                              error={validationErrs.followUpDiscountPercent}
-                            />
-                          </div>
-
-                          <DaysInput
-                            label="Offer valid for (days after 1st visit)"
-                            value={form.followUpValidDays}
-                            onChange={v => set('followUpValidDays', v)}
-                            error={validationErrs.followUpValidDays}
-                          />
-                          <p className="text-[10px] text-base-content/50 mt-1.5 font-medium">Choose between 1 and 90 days.</p>
-
-                          {/* summary pill */}
-                          <div className="mt-5 rounded-[var(--r-field)] bg-base-200 border border-base-300 p-4">
-                            <p className="text-xs font-bold text-base-content flex items-center gap-2 mb-2">
-                              <CheckCircle2 size={14} className="text-primary" /> Follow-Up Summary
-                            </p>
-                            <p className="text-xs text-base-content/70 leading-relaxed">
-                              If a patient returns within{' '}
-                              <strong className="text-base-content">{form.followUpValidDays} days</strong>{' '}
-                              they will be charged{' '}
-                              {form.followUpFee === 0
-                                ? <strong className="text-success uppercase tracking-wide">Free</strong>
-                                : (
-                                  <>
-                                    <strong className="text-base-content">{fmt(form.followUpFee)}</strong>
-                                    {form.followUpDiscountPercent > 0 && (
-                                      <> — or get a{' '}
-                                        <strong className="text-success">
-                                          {form.followUpDiscountPercent}% discount
-                                        </strong>
-                                      </>
-                                    )}
-                                  </>
-                                )
-                              }
-                              {' '}for their visit.
-                            </p>
-                          </div>
-                        </motion.div>
-
-                        {/* revenue chart */}
-                        <motion.div variants={fadeUp} className="card p-6 border border-base-300">
-                          <div className="flex items-center justify-between mb-1">
-                            <SectionTitle
-                              icon={TrendingUp}
-                              title="Profit & Revenue Breakdown"
-                              desc="A visual summary of the hospital's profit margin compared to the patient fee and doctor's payout."
-                            />
-                            <button
-                              onClick={() => setShowChart(s => !s)}
-                              className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-base-content/50
-                                         hover:text-primary transition-colors shrink-0 -mt-5"
-                            >
-                              {showChart
-                                ? <><ChevronDown size={13} /> Hide Chart</>
-                                : <><ChevronRight size={13} /> Show Chart</>
-                              }
-                            </button>
-                          </div>
-
-                          <AnimatePresence>
-                            {showChart && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                                className="overflow-hidden mt-4"
-                              >
-                                <ResponsiveContainer width="100%" height={220}>
-                                  <BarChart
-                                    data={chartData}
-                                    margin={{ top: 6, right: 4, left: 0, bottom: 0 }}
-                                    barCategoryGap="35%"
-                                  >
-                                    <CartesianGrid
-                                      strokeDasharray="3 3"
-                                      stroke="var(--base-300)"
-                                      vertical={false}
-                                    />
-                                    <XAxis
-                                      dataKey="name"
-                                      tick={{ fontSize: 11, fill: 'var(--base-content)', opacity: 0.7, fontWeight: 500 }}
-                                      axisLine={false}
-                                      tickLine={false}
-                                    />
-                                    <YAxis
-                                      tick={{ fontSize: 10, fill: 'var(--base-content)', opacity: 0.5 }}
-                                      axisLine={false}
-                                      tickLine={false}
-                                      tickFormatter={v =>
-                                        `₹${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`
-                                      }
-                                    />
-                                    <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--base-300)', opacity: 0.15 }} />
-                                    <Legend
-                                      iconType="circle"
-                                      iconSize={8}
-                                      wrapperStyle={{ fontSize: 11, paddingTop: 10, fontWeight: 500 }}
-                                    />
-                                    <Bar dataKey="Patient Fee"  fill="var(--primary)"   radius={[3,3,0,0]} />
-                                    <Bar dataKey="Doctor's Payout"   fill="var(--secondary)" radius={[3,3,0,0]} />
-                                    <Bar dataKey="Hospital Profit"       fill="var(--success)"   radius={[3,3,0,0]} opacity={0.85} />
-                                  </BarChart>
-                                </ResponsiveContainer>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </motion.div>
-
-                      </div>
+                {/* LEFT column */}
+                <div className="space-y-6">
+                  <motion.div variants={fadeUp} className="card p-6 border border-base-300">
+                    <SectionTitle
+                      icon={MonitorSmartphone}
+                      title="Pricing by Visit Type"
+                      desc="Set patient fee and doctor payout for each visit type this hospital offers. Toggle a type off to stop offering it."
+                    />
+                    <div className="space-y-4 mt-2">
+                      {CONSULTATION_TYPES.map(ct => (
+                        <PerTypeRow
+                          key={ct.key}
+                          typeKey={ct.key}
+                          label={ct.label}
+                          Icon={ct.Icon}
+                          form={form}
+                          set={set}
+                          errors={validationErrs}
+                        />
+                      ))}
                     </div>
                   </motion.div>
-                </AnimatePresence>
-              )}
-            </div>
+                </div>
 
-          </>
-        )}
+                {/* RIGHT column */}
+                <div className="space-y-6">
+                  <motion.div variants={fadeUp} className="card p-6 border border-base-300">
+                    <SectionTitle
+                      icon={Edit3}
+                      title="Follow-Up Visit Rules"
+                      desc="Define how much patients pay when returning, and how long the offer lasts."
+                    />
+
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <RupeeInput
+                        label="Follow-Up Cost"
+                        value={form.followUpFee}
+                        onChange={v => set('followUpFee', v ?? 0)}
+                        helper="Enter 0 to make follow-ups free"
+                      />
+                      <PercentInput
+                        label="Discount (%)"
+                        value={form.followUpDiscountPercent}
+                        onChange={v => set('followUpDiscountPercent', v)}
+                        error={validationErrs.followUpDiscountPercent}
+                      />
+                    </div>
+
+                    <DaysInput
+                      label="Offer valid for (days after 1st visit)"
+                      value={form.followUpValidDays}
+                      onChange={v => set('followUpValidDays', v)}
+                      error={validationErrs.followUpValidDays}
+                    />
+                    <p className="text-[10px] text-base-content/50 mt-1.5 font-medium">Choose between 1 and 90 days.</p>
+                  </motion.div>
+
+                  <motion.div variants={fadeUp} className="card p-6 border border-base-300">
+                    <div className="flex items-center justify-between mb-1">
+                      <SectionTitle
+                        icon={TrendingUp}
+                        title="Profit & Revenue Breakdown"
+                        desc="Profit margin vs. patient fee and doctor payout, per offered visit type."
+                      />
+                      <button
+                        onClick={() => setShowChart(s => !s)}
+                        className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-base-content/50
+                                   hover:text-primary transition-colors shrink-0 -mt-5"
+                      >
+                        {showChart
+                          ? <><ChevronDown size={13} /> Hide Chart</>
+                          : <><ChevronRight size={13} /> Show Chart</>}
+                      </button>
+                    </div>
+
+                    <AnimatePresence>
+                      {showChart && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                          className="overflow-hidden mt-4"
+                        >
+                          {chartData.length === 0 ? (
+                            <p className="text-xs text-base-content/45 text-center py-8">
+                              No visit types with a fee set yet.
+                            </p>
+                          ) : (
+                            <ResponsiveContainer width="100%" height={220}>
+                              <BarChart data={chartData} margin={{ top: 6, right: 4, left: 0, bottom: 0 }} barCategoryGap="35%">
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--base-300)" vertical={false} />
+                                <XAxis
+                                  dataKey="name"
+                                  tick={{ fontSize: 11, fill: 'var(--base-content)', opacity: 0.7, fontWeight: 500 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                />
+                                <YAxis
+                                  tick={{ fontSize: 10, fill: 'var(--base-content)', opacity: 0.5 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={v => `₹${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`}
+                                />
+                                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--base-300)', opacity: 0.15 }} />
+                                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 10, fontWeight: 500 }} />
+                                <Bar dataKey="Patient Fee" fill="var(--primary)" radius={[3, 3, 0, 0]} />
+                                <Bar dataKey="Doctor's Payout" fill="var(--secondary)" radius={[3, 3, 0, 0]} />
+                                <Bar dataKey="Hospital Profit" fill="var(--success)" radius={[3, 3, 0, 0]} opacity={0.85} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </div>
       </div>
 
       {/* ── mobile sticky save bar ───────────────────────────────────────────── */}
@@ -1109,17 +819,10 @@ export default function Pricing() {
               <span className="text-[10px] font-semibold text-base-content/65">Unsaved changes</span>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleReset}
-                className="text-[10px] font-bold text-base-content/45 hover:text-base-content transition-colors"
-              >
+              <button onClick={handleReset} className="text-[10px] font-bold text-base-content/45 hover:text-base-content transition-colors">
                 Reset
               </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="btn btn-sm btn-primary text-[10px] px-4 rounded-full"
-              >
+              <button onClick={handleSave} disabled={saving} className="btn btn-sm btn-primary text-[10px] px-4 rounded-full">
                 {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
                 {saving ? 'Saving…' : 'Save'}
               </button>
@@ -1127,7 +830,6 @@ export default function Pricing() {
           </motion.div>
         )}
       </AnimatePresence>
-
     </motion.div>
   );
 }

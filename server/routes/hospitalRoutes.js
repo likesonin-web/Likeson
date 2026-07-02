@@ -9,6 +9,9 @@ import Hospital from '../models/Hospital.js';
 import DoctorProfile from '../models/DoctorProfile.js';
 import User from '../models/User.js';
 import SystemLog from '../models/SystemLog.js';
+import Booking from '../models/Booking.js';
+import OutPatientRecord from '../models/OutPatientRecord.js';
+import Consultation from '../models/Consultation.js';
 import sendEmail from '../utils/sendEmail.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 import cache from '../middleware/cache.js';
@@ -112,7 +115,48 @@ const buildGeoFilter = (query) => {
 };
 
 const asyncHandler = (fn) => (req, res, next) =>
-  Promise.resolve(fn(req, res, next)).catch(next);
+  Promise.resolve(fn(req, res, next)).catch((err) => {
+    // Mongoose ValidationError (e.g. "honorarium cannot exceed fee",
+    // scheduledPricing overlap) is a client input problem → 400, not 500.
+    const status = err.statusCode || (err.name === 'ValidationError' ? 400 : 500);
+    res.status(status).json({ success: false, message: err.message });
+  });
+
+// Single source of truth for "how is this hospital priced" — used by the
+// dedicated pricing endpoint AND attached to detail views so front-end
+// doesn't need two calls to know whether to show hospital or per-doctor fees.
+const buildHospitalPricingInfo = (hospital) => {
+  const isManaged = hospital.managementModel === 'hospital-manager';
+  return {
+    managementModel: hospital.managementModel,
+    note: isManaged
+      ? 'Pricing is set at hospital level. All linked doctors use this pricing.'
+      : 'Doctor-owner hospital. Each doctor controls their own pricing.',
+    consultationPricing: isManaged ? (hospital.consultationPricing || null) : null,
+  };
+};
+
+/**
+ * sanitizeDoctorPricing
+ * -----------------------
+ * ARCHITECTURE FIX: doctor.fees is only meaningful when the doctor's
+ * primaryHospital is 'doctor-owner' (see DoctorProfile.resolveEffectivePricing).
+ * Public doctor payloads used to leak doctor.fees unconditionally, which is
+ * actively misleading for hospital-managed doctors — their real price lives
+ * on Hospital.consultationPricing, not their own profile. This strips fees
+ * in that case and tells the client where to look instead.
+ * Expects doctor.primaryHospital to be populated with at least `managementModel`.
+ */
+const sanitizeDoctorPricing = (doctor) => {
+  const isHospitalManaged = doctor?.primaryHospital?.managementModel === 'hospital-manager';
+  if (isHospitalManaged) {
+    delete doctor.fees;
+    doctor.pricingNote = 'Priced by the hospital, not this doctor — see the hospital\'s consultationPricing.';
+  } else {
+    doctor.pricingNote = 'Doctor-owned consultation pricing.';
+  }
+  return doctor;
+};
 
 const DOCTOR_PUBLIC_EXCLUDE =
   '-kyc.aadhaarNumber -kyc.panNumber -adminNotes -bankDetails.accountNumber -contractUrl -platformFee -stats';
@@ -325,6 +369,7 @@ const sendCredentialsEmail = async ({
 //  A. PUBLIC HOSPITAL CONTROLLERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// GET hospitals sorted by distance from {lat,lng}, with type/specialty/facility filters.
 const getNearbyHospitals = asyncHandler(async (req, res) => {
   const lat      = parseFloat(req.query.lat);
   const lng      = parseFloat(req.query.lng);
@@ -401,6 +446,7 @@ const getNearbyHospitals = asyncHandler(async (req, res) => {
   });
 });
 
+// GET all verified hospitals, filterable by city/state/type/specialty/rating/etc.
 const getAllHospitals = asyncHandler(async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
 
@@ -456,6 +502,7 @@ const getAllHospitals = asyncHandler(async (req, res) => {
   });
 });
 
+// GET a single hospital by ObjectId, with linked doctors + resolved pricingInfo attached.
 const getHospitalById = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -470,13 +517,24 @@ const getHospitalById = asyncHandler(async (req, res) => {
     })
     .lean();
 
-  if (!hospital) {
+if (!hospital) {
     return res.status(404).json({ success: false, message: 'Hospital not found' });
   }
 
+  hospital.pricingInfo = buildHospitalPricingInfo(hospital);
+  // Linked doctors' raw `fees` is only meaningful for doctor-owner hospitals —
+  // for a hospital-manager hospital, strip it so the client doesn't display
+  // stale/irrelevant per-doctor numbers instead of hospital.consultationPricing.
+  if (hospital.managementModel === 'hospital-manager') {
+    hospital.linkedDoctors = (hospital.linkedDoctors || []).map((d) => {
+      delete d.fees;
+      return d;
+    });
+  }
   res.json({ success: true, data: hospital });
 });
 
+// GET a single hospital by its SEO-friendly slug — same shape as getHospitalById.
 const getHospitalBySlug = asyncHandler(async (req, res) => {
   const hospital = await Hospital.findOne({ slug: req.params.slug, isActive: true })
     .select('-internalNotes -settlementCycle')
@@ -487,13 +545,21 @@ const getHospitalBySlug = asyncHandler(async (req, res) => {
     })
     .lean();
 
-  if (!hospital) {
+if (!hospital) {
     return res.status(404).json({ success: false, message: 'Hospital not found' });
   }
 
+  hospital.pricingInfo = buildHospitalPricingInfo(hospital);
+  if (hospital.managementModel === 'hospital-manager') {
+    hospital.linkedDoctors = (hospital.linkedDoctors || []).map((d) => {
+      delete d.fees;
+      return d;
+    });
+  }
   res.json({ success: true, data: hospital });
 });
 
+// GET hospitals matching a free-text query across name/description/specialties/facilities.
 const searchHospitals = asyncHandler(async (req, res) => {
   const q = req.query.q?.trim();
   if (!q || q.length < 2) {
@@ -539,6 +605,7 @@ const searchHospitals = asyncHandler(async (req, res) => {
 //  B. PUBLIC DOCTOR CONTROLLERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// GET verified, active doctors near {lat,lng} (via nearby hospitals), pricing sanitized.
 const getNearbyDoctors = asyncHandler(async (req, res) => {
   const { filter: geoFilter, distance } = buildGeoFilter(req.query);
 
@@ -576,24 +643,27 @@ const getNearbyDoctors = asyncHandler(async (req, res) => {
     DoctorProfile.find(doctorFilter)
       .select(DOCTOR_PUBLIC_EXCLUDE)
       .populate('user', 'name avatar email phone')
-      .populate('primaryHospital', 'name address location slug')
+      .populate('primaryHospital', 'name address location slug managementModel')
       .skip(skip)
       .limit(limit)
       .lean(),
     DoctorProfile.countDocuments(doctorFilter),
   ]);
 
+  const sanitized = doctors.map(sanitizeDoctorPricing);
+
   res.json({
     success:  true,
-    count:    doctors.length,
+    count:    sanitized.length,
     total,
     page,
     pages:    Math.ceil(total / limit),
     distance: `${distance} km`,
-    data:     doctors,
+    data:     sanitized,
   });
 });
 
+// GET all verified, active doctors with specialization/rating/hospital/search filters.
 const getAllDoctors = asyncHandler(async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
 
@@ -632,7 +702,7 @@ const getAllDoctors = asyncHandler(async (req, res) => {
     DoctorProfile.find(filter)
       .select(DOCTOR_PUBLIC_EXCLUDE)
       .populate('user', 'name avatar')
-      .populate('primaryHospital', 'name address slug logo')
+      .populate('primaryHospital', 'name address slug logo managementModel')
       .sort(sort)
       .skip(skip)
       .limit(limit)
@@ -640,16 +710,19 @@ const getAllDoctors = asyncHandler(async (req, res) => {
     DoctorProfile.countDocuments(filter),
   ]);
 
+  const sanitized = doctors.map(sanitizeDoctorPricing);
+
   res.json({
     success: true,
-    count:   doctors.length,
+    count:   sanitized.length,
     total,
     page,
     pages:   Math.ceil(total / limit),
-    data:    doctors,
+    data:    sanitized,
   });
 });
 
+// GET doctors filtered by a validated specialization enum value, optionally by city.
 const getDoctorsBySpecialization = asyncHandler(async (req, res) => {
   const validSpecs = [
     'General Physician', 'Cardiologist', 'Neurologist', 'Pediatrician',
@@ -702,7 +775,7 @@ const getDoctorsBySpecialization = asyncHandler(async (req, res) => {
     DoctorProfile.find(finalFilter)
       .select(DOCTOR_PUBLIC_EXCLUDE)
       .populate('user', 'name avatar')
-      .populate('primaryHospital', 'name address slug logo')
+      .populate('primaryHospital', 'name address slug logo managementModel')
       .sort({ 'rating.averageRating': -1, experienceYears: -1 })
       .skip(skip)
       .limit(limit)
@@ -710,17 +783,23 @@ const getDoctorsBySpecialization = asyncHandler(async (req, res) => {
     DoctorProfile.countDocuments(finalFilter),
   ]);
 
+  const sanitized = doctors.map(sanitizeDoctorPricing);
+
   res.json({
     success:        true,
     specialization: normalizedSpec,
-    count:          doctors.length,
+    count:          sanitized.length,
     total,
     page,
     pages:          Math.ceil(total / limit),
-    data:           doctors,
+    data:           sanitized,
   });
 });
 
+// GET a single doctor's public profile, including the resolved effective
+// pricing (Problem 2 fix, surfaced end-to-end): calls
+// DoctorProfile.resolveEffectivePricing() so the client always sees the
+// CORRECT price source (doctor vs hospital), never a stale/irrelevant one.
 const getDoctorById = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -729,7 +808,7 @@ const getDoctorById = asyncHandler(async (req, res) => {
   const doctor = await DoctorProfile.findOne({ _id: req.params.id, isActive: true })
     .select(DOCTOR_PUBLIC_EXCLUDE)
     .populate('user', 'name avatar email')
-    .populate('primaryHospital', 'name address slug logo contact')
+    .populate('primaryHospital', 'name address slug logo contact managementModel')
     .populate('otherHospitals',  'name address slug')
     .lean();
 
@@ -737,9 +816,22 @@ const getDoctorById = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Doctor not found' });
   }
 
+  // Best-effort — a doctor with no primaryHospital or misconfigured hospital
+  // shouldn't 500 the whole profile page, just omit effectivePricing.
+  let effectivePricing = null;
+  try {
+    effectivePricing = await DoctorProfile.resolveEffectivePricing(doctor._id, 'inPerson');
+  } catch (err) {
+    effectivePricing = { error: err.message };
+  }
+
+  sanitizeDoctorPricing(doctor);
+  doctor.effectivePricing = effectivePricing;
+
   res.json({ success: true, data: doctor });
 });
 
+// GET doctors matching a free-text query against the linked User's name or bio/achievements.
 const searchDoctors = asyncHandler(async (req, res) => {
   const q = req.query.q?.trim();
   if (!q || q.length < 2) {
@@ -769,21 +861,23 @@ const searchDoctors = asyncHandler(async (req, res) => {
     DoctorProfile.find(filter)
       .select(DOCTOR_PUBLIC_EXCLUDE)
       .populate('user', 'name avatar')
-      .populate('primaryHospital', 'name address slug')
+      .populate('primaryHospital', 'name address slug managementModel')
       .skip(skip)
       .limit(limit)
       .lean(),
     DoctorProfile.countDocuments(filter),
   ]);
 
+  const sanitized = doctors.map(sanitizeDoctorPricing);
+
   res.json({
     success: true,
     query:   q,
-    count:   doctors.length,
+    count:   sanitized.length,
     total,
     page,
     pages:   Math.ceil(total / limit),
-    data:    doctors,
+    data:    sanitized,
   });
 });
 
@@ -791,6 +885,8 @@ const searchDoctors = asyncHandler(async (req, res) => {
 //  C. HOSPITAL ADMIN/MANAGEMENT CONTROLLERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// POST admin-only: create a hospital + its manager/owner User account in one call,
+// derives managementModel from hospitalType, emails temp credentials.
 const createHospital = asyncHandler(async (req, res) => {
   const {
     name, hospitalType, description,
@@ -958,6 +1054,7 @@ const createHospital = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT admin-only: update a hospital's descriptive/profile fields (not pricing, not security).
 const updateHospitalProfile = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -1019,6 +1116,7 @@ const updateHospitalProfile = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Hospital profile updated', data: hospital });
 });
 
+// PUT admin-only: toggle facility flags, bed count, operating hours, accepted schemes.
 const updateHospitalSettings = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -1065,6 +1163,7 @@ const updateHospitalSettings = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT admin-only: update license/GST/PAN registration fields, enforcing license-number uniqueness.
 const updateHospitalSecurity = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -1115,6 +1214,9 @@ const updateHospitalSecurity = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT hospital-manager (own hospital) or admin: update hospital-wide consultation pricing.
+// Rejects with 400 for doctor-owner hospitals — those price at the DoctorProfile level
+// instead (Problem 2's core distinction, enforced here at the write path too, not just reads).
 const updateHospitalConsultationPricing = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -1159,7 +1261,11 @@ const updateHospitalConsultationPricing = asyncHandler(async (req, res) => {
     }
   });
 
-  hospital.consultationPricing.lastUpdatedBy   = req.user._id;
+  // Version bump on every write, mirroring the hospital-manager router's
+  // /pricing endpoint — bookings always know which pricing version priced them.
+  const prevVersion = hospital.consultationPricing.pricingVersion || 1;
+  hospital.consultationPricing.pricingVersion   = prevVersion + 1;
+  hospital.consultationPricing.lastUpdatedBy    = req.user._id;
   hospital.consultationPricing.lastUpdatedByRole = req.user.role;
   hospital.updatedBy = req.user._id;
   await hospital.save();
@@ -1173,6 +1279,79 @@ const updateHospitalConsultationPricing = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT admin-only: set/clear this hospital's platform-fee override inside the
+// GLOBAL PlatformPricingConfig.hospital.hospitalOverrides map. This is distinct
+// from Hospital.consultationPricing.platformFeeOverride (which the hospital
+// itself can theoretically hold) — this route is the admin-controlled layer,
+// second in the priority chain. Sending platformFee: null removes the entry
+// and the hospital falls back to config.hospital.platformFee (global default).
+const updateHospitalPlatformFeeOverride = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
+  }
+
+  const hospital = await Hospital.findById(req.params.id).select('name').lean();
+  if (!hospital) {
+    return res.status(404).json({ success: false, message: 'Hospital not found' });
+  }
+
+  const { default: PlatformPricingConfig } = await import('../models/PlatformPricingConfig.js');
+  const config = await PlatformPricingConfig.getGlobal();
+
+  if (!config.hospital.hospitalOverrides) config.hospital.hospitalOverrides = new Map();
+
+  if (req.body.platformFee === null) {
+    config.hospital.hospitalOverrides.delete(req.params.id);
+  } else {
+    const { type, value } = req.body.platformFee || {};
+    if (!['fixed', 'percentage'].includes(type)) {
+      return res.status(400).json({ success: false, message: "platformFee.type must be 'fixed' or 'percentage'" });
+    }
+    if (typeof value !== 'number' || value < 0) {
+      return res.status(400).json({ success: false, message: 'platformFee.value must be a non-negative number' });
+    }
+    if (type === 'percentage' && value > 100) {
+      return res.status(400).json({ success: false, message: 'platformFee.value cannot exceed 100 for percentage' });
+    }
+    config.hospital.hospitalOverrides.set(req.params.id, { type, value });
+  }
+
+  await config.saveWithAudit({
+    adminUserId:  req.user._id,
+    adminRole:    req.user.role,
+    section:      'hospital.hospitalOverrides',
+    note:         req.body.platformFee === null
+      ? `Cleared platform-fee override for hospital ${hospital.name}`
+      : `Set platform-fee override for hospital ${hospital.name}: ${req.body.platformFee.type} = ${req.body.platformFee.value}`,
+    changeSource: 'manual',
+  });
+
+  await SystemLog.createLog({
+    level:    'warning',
+    category: 'payment',
+    message:  `Hospital platform-fee override ${req.body.platformFee === null ? 'cleared' : 'set'}: ${hospital.name}`,
+    actor:    { userId: req.user._id, name: req.user.name, role: req.user.role },
+    relatedEntity: { model: 'Hospital', entityId: hospital._id, label: hospital.name },
+    request:  { method: 'PUT', path: `/api/hospitals/${req.params.id}/platform-fee`, statusCode: 200 },
+    metadata: { platformFee: req.body.platformFee },
+  });
+
+  await invalidatePattern(`hospitals:${req.params.id}*`);
+  await invalidatePattern('hospitals:*');
+
+  res.json({
+    success: true,
+    message: req.body.platformFee === null
+      ? 'Platform fee override cleared — hospital now uses global default (or its own consultationPricing override if set).'
+      : `Platform fee override set: ${req.body.platformFee.type} = ${req.body.platformFee.value}`,
+    data: {
+      hospitalId:  hospital._id,
+      platformFee: req.body.platformFee,
+    },
+  });
+});
+
+// POST admin-only: reset the hospital manager's password and re-email credentials.
 const resendHospitalManagerCredentials = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -1230,6 +1409,7 @@ const resendHospitalManagerCredentials = asyncHandler(async (req, res) => {
   });
 });
 
+// POST admin-only: upload/replace hospital logo and/or add gallery images.
 const uploadHospitalImages = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -1289,6 +1469,7 @@ const uploadHospitalImages = asyncHandler(async (req, res) => {
   });
 });
 
+// DELETE admin-only: remove one gallery image by its array index.
 const deleteHospitalImage = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -1313,6 +1494,7 @@ const deleteHospitalImage = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Image removed', images: hospital.images });
 });
 
+// PUT admin-only: set/replace the hospital's map coordinates.
 const updateHospitalLocation = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -1350,6 +1532,8 @@ const updateHospitalLocation = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Hospital location updated', location: hospital.location });
 });
 
+// POST admin-only: link an existing doctor to an existing hospital (sets primaryHospital
+// if the doctor has none, otherwise adds to otherHospitals).
 const linkDoctorToHospital = asyncHandler(async (req, res) => {
   const { id: hospitalId, doctorId } = req.params;
 
@@ -1398,6 +1582,7 @@ const linkDoctorToHospital = asyncHandler(async (req, res) => {
   });
 });
 
+// DELETE admin-only: unlink a doctor from a hospital, reassigning primaryHospital if needed.
 const unlinkDoctorFromHospital = asyncHandler(async (req, res) => {
   const { id: hospitalId, doctorId } = req.params;
 
@@ -1437,6 +1622,7 @@ const unlinkDoctorFromHospital = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT admin-only: mark a hospital verified/unverified.
 const verifyHospital = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -1472,6 +1658,7 @@ const verifyHospital = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT admin-only: flip isActive (soft enable/disable, does not delete data).
 const toggleHospitalActive = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -1503,6 +1690,7 @@ const toggleHospitalActive = asyncHandler(async (req, res) => {
   });
 });
 
+// DELETE superadmin-only: hard-delete a hospital and detach any linked doctors.
 const deleteHospital = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -1542,6 +1730,8 @@ const deleteHospital = asyncHandler(async (req, res) => {
 //  D. DOCTOR SELF-SERVICE CONTROLLERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// GET the logged-in doctor's own full profile (includes hospital consultationPricing
+// for hospital-managed doctors, so the doctor can see what they're actually paid at).
 const getMyDoctorProfile = asyncHandler(async (req, res) => {
   const profile = await DoctorProfile.findOne({ user: req.user._id })
     .populate('user', 'name avatar email phone')
@@ -1562,11 +1752,12 @@ const getMyDoctorProfile = asyncHandler(async (req, res) => {
   res.json({ success: true, data: profile });
 });
 
+// GET the caller's managed/owned/linked hospitals — branches on role (hospital manager vs doctor).
 export const getMyManagedHospitals = asyncHandler(async (req, res) => {
   // ── 1. Handle Hospital Manager Role ─────────────────────────────────────────
   if (req.user.role === 'hospital') {
-    const managedHospitals = await Hospital.find({ managedBy: req.user._id })
-      .select('name address slug logo isVerified isActive bedCount rating managementModel')
+const managedHospitals = await Hospital.find({ managedBy: req.user._id })
+      .select('name address slug logo isVerified isActive bedCount rating managementModel consultationPricing')
       .lean();
 
     return res.json({
@@ -1585,14 +1776,12 @@ export const getMyManagedHospitals = asyncHandler(async (req, res) => {
     });
   }
 
-  // ── 2. Handle Doctor Role ───────────────────────────────────────────────────
-  const profile = await DoctorProfile.findOne({ user: req.user._id })
+const profile = await DoctorProfile.findOne({ user: req.user._id })
     .select('managedHospitals primaryHospital otherHospitals ownedHospitals')
-    .populate('managedHospitals', 'name address slug logo isVerified isActive bedCount rating managementModel')
-    .populate('primaryHospital',  'name address slug logo isVerified isActive managementModel')
+    .populate('managedHospitals', 'name address slug logo isVerified isActive bedCount rating managementModel consultationPricing')
+    .populate('primaryHospital',  'name address slug logo isVerified isActive managementModel consultationPricing')
     .populate('otherHospitals',   'name address slug logo isVerified isActive managementModel')
-    .populate('ownedHospitals',   'name address slug logo isVerified isActive managementModel'); 
-    
+    .populate('ownedHospitals',   'name address slug logo isVerified isActive managementModel');
   if (!profile) {
     return res.status(404).json({ success: false, message: 'Doctor profile not found' });
   }
@@ -1618,13 +1807,16 @@ export const getMyManagedHospitals = asyncHandler(async (req, res) => {
   });
 });
 
+// GET a doctor's live-computed stats (bookings/earnings/OP records/consultations),
+// self-access or admin-access only.
 const getDoctorStats = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
   }
 
   const doctor = await DoctorProfile.findById(req.params.id)
-    .select('user stats rating profileCompletionPercent partnershipStatus kycStatus');
+    .select('user stats rating profileCompletionPercent partnershipStatus kycStatus')
+    .lean();
 
   if (!doctor) {
     return res.status(404).json({ success: false, message: 'Doctor not found' });
@@ -1637,16 +1829,115 @@ const getDoctorStats = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: 'Access denied' });
   }
 
-  res.json({ success: true, data: doctor });
+  const doctorId = doctor._id;
+
+  // Group-by-status counts + revenue + OP/follow-up + recent activity —
+  // computed live so stats never drift from what DoctorProfile.stats cache holds.
+  const [
+    bookingStatusRows,
+    revenueRows,
+    opStatusRows,
+    followUpEligibleCount,
+    consultationStatusRows,
+    recentBookings,
+    recentConsultations,
+  ] = await Promise.all([
+    Booking.aggregate([
+      { $match: { doctor: doctorId } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]),
+    Booking.aggregate([
+      { $match: { doctor: doctorId, status: 'completed' } },
+      {
+        $group: {
+          _id:            null,
+          completedCount: { $sum: 1 },
+          doctorShare:    { $sum: '$fareBreakdown.doctorShare' },
+          amountPaid:     { $sum: '$fareBreakdown.amountPaid' },
+        },
+      },
+    ]),
+    OutPatientRecord.aggregate([
+      { $match: { doctor: doctorId } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]),
+    OutPatientRecord.countDocuments({
+      doctor: doctorId,
+      followUpExpiry: { $gt: new Date() },
+    }),
+    Consultation.aggregate([
+      { $match: { doctor: doctorId } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]),
+    Booking.find({ doctor: doctorId })
+      .select('bookingCode bookingType status scheduledAt patientInfo.name fareBreakdown.totalAmount paymentStatus createdAt')
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .lean(),
+    Consultation.find({ doctor: doctorId })
+      .select('consultationCode consultationType status scheduledAt patientSnapshot.name sessionMetrics createdAt')
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .lean(),
+  ]);
+
+  const toCountMap = (rows) =>
+    rows.reduce((acc, r) => {
+      acc[r._id ?? 'unknown'] = r.count;
+      return acc;
+    }, {});
+
+  const bookingCounts      = toCountMap(bookingStatusRows);
+  const opCounts           = toCountMap(opStatusRows);
+  const consultationCounts = toCountMap(consultationStatusRows);
+  const revenue = revenueRows[0] || { completedCount: 0, doctorShare: 0, amountPaid: 0 };
+
+  res.json({
+    success: true,
+    data: {
+      profile: doctor,
+      liveStats: {
+        bookings: {
+          total:    Object.values(bookingCounts).reduce((a, b) => a + b, 0),
+          byStatus: bookingCounts,
+        },
+        earnings: {
+          completedBookings: revenue.completedCount,
+          totalDoctorShare:  revenue.doctorShare,
+          totalCollected:    revenue.amountPaid,
+        },
+        outPatientRecords: {
+          total:               Object.values(opCounts).reduce((a, b) => a + b, 0),
+          byStatus:            opCounts,
+          followUpEligibleNow: followUpEligibleCount,
+        },
+        consultations: {
+          total:    Object.values(consultationCounts).reduce((a, b) => a + b, 0),
+          byStatus: consultationCounts,
+        },
+      },
+      recentActivity: {
+        recentBookings,
+        recentConsultations,
+      },
+    },
+  });
 });
 
+// GET the logged-in doctor's own resolved effective pricing — thin wrapper around
+// the model's resolveEffectivePricing static, which now correctly checks
+// Hospital.managementModel (Problem 2 fix) instead of always returning doctor.fees.
 const getMyEffectivePricing = asyncHandler(async (req, res) => {
   const profile = await DoctorProfile.findOne({ user: req.user._id }).lean();
   if (!profile) {
     return res.status(404).json({ success: false, message: 'Doctor profile not found' });
   }
 
-  const pricing = await DoctorProfile.resolveEffectivePricing(profile._id);
+  const consultationType = ['inPerson', 'video', 'homeVisit'].includes(req.query.consultationType)
+    ? req.query.consultationType
+    : 'inPerson';
+
+  const pricing = await DoctorProfile.resolveEffectivePricing(profile._id, consultationType);
   res.json({ success: true, data: pricing });
 });
 
@@ -1654,6 +1945,32 @@ const getMyEffectivePricing = asyncHandler(async (req, res) => {
 //  E. DOCTOR ADMIN CONTROLLERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/**
+ * assertFeesAllowed
+ * -------------------
+ * ARCHITECTURE FIX: a doctor's `fees` field is only writable when their
+ * primaryHospital is 'doctor-owner'. If it's 'hospital-manager', writing
+ * fees here would recreate exactly the bug that was fixed in
+ * DoctorProfile.resolveEffectivePricing — data getting written to a
+ * pricing source the resolver will then correctly ignore, silently
+ * confusing whoever set it. We reject the write instead of silently
+ * accepting-and-ignoring it.
+ */
+const assertFeesAllowed = async (primaryHospitalId) => {
+  if (!primaryHospitalId) return; // no hospital yet — allow, resolver requires one before pricing is used anyway
+  const hosp = await Hospital.findById(primaryHospitalId).select('managementModel name').lean();
+  if (hosp?.managementModel === 'hospital-manager') {
+    const err = new Error(
+      `Cannot set doctor-level fees: "${hosp.name}" is a hospital-managed hospital — ` +
+      `pricing is controlled centrally via that hospital's consultationPricing.`
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+};
+
+// POST admin/hospital-manager: create a new doctor User + DoctorProfile, emails temp credentials.
+// `fees` in the body is only applied when the target hospital is doctor-owner.
 const createDoctorProfile = asyncHandler(async (req, res) => {
   const {
     name, email, phone,
@@ -1689,6 +2006,14 @@ const createDoctorProfile = asyncHandler(async (req, res) => {
       managementModel = hosp.managementModel;
       hospitalName    = hosp.name;
     }
+  }
+
+  // Only apply custom fees when the doctor actually owns pricing.
+  if (fees !== undefined && managementModel === 'hospital-manager') {
+    return res.status(400).json({
+      success: false,
+      message: `Cannot set fees: "${hospitalName}" is hospital-managed. Configure pricing via that hospital's consultationPricing instead.`,
+    });
   }
 
   const generatePassword = () => {
@@ -1730,7 +2055,7 @@ const createDoctorProfile = asyncHandler(async (req, res) => {
     registrationCouncil: registrationCouncil || undefined,
     biography:           biography           || undefined,
     languagesSpoken:     languagesSpoken     || [],
-    fees:                fees                || {},
+    fees:                managementModel === 'doctor-owner' ? (fees || {}) : undefined,
     consultationTypes:   consultationTypes   || { inPerson: true, video: false, homeVisit: false },
     primaryHospital:     primaryHospital     || null,
     createdBy:           req.user._id,
@@ -1791,6 +2116,7 @@ const createDoctorProfile = asyncHandler(async (req, res) => {
   });
 });
 
+// POST admin-only: reset a doctor's password and re-email credentials.
 const resendDoctorCredentials = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -1850,6 +2176,8 @@ const resendDoctorCredentials = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT doctor (self) or admin: update profile fields. `fees` is stripped/rejected
+// unless the doctor's (possibly newly-set) primaryHospital is doctor-owner.
 const updateDoctorProfile = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -1865,6 +2193,15 @@ const updateDoctorProfile = asyncHandler(async (req, res) => {
     doctor.user.toString() !== req.user._id.toString()
   ) {
     return res.status(403).json({ success: false, message: 'Access denied' });
+  }
+
+  // Gate fees BEFORE assignment — check against the hospital that will be
+  // effective after this update (new primaryHospital if provided, else current).
+  if (req.body.fees !== undefined) {
+    const effectiveHospitalId = req.body.primaryHospital !== undefined
+      ? req.body.primaryHospital
+      : doctor.primaryHospital;
+    await assertFeesAllowed(effectiveHospitalId); // throws 400 if hospital-managed
   }
 
   const allowedFields = [
@@ -1895,6 +2232,8 @@ const updateDoctorProfile = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Doctor profile updated', data: doctor });
 });
 
+// PUT doctor (self) or admin: update notification prefs / onboarding step / online flag.
+// settlementCycle is admin/superadmin-only.
 const updateDoctorSettings = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -1944,6 +2283,7 @@ const updateDoctorSettings = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT admin-only: update registration number/council, contract URL, admin notes.
 const updateDoctorSecurity = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -1996,6 +2336,7 @@ const updateDoctorSecurity = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT doctor (self) or admin: replace the doctor's weekly availability schedule.
 const updateDoctorAvailability = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -2034,6 +2375,8 @@ const updateDoctorAvailability = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT doctor (self) or admin: update bank details; always resets isBankVerified,
+// forcing a fresh admin verification pass after any change.
 const updateDoctorBankDetails = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -2089,6 +2432,7 @@ const updateDoctorBankDetails = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT doctor (self) or admin: submit/update KYC document fields; flips kycStatus to 'pending'.
 const updateDoctorKyc = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -2139,6 +2483,7 @@ const updateDoctorKyc = asyncHandler(async (req, res) => {
   });
 });
 
+// POST doctor (self) or admin: upload profile photo, syncs to linked User.avatar too.
 const uploadDoctorPhoto = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -2180,6 +2525,7 @@ const uploadDoctorPhoto = asyncHandler(async (req, res) => {
   });
 });
 
+// POST doctor (self) or admin: upload signature image used on prescriptions.
 const uploadDoctorSignature = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -2220,6 +2566,9 @@ const uploadDoctorSignature = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT admin-only: set/clear a doctor's individual platform-fee override — top of the
+// priority chain in DoctorProfile.resolveEffectivePricing (doctor override → hospital
+// override → global config).
 const updateDoctorPlatformFee = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -2275,6 +2624,7 @@ const updateDoctorPlatformFee = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT admin-only: update partnershipStatus / partnerSince / contractUrl / adminNotes.
 const updateDoctorPartnership = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -2319,6 +2669,7 @@ const updateDoctorPartnership = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT admin-only: approve or reject a doctor's KYC submission.
 const verifyDoctorKyc = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -2405,6 +2756,7 @@ const verifyDoctorKyc = asyncHandler(async (req, res) => {
   });
 });
 
+// PUT admin-only: flip a doctor's isActive flag.
 const toggleDoctorActive = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -2434,6 +2786,7 @@ const toggleDoctorActive = asyncHandler(async (req, res) => {
   });
 });
 
+// DELETE superadmin-only: hard-delete a doctor profile and detach from all hospitals.
 const deleteDoctorProfile = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid doctor ID' });
@@ -2462,6 +2815,7 @@ const deleteDoctorProfile = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Doctor profile deleted permanently' });
 });
 
+// GET verified, active doctors linked to a specific hospital (primary or other).
 const getDoctorsByHospital = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.hospitalId)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -2502,6 +2856,8 @@ const getDoctorsByHospital = asyncHandler(async (req, res) => {
   });
 });
 
+// GET a hospital's resolved pricing info by id (public, cached) — thin wrapper around
+// buildHospitalPricingInfo, mirrors the shape attached to getHospitalById/BySlug.
 const getHospitalEffectivePricing = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ success: false, message: 'Invalid hospital ID' });
@@ -2518,15 +2874,9 @@ const getHospitalEffectivePricing = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: {
-      hospitalId:      hospital._id,
-      name:            hospital.name,
-      managementModel: hospital.managementModel,
-      note: hospital.managementModel === 'hospital-manager'
-        ? 'Pricing is set at hospital level. All linked doctors use this pricing.'
-        : 'Doctor-owner hospital. Each doctor controls their own pricing.',
-      consultationPricing: hospital.managementModel === 'hospital-manager'
-        ? hospital.consultationPricing
-        : null,
+      hospitalId: hospital._id,
+      name:       hospital.name,
+      ...buildHospitalPricingInfo(hospital),
       settlementCycle: hospital.settlementCycle,
     },
   });
@@ -2549,16 +2899,14 @@ router.get('/doctors',                          cache(180, (req) => `doctors:all
 router.get('/doctors/specialization/:spec',     cache(180, (req) => `doctors:spec:${req.params.spec}:${req.query.city || ''}:${req.query.page || 1}`), getDoctorsBySpecialization);
 router.get('/doctors/by-hospital/:hospitalId',  cache(120, (req) => `doctors:hospital:${req.params.hospitalId}:${req.query.page || 1}`), getDoctorsByHospital);
 
-// ── C. AUTHENTICATED DOCTOR SELF-SERVICE ROUTES ───────────────────────────────
 // ── C. AUTHENTICATED DOCTOR / HOSPITAL SELF-SERVICE ROUTES ────────────────────
 router.get('/doctors/me',                protect, authorize('doctor'), getMyDoctorProfile);
-// Added 'hospital' below to resolve the FORBIDDEN error
+// 'hospital' included so managers can view their own hospitals through the same endpoint
 router.get('/doctors/me/hospitals',      protect, authorize('doctor', 'hospital'), getMyManagedHospitals);
-// Added 'hospital' below so managers can view their effective pricing rules
+// 'hospital' included so managers can view the effective platform-fee/pricing context
 router.get('/doctors/me/pricing',        protect, authorize('doctor', 'hospital'), getMyEffectivePricing);
 
 // ── D. DOCTOR CREATE (Admin & Hospital Managers) ──────────────────────────────
-// Added 'hospital' below so managers can use the "Add New Doctor" UI button
 router.post('/doctors', protect, authorize('admin', 'superadmin', 'hospital'), createDoctorProfile);
 
 // ── E. DOCTOR PROFILE UPDATES (Doctor own + Admin) ───────────────────────────
@@ -2603,6 +2951,7 @@ router.put('/:id/profile',              protect, authorize('admin', 'superadmin'
 router.put('/:id/settings',             protect, authorize('admin', 'superadmin'), updateHospitalSettings);
 router.put('/:id/security',             protect, authorize('admin', 'superadmin'), updateHospitalSecurity);
 router.put('/:id/consultation-pricing', protect, authorize('hospital', 'admin', 'superadmin'), updateHospitalConsultationPricing);
+router.put('/:id/platform-fee',         protect, authorize('admin', 'superadmin'), updateHospitalPlatformFeeOverride);
 router.post('/:id/resend-credentials',  protect, authorize('admin', 'superadmin'), resendHospitalManagerCredentials);
 
 router.post(

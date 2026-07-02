@@ -120,49 +120,56 @@ export default function DoctorDashboard() {
     }
   }, [dispatch, profile?._id]);
 
-  // Real stats from DoctorProfile.stats schema
-  const s = stats?.stats ?? {};
+// Legacy denormalized cache — kept as fallback only, usually stale/zero
+  const s = stats?.profile?.stats ?? {};
+  // Live computed numbers — source of truth now
+  const live = stats?.liveStats ?? {};
+  const recent = stats?.recentActivity ?? {};
 
   const isLoading =
     loading?.fetchMyDoctorProfile ||
     loading?.fetchDoctorStats;
 
-  // KPI cards — values from real DoctorProfile.stats fields
+// KPI cards — live-computed from Booking/OutPatientRecord/Consultation,
+  // falling back to the legacy DoctorProfile.stats cache only where no
+  // live equivalent exists (pendingSettlement has no live source yet).
   const kpiCards = [
     {
       icon: Stethoscope,
       label: 'Total Consultations',
-      value: s.totalConsultations ?? 0,
+      value: live.consultations?.total ?? s.totalConsultations ?? 0,
+      sub: `${live.consultations?.byStatus?.scheduled ?? 0} scheduled`,
       iconBg: 'bg-primary',
       delay: 1,
     },
     {
-      icon: Video,
-      label: 'Video Consultations',
-      value: s.totalVideoConsultations ?? 0,
+      icon: Calendar,
+      label: 'Total Bookings',
+      value: live.bookings?.total ?? 0,
+      sub: `${live.bookings?.byStatus?.completed ?? 0} completed`,
       iconBg: 'bg-secondary',
       delay: 2,
     },
     {
       icon: Home,
-      label: 'Home Visits',
-      value: s.totalHomeVisits ?? 0,
+      label: 'OP Records',
+      value: live.outPatientRecords?.total ?? 0,
+      sub: `${live.outPatientRecords?.followUpEligibleNow ?? 0} follow-up eligible`,
       iconBg: 'bg-info',
       delay: 3,
     },
     {
-      icon: Users,
-      label: 'Total Referrals',
-      value: s.totalReferrals ?? 0,
+      icon: CheckCircle,
+      label: 'Completed Bookings',
+      value: live.earnings?.completedBookings ?? 0,
       iconBg: 'bg-warning',
       delay: 4,
     },
     {
       icon: TrendingUp,
-      label: 'Total Earnings',
-      value: s.totalEarnings != null
-        ? `₹${Number(s.totalEarnings).toLocaleString('en-IN')}`
-        : '₹0',
+      label: 'Doctor Earnings',
+      value: `₹${Number(live.earnings?.totalDoctorShare ?? 0).toLocaleString('en-IN')}`,
+      sub: `₹${Number(live.earnings?.totalCollected ?? 0).toLocaleString('en-IN')} collected`,
       iconBg: 'bg-success',
       delay: 5,
     },
@@ -367,13 +374,13 @@ export default function DoctorDashboard() {
                 <div className="h-8 bg-base-300 rounded animate-pulse skeleton" />
               ) : (
                 <>
-                  <p className="text-3xl font-semibold font-poppins text-warning">
-                    {stats?.rating?.averageRating != null
-                      ? Number(stats.rating.averageRating).toFixed(1)
+<p className="text-3xl font-semibold font-poppins text-warning">
+                    {stats?.profile?.rating?.averageRating != null
+                      ? Number(stats.profile.rating.averageRating).toFixed(1)
                       : '—'}
                   </p>
                   <p className="text-xs text-base-content/40 mt-1">
-                    {stats?.rating?.totalRatings ?? 0} ratings
+                    {stats?.profile?.rating?.totalRatings ?? 0} ratings
                   </p>
                 </>
               )}
@@ -400,6 +407,55 @@ export default function DoctorDashboard() {
             </div>
           </motion.div>
         </div>
+
+    {/* ── Recent Activity ── */}
+        {!isLoading && (recent.recentBookings?.length > 0 || recent.recentConsultations?.length > 0) && (
+          <motion.div
+            variants={fadeUp}
+            custom={8.5}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"
+          >
+            <div className="rounded-2xl border border-base-300/60 bg-base-200 p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-widest mb-4 text-base-content/50">
+                Recent Bookings
+              </h2>
+              <div className="space-y-3">
+                {(recent.recentBookings ?? []).map((b) => (
+                  <div key={b._id} className="flex items-center justify-between text-sm">
+                    <div>
+                      <p className="font-semibold text-base-content">{b.patientInfo?.name ?? 'Patient'}</p>
+                      <p className="text-xs text-base-content/40">{b.bookingCode} · {b.status}</p>
+                    </div>
+                    <p className="text-xs font-semibold text-base-content/60">
+                      ₹{Number(b.fareBreakdown?.totalAmount ?? 0).toLocaleString('en-IN')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-base-300/60 bg-base-200 p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-widest mb-4 text-base-content/50">
+                Recent Consultations
+              </h2>
+              <div className="space-y-3">
+                {(recent.recentConsultations ?? []).map((c) => (
+                  <div key={c._id} className="flex items-center justify-between text-sm">
+                    <div>
+                      <p className="font-semibold text-base-content">{c.patientSnapshot?.name ?? 'Patient'}</p>
+                      <p className="text-xs text-base-content/40">{c.consultationCode} · {c.status}</p>
+                    </div>
+                    <span className="text-xs font-semibold text-base-content/60 capitalize">
+                      {c.consultationType}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* ── Alerts ── */}
         <div className="space-y-3">

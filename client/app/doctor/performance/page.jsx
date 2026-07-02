@@ -166,13 +166,15 @@ export default function Performance() {
     if (profile?._id) dispatch(fetchDoctorStats(profile._id));
   }, [dispatch, profile?._id]);
 
-  const s          = stats?.stats || {};
-  const rating     = stats?.rating || {};
+const s          = stats?.profile?.stats || {};
+  const rating     = stats?.profile?.rating || {};
+  const live       = stats?.liveStats || {};
   const isLoading  = loading.fetchMyDoctorProfile || loading.fetchDoctorStats;
   const completion = profile?.profileCompletionPercent ?? 0;
 
   const ratingScore  = Math.round(((rating.averageRating || 0) / 5) * 100);
-  const consultScore = Math.min(100, Math.round(((s.totalConsultations || 0) / 50) * 100));
+const consultCount = live.consultations?.total ?? s.totalConsultations ?? 0;
+  const consultScore = Math.min(100, Math.round((consultCount / 50) * 100));
   const settleScore  = s.totalEarnings > 0
     ? Math.round(((s.totalSettled || 0) / s.totalEarnings) * 100)
     : 0;
@@ -189,7 +191,7 @@ export default function Performance() {
   const badges = [
     { icon: Star,       title: 'Top Rated',     desc: 'Rating ≥ 4.5',                achieved: (rating.averageRating || 0) >= 4.5 },
     { icon: Zap,        title: 'Active Partner', desc: 'Partnership Active & KYC OK', achieved: profile?.partnershipStatus === 'Active' && profile?.kycStatus === 'verified' },
-    { icon: Target,     title: 'High Volume',    desc: '50+ consultations',           achieved: (s.totalConsultations || 0) >= 50 },
+{ icon: Target,     title: 'High Volume',    desc: '50+ consultations',           achieved: consultCount >= 50 },   
     { icon: UserCheck,  title: 'KYC Verified',   desc: 'Identity confirmed',          achieved: profile?.kycStatus === 'verified' },
     { icon: ShieldCheck,title: 'Bank Verified',  desc: 'Payout enabled',             achieved: profile?.bankDetails?.isBankVerified },
     { icon: Award,      title: 'Profile Pro',    desc: '80%+ profile completion',     achieved: completion >= 80 },
@@ -286,7 +288,7 @@ export default function Performance() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
               <ProgressBar label="Profile Completion" value={completion}                     max={100}                                           icon={UserCheck}   delay={9}  />
-              <ProgressBar label="Consultations"      value={s.totalConsultations || 0}      max={Math.max(50, s.totalConsultations || 0)}        icon={Activity}    delay={10} />
+<ProgressBar label="Consultations"      value={consultCount}                   max={Math.max(50, consultCount)}                     icon={Activity}    delay={10} />
               <ProgressBar label="Referrals"          value={s.totalReferrals || 0}          max={Math.max(20, s.totalReferrals || 0)}            icon={TrendingUp}  delay={11} />
               <ProgressBar label="Home Visits"        value={s.totalHomeVisits || 0}         max={Math.max(20, s.totalHomeVisits || 0)}           icon={Clock}       delay={12} />
               <ProgressBar label="Total Ratings"      value={rating.totalRatings || 0}       max={Math.max(50, rating.totalRatings || 0)}         icon={Star}        delay={13} />

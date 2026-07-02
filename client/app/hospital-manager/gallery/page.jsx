@@ -216,7 +216,6 @@ const Card = ({ children, className = "" }) => (
   </div>
 );
 
-// Toggle component — fixed direction logic
 const Toggle = ({ checked, onChange, colorOn = "bg-[var(--primary)]" }) => (
   <button
     type="button"
@@ -247,7 +246,6 @@ const GoogleMapPicker = ({ lat, lng, onLocationChange }) => {
   const centerLat = parseFloat(lat) || DEFAULT_LAT;
   const centerLng = parseFloat(lng) || DEFAULT_LNG;
 
-  // Init map
   useEffect(() => {
     let cancelled = false;
     loadGoogleMaps()
@@ -276,20 +274,17 @@ const GoogleMapPicker = ({ lat, lng, onLocationChange }) => {
           title: "Hospital Location",
         });
 
-        // Marker drag end → update coords
         markerObj.current.addListener("dragend", () => {
           const pos = markerObj.current.getPosition();
           onLocationChange(pos.lat(), pos.lng());
         });
 
-        // Map click → move marker
         mapObj.current.addListener("click", (e) => {
           const pos = e.latLng;
           markerObj.current.setPosition(pos);
           onLocationChange(pos.lat(), pos.lng());
         });
 
-        // Places Autocomplete on search input
         if (inputRef.current) {
           acRef.current = new google.maps.places.Autocomplete(inputRef.current, {
             types: ["establishment", "geocode"],
@@ -315,9 +310,8 @@ const GoogleMapPicker = ({ lat, lng, onLocationChange }) => {
       });
 
     return () => { cancelled = true; };
-  }, []); // mount only
+  }, []);
 
-  // Sync external lat/lng changes → move marker + recenter
   useEffect(() => {
     if (!mapReady || !markerObj.current || !mapObj.current) return;
     const newLat = parseFloat(lat);
@@ -342,7 +336,6 @@ const GoogleMapPicker = ({ lat, lng, onLocationChange }) => {
 
   return (
     <div className="space-y-3">
-      {/* Places search bar */}
       <div className="relative">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--base-content)]/40 z-10" />
         <input
@@ -356,7 +349,6 @@ const GoogleMapPicker = ({ lat, lng, onLocationChange }) => {
         />
       </div>
 
-      {/* Map canvas */}
       <div className="relative rounded-xl overflow-hidden border border-[var(--base-300)] shadow-sm" style={{ height: 340 }}>
         {!mapReady && (
           <div className="absolute inset-0 bg-[var(--base-200)] flex items-center justify-center z-10">
@@ -366,7 +358,7 @@ const GoogleMapPicker = ({ lat, lng, onLocationChange }) => {
         <div ref={mapRef} className="w-full h-full" />
         {mapReady && (
           <div className="absolute bottom-3 left-3 bg-[var(--base-100)]/90 backdrop-blur-sm border border-[var(--base-300)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--base-content)]/60 shadow">
-            <span className="font-semibold text-[var(--primary)]">Lat:</span> {parseFloat(lat || DEFAULT_LAT).toFixed(6)} &nbsp;
+            <span className="font-semibold text-[var(--primary)]">Lat:</span> {parseFloat(lat || DEFAULT_LAT).toFixed(6)}  
             <span className="font-semibold text-[var(--primary)]">Lng:</span> {parseFloat(lng || DEFAULT_LNG).toFixed(6)}
           </div>
         )}
@@ -389,10 +381,9 @@ const ProfileSection = ({ hospital, dispatch }) => {
     hasAmbulance: false, hasWheelchairAccess: false, is24x7: false,
     facilities: [], acceptedSchemes: [],
   });
-  const [toast, setToast]       = useState(null);
+  const [toast, setToast] = useState(null);
   const [newSpecialty, setNewSpecialty] = useState("");
-  const [newFacility, setNewFacility]   = useState("");
-  const [newScheme, setNewScheme]       = useState("");
+  const [newScheme, setNewScheme] = useState("");
 
   useEffect(() => {
     if (!hospital) return;
@@ -417,14 +408,15 @@ const ProfileSection = ({ hospital, dispatch }) => {
     });
   }, [hospital]);
 
-  const set      = (key, val) => setForm(f => ({ ...f, [key]: val }));
+  const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
   const setContact = (key, val) => setForm(f => ({ ...f, contact: { ...f.contact, [key]: val } }));
 
-  const addTag    = (key, val, setter) => {
+  const addTag = (key, val, setter) => {
     if (!val.trim()) return;
     setForm(f => ({ ...f, [key]: [...(f[key] || []), val.trim()] }));
     setter("");
   };
+  
   const removeTag = (key, idx) =>
     setForm(f => ({ ...f, [key]: f[key].filter((_, i) => i !== idx) }));
 
@@ -446,7 +438,6 @@ const ProfileSection = ({ hospital, dispatch }) => {
     <div className="space-y-6">
       <SectionHeader title="Hospital Profile" subtitle="Core details visible to patients and staff on the platform." icon={Hospital} />
 
-      {/* Basic Info */}
       <Card>
         <div className="p-6 border-b border-[var(--base-300)]">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50">Basic Information</h3>
@@ -474,13 +465,12 @@ const ProfileSection = ({ hospital, dispatch }) => {
               <Label>ICU Beds</Label>
               <Input type="number" min={0} value={form.bedCount.icu}
                 onChange={e => set("bedCount", { ...form.bedCount, icu: Number(e.target.value) })} />
-              <FieldNote>Setting &gt; 0 auto-enables "Has ICU" flag.</FieldNote>
+              <FieldNote>Setting  0 auto-enables "Has ICU" flag.</FieldNote>
             </div>
           </div>
         </div>
       </Card>
 
-      {/* Contact */}
       <Card>
         <div className="p-6 border-b border-[var(--base-300)]">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50">Contact Details</h3>
@@ -506,7 +496,6 @@ const ProfileSection = ({ hospital, dispatch }) => {
         </div>
       </Card>
 
-      {/* Accreditations */}
       <Card>
         <div className="p-6 border-b border-[var(--base-300)]">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50">Accreditations & Certifications</h3>
@@ -535,7 +524,6 @@ const ProfileSection = ({ hospital, dispatch }) => {
         </div>
       </Card>
 
-      {/* Specialties */}
       <Card>
         <div className="p-6 border-b border-[var(--base-300)]">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50">Medical Specialties</h3>
@@ -563,7 +551,6 @@ const ProfileSection = ({ hospital, dispatch }) => {
         </div>
       </Card>
 
-      {/* Facility Flags */}
       <Card>
         <div className="p-6 border-b border-[var(--base-300)]">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50">Facility Features</h3>
@@ -587,7 +574,6 @@ const ProfileSection = ({ hospital, dispatch }) => {
         </div>
       </Card>
 
-      {/* Accepted Schemes */}
       <Card>
         <div className="p-6 border-b border-[var(--base-300)]">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50">Accepted Insurance & Govt. Schemes</h3>
@@ -636,7 +622,7 @@ const LocationSection = ({ hospital, dispatch }) => {
     lat: "", lng: "", googleMapsUrl: "",
     address: { line1: "", line2: "", landmark: "", city: "Vijayawada", state: "Andhra Pradesh", pincode: "" },
   });
-  const [toast, setToast]   = useState(null);
+  const [toast, setToast] = useState(null);
   const [detecting, setDetecting] = useState(false);
 
   useEffect(() => {
@@ -658,7 +644,6 @@ const LocationSection = ({ hospital, dispatch }) => {
 
   const setAddr = (key, val) => setForm(f => ({ ...f, address: { ...f.address, [key]: val } }));
 
-  // Called by GoogleMapPicker on marker drag / click / place select
   const handleMapLocationChange = useCallback((lat, lng) => {
     setForm(f => ({
       ...f,
@@ -666,7 +651,6 @@ const LocationSection = ({ hospital, dispatch }) => {
       lng: lng.toFixed(6),
     }));
 
-    // Reverse geocode to fill address fields
     if (!window.google) return;
     const geocoder = new window.google.maps.Geocoder();
     geocoder.geocode({ location: { lat, lng } }, (results, status) => {
@@ -712,12 +696,11 @@ const LocationSection = ({ hospital, dispatch }) => {
     if (isNaN(lat) || isNaN(lng)) {
       return setToast({ msg: "Invalid coordinates. Use the map or enter valid lat/lng.", type: "error" });
     }
-    // FIX: googleMapsUrl is top-level on hospital, not inside address
     const result = await dispatch(updateLocation({
       lat,
       lng,
       address:      form.address,
-      googleMapsUrl: form.googleMapsUrl, // passed separately; backend route accepts it
+      googleMapsUrl: form.googleMapsUrl, 
     }));
     if (!result.error) setToast({ msg: "Location updated successfully.", type: "success" });
     else setToast({ msg: result.payload || "Failed to update location.", type: "error" });
@@ -727,7 +710,6 @@ const LocationSection = ({ hospital, dispatch }) => {
     <div className="space-y-6">
       <SectionHeader title="Location & GPS" subtitle="Accurate location ensures patients can navigate to your hospital." icon={MapPin} />
 
-      {/* Interactive Map */}
       <Card>
         <div className="p-6 border-b border-[var(--base-300)] flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50">Interactive Map</h3>
@@ -747,7 +729,6 @@ const LocationSection = ({ hospital, dispatch }) => {
         </div>
       </Card>
 
-      {/* Manual Coordinates */}
       <Card>
         <div className="p-6 border-b border-[var(--base-300)]">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50">GPS Coordinates</h3>
@@ -772,7 +753,6 @@ const LocationSection = ({ hospital, dispatch }) => {
         </div>
       </Card>
 
-      {/* Physical Address */}
       <Card>
         <div className="p-6 border-b border-[var(--base-300)]">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50">Physical Address</h3>
@@ -793,7 +773,6 @@ const LocationSection = ({ hospital, dispatch }) => {
             </div>
           ))}
 
-          {/* FIX: googleMapsUrl is top-level field, not inside address */}
           <div>
             <Label>Google Maps URL</Label>
             <div className="relative">
@@ -827,7 +806,6 @@ const LocationSection = ({ hospital, dispatch }) => {
 
 const HoursSection = ({ dispatch }) => {
   const loading      = useSelector(isLoading(updateOperatingHours));
-  // FIX: select from Redux, fetch on mount
   const savedHours   = useSelector(selectOperatingHours);
 
   const [hours, setHours] = useState(
@@ -836,16 +814,13 @@ const HoursSection = ({ dispatch }) => {
   const [is24x7, setIs24x7] = useState(false);
   const [toast, setToast]   = useState(null);
 
-  // FIX: fetch operating hours on mount
   useEffect(() => {
     dispatch(fetchOperatingHours());
   }, [dispatch]);
 
-  // FIX: merge saved hours from Redux into local state
   useEffect(() => {
     if (!savedHours) return;
 
-    // savedHours may be { operatingHours: [...], is24x7: bool } or just array
     const arr     = Array.isArray(savedHours) ? savedHours : savedHours.operatingHours;
     const flag24  = savedHours.is24x7 ?? false;
 
@@ -865,7 +840,6 @@ const HoursSection = ({ dispatch }) => {
   const updateDay = (dayName, key, val) =>
     setHours(h => h.map(d => d.day === dayName ? { ...d, [key]: val } : d));
 
-  // FIX: applyAllWeekdays uses current hours state correctly
   const applyAllWeekdays = () => {
     const monday = hours.find(d => d.day === "Monday");
     if (!monday) return;
@@ -905,83 +879,82 @@ const HoursSection = ({ dispatch }) => {
             <FieldNote>Set open/close times per day. "24hr" overrides times. "Closed" means no bookings that day.</FieldNote>
           </div>
 
-         
-                   <div className="space-y-3">
-           {hours.map((d, i) => (
-             <motion.div
-               key={d.day}
-               initial={{ opacity: 0, x: -8 }}
-               animate={{ opacity: 1, x: 0 }}
-               transition={{ delay: i * 0.04 }}
-               className={`flex items-center justify-between gap-4 p-3.5 rounded-xl border transition-all duration-200 ${
-                 d.isClosed
-                   ? "bg-[var(--base-200)]/40 border-[var(--base-300)] opacity-70"
-                   : "bg-[var(--base-100)] border-[var(--base-300)] hover:border-[var(--primary)]/30"
-               }`}
-             >
-               {/* Day Label */}
-               <span className="w-24 text-xs font-bold text-[var(--base-content)]/70 shrink-0 uppercase tracking-wide">
-                 {d.day}
-               </span>
-         
-               {/* Time Inputs / Status Message Container */}
-               <div className="flex-1 flex items-center justify-center min-w-0">
-                 {d.isClosed ? (
-                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--error)]/60 bg-[var(--error)]/5 px-4 py-2 rounded-lg border border-[var(--error)]/10">
-                     Closed
-                   </span>
-                 ) : d.is24Hours ? (
-                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--success)]/60 bg-[var(--success)]/5 px-4 py-2 rounded-lg border border-[var(--success)]/10">
-                     Open 24 Hours
-                   </span>
-                 ) : (
-                   <div className="flex items-center gap-2">
-                     <Input 
-                       type="time" 
-                       className="w-32 h-9 text-sm"
-                       value={d.openTime}
-                       onChange={e => updateDay(d.day, "openTime", e.target.value)} 
-                     />
-                     <span className="text-[var(--base-content)]/20 text-[10px] font-bold uppercase">to</span>
-                     <Input 
-                       type="time" 
-                       className="w-32 h-9 text-sm"
-                       value={d.closeTime}
-                       onChange={e => updateDay(d.day, "closeTime", e.target.value)} 
-                     />
-                   </div>
-                 )}
-               </div>
-         
-               {/* Toggle Controls - Fixed width ensures vertical alignment */}
-               <div className="flex items-center gap-5 shrink-0 w-[130px] justify-end">
-                 <label className="flex flex-col items-center gap-1.5 cursor-pointer group">
-                   <Toggle
-                     checked={d.is24Hours}
-                     colorOn="bg-[var(--success)]"
-                     onChange={v => {
-                       updateDay(d.day, "is24Hours", v);
-                       if (v) updateDay(d.day, "isClosed", false);
-                     }}
-                   />
-                   <span className="text-[9px] font-bold text-[var(--base-content)]/40 group-hover:text-[var(--success)] transition-colors">24H</span>
-                 </label>
-         
-                 <label className="flex flex-col items-center gap-1.5 cursor-pointer group">
-                   <Toggle
-                     checked={d.isClosed}
-                     colorOn="bg-[var(--error)]"
-                     onChange={v => {
-                       updateDay(d.day, "isClosed", v);
-                       if (v) updateDay(d.day, "is24Hours", false);
-                     }}
-                   />
-                   <span className="text-[9px] font-bold text-[var(--base-content)]/40 group-hover:text-[var(--error)] transition-colors">CLOSED</span>
-                 </label>
-               </div>
-             </motion.div>
-           ))}
-         </div>
+          <div className="space-y-3">
+            {hours.map((d, i) => (
+              <motion.div
+                key={d.day}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.04 }}
+                className={`flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border transition-all duration-200 ${
+                  d.isClosed
+                    ? "bg-[var(--base-200)]/40 border-[var(--base-300)] opacity-70"
+                    : "bg-[var(--base-100)] border-[var(--base-300)] hover:border-[var(--primary)]/30"
+                }`}
+              >
+                {/* Day Label */}
+                <span className="w-24 shrink-0 text-sm font-bold text-[var(--base-content)]/80 uppercase tracking-wide">
+                  {d.day}
+                </span>
+
+                {/* Time Inputs / Status Message Container */}
+                <div className="flex-1 flex items-center gap-3 min-w-[240px]">
+                  {d.isClosed ? (
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--error)]/60 bg-[var(--error)]/5 px-4 py-2 rounded-lg border border-[var(--error)]/10">
+                      Closed
+                    </span>
+                  ) : d.is24Hours ? (
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--success)]/60 bg-[var(--success)]/5 px-4 py-2 rounded-lg border border-[var(--success)]/10">
+                      Open 24 Hours
+                    </span>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Input 
+                        type="time" 
+                        className="w-[120px] h-10 text-sm px-3"
+                        value={d.openTime}
+                        onChange={e => updateDay(d.day, "openTime", e.target.value)} 
+                      />
+                      <span className="text-[var(--base-content)]/40 text-[10px] font-bold uppercase">to</span>
+                      <Input 
+                        type="time" 
+                        className="w-[120px] h-10 text-sm px-3"
+                        value={d.closeTime}
+                        onChange={e => updateDay(d.day, "closeTime", e.target.value)} 
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Toggle Controls - Adjusted to side-by-side flex-row layout */}
+                <div className="flex items-center gap-6 shrink-0">
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <span className="text-xs font-bold text-[var(--base-content)]/50 group-hover:text-[var(--success)] transition-colors">24H</span>
+                    <Toggle
+                      checked={d.is24Hours}
+                      colorOn="bg-[var(--success)]"
+                      onChange={v => {
+                        updateDay(d.day, "is24Hours", v);
+                        if (v) updateDay(d.day, "isClosed", false);
+                      }}
+                    />
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <span className="text-xs font-bold text-[var(--base-content)]/50 group-hover:text-[var(--error)] transition-colors">Closed</span>
+                    <Toggle
+                      checked={d.isClosed}
+                      colorOn="bg-[var(--error)]"
+                      onChange={v => {
+                        updateDay(d.day, "isClosed", v);
+                        if (v) updateDay(d.day, "is24Hours", false);
+                      }}
+                    />
+                  </label>
+                </div>
+              </motion.div>
+            ))}
+          </div>
 
           <div className="mt-4">
             <FieldNote>The "24×7 Hospital" toggle overrides all individual day settings when enabled.</FieldNote>
@@ -1046,7 +1019,6 @@ const GallerySection = ({ hospital, dispatch }) => {
     <div className="space-y-6">
       <SectionHeader title="Gallery & Logo" subtitle="Upload visual assets that represent your hospital to patients." icon={ImageIcon} />
 
-      {/* Logo */}
       <Card>
         <div className="p-6 border-b border-[var(--base-300)]">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50">Hospital Logo</h3>
@@ -1074,7 +1046,6 @@ const GallerySection = ({ hospital, dispatch }) => {
         </div>
       </Card>
 
-      {/* Gallery */}
       <Card>
         <div className="p-6 border-b border-[var(--base-300)] flex items-center justify-between">
           <div>
@@ -1236,7 +1207,6 @@ const LegalSection = ({ hospital, dispatch }) => {
         </div>
       </Card>
 
-      {/* Document Upload */}
       <Card>
         <div className="p-6 border-b border-[var(--base-300)]">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50">License Document</h3>
@@ -1324,7 +1294,6 @@ export default function FacilityManagement() {
 
   return (
     <div className="min-h-screen bg-[var(--base-200)]/50" data-theme="hospital">
-      {/* Sticky Header */}
       <div className="bg-[var(--base-100)] border-b border-[var(--base-300)] sticky top-0 z-30">
         <div className="max-w-7xl mx-auto  py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -1351,7 +1320,6 @@ export default function FacilityManagement() {
       <div className="max-w-7xl mx-auto 6 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
 
-          {/* Sidebar */}
           <aside className="lg:w-60 shrink-0">
             <div className="sticky top-24">
               <Card className="overflow-hidden">
@@ -1383,7 +1351,6 @@ export default function FacilityManagement() {
                   })}
                 </nav>
 
-                {/* Progress bar */}
                 <div className="px-4 py-4 border-t border-[var(--base-300)]">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-semibold text-[var(--base-content)]/50">Profile Complete</span>
@@ -1404,7 +1371,6 @@ export default function FacilityManagement() {
             </div>
           </aside>
 
-          {/* Main Content */}
           <main className="flex-1 min-w-0">
             <AnimatePresence mode="wait">
               <motion.div

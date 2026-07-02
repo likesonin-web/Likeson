@@ -16,7 +16,7 @@ import {
   fetchMyDoctorProfile,
   updateDoctorProfile,
   uploadDoctorPhoto,
-  uploadDoctorSignature, // Added signature thunk
+  uploadDoctorSignature,
   selectMyDoctorProfile,
   selectHospitalLoading,
   selectHospitalError,
@@ -24,50 +24,43 @@ import {
 import { RadialBarChart, RadialBar, ResponsiveContainer } from "recharts";
 
 // ─── Section registry ─────────────────────────────────────────────────────────
-// /doctor/profile          → params.section = undefined  → activeId = "overview"
-// /doctor/profile/fees     → params.section = "fees"     → activeId = "fees"
 const SECTIONS = [
   { id: "overview",       label: "Profile Overview",  icon: UserRound,        href: "/doctor/profile" },
   { id: "professional",   label: "Professional Info", icon: Stethoscope,      href: "/doctor/profile/professional" },
   { id: "qualifications", label: "Qualifications",    icon: Award,            href: "/doctor/profile/qualifications" },
   { id: "bio",            label: "Languages & Bio",   icon: Languages,        href: "/doctor/profile/bio" },
-{ id: "fees",           label: "Consultation Fees", icon: CircleDollarSign, href: "/doctor/profile/fees" },
+  { id: "fees",           label: "Consultation Fees", icon: CircleDollarSign, href: "/doctor/profile/fees" },
   { id: "photo",          label: "Profile Photo",     icon: Camera,           href: "/doctor/profile/photo" },
   { id: "signature",      label: "E-Signature",       icon: Edit3,            href: "/doctor/profile/signature" },
 ];
 
-// Map the raw URL param → section id, falling back to "overview"
 const resolveSection = (param) => {
   if (!param) return "overview";
   return SECTIONS.find((s) => s.id === param)?.id ?? "overview";
 };
 
-// ─── Style tokens ─────────────────────────────────────────────────────────────
-const inputCls =
-  "w-full bg-base-200 border border-base-300 rounded-xl px-4 py-3 text-base-content text-xs " +
-  "focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all " +
-  "placeholder:text-base-content/30 font-poppins";
-const labelCls =
-  "block text-[10px] font-semibold uppercase tracking-widest text-base-content/50 mb-1.5 font-montserrat";
+// ─── Style tokens — routed through globals.css component classes ─────────────
+const inputCls = "input-field text-xs";
+const labelCls = "block text-[10px] font-semibold uppercase tracking-widest text-base-content/50 mb-1.5 font-montserrat";
 
-// ─── Badge helpers ────────────────────────────────────────────────────────────
+// ─── Badge helpers — map onto globals.css .badge-* variants ──────────────────
 const kycBadge = (status) => {
   const map = {
-    verified:        { label: "KYC Verified",  color: "text-success border-success/30 bg-success/10" },
-    pending:         { label: "KYC Pending",   color: "text-warning border-warning/30 bg-warning/10" },
-    "under-review":  { label: "Under Review",  color: "text-info border-info/30 bg-info/10" },
-    rejected:        { label: "KYC Rejected",  color: "text-error border-error/30 bg-error/10" },
-    "not-submitted": { label: "Not Submitted", color: "text-neutral/60 border-base-300 bg-base-200" },
+    verified:        { label: "KYC Verified",  cls: "badge-success" },
+    pending:         { label: "KYC Pending",   cls: "badge-warning" },
+    "under-review":  { label: "Under Review",  cls: "badge-info" },
+    rejected:        { label: "KYC Rejected",  cls: "badge-error" },
+    "not-submitted": { label: "Not Submitted", cls: "badge-secondary" },
   };
   return map[status] ?? map["not-submitted"];
 };
 
 const partnerBadge = (status) => {
   const map = {
-    Active:    { label: "Active Partner", color: "text-success border-success/30 bg-success/10" },
-    Pending:   { label: "Pending",        color: "text-warning border-warning/30 bg-warning/10" },
-    Inactive:  { label: "Inactive",       color: "text-neutral/50 border-base-300 bg-base-200" },
-    Suspended: { label: "Suspended",      color: "text-error border-error/30 bg-error/10" },
+    Active:    { label: "Active Partner", cls: "badge-success" },
+    Pending:   { label: "Pending",        cls: "badge-warning" },
+    Inactive:  { label: "Inactive",       cls: "badge-secondary" },
+    Suspended: { label: "Suspended",      cls: "badge-error" },
   };
   return map[status] ?? map["Pending"];
 };
@@ -80,7 +73,7 @@ function SectionCard({ children, className = "" }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.32, ease: "easeOut" }}
-      className={`bg-base-100 border border-base-300 rounded-2xl p-6 shadow-sm ${className}`}
+      className={`card p-6 ${className}`}
     >
       {children}
     </motion.div>
@@ -103,25 +96,15 @@ function SectionHeader({ title, subtitle, icon: Icon, onEdit, isEditing, onCance
         <div className="flex gap-2">
           {isEditing ? (
             <>
-              <button
-                onClick={onCancel}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold text-base-content/60 hover:bg-base-200 transition-all"
-              >
+              <button onClick={onCancel} className="btn btn-xs btn-ghost">
                 <X size={13} /> Cancel
               </button>
-              <button
-                onClick={onSave}
-                disabled={saving}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-semibold bg-primary text-primary-content hover:brightness-110 transition-all disabled:opacity-50"
-              >
+              <button onClick={onSave} disabled={saving} className="btn btn-xs btn-primary">
                 {saving ? <span className="spinner w-3 h-3" /> : <Save size={13} />} Save
               </button>
             </>
           ) : (
-            <button
-              onClick={onEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold text-primary hover:bg-primary/10 transition-all border border-primary/20"
-            >
+            <button onClick={onEdit} className="btn btn-xs btn-outline">
               <Edit3 size={13} /> Edit
             </button>
           )}
@@ -152,9 +135,10 @@ function OverviewSection({ profile }) {
   const user    = profile?.user || {};
   const kyc     = kycBadge(profile?.kycStatus);
   const partner = partnerBadge(profile?.partnershipStatus);
+  const completion = profile?.profileCompletionPercent ?? 0;
 
   const completionData = [
-    { name: "Completion", value: profile?.profileCompletionPercent || 0, fill: "var(--color-primary)" },
+    { name: "Completion", value: completion, fill: "var(--color-primary)" },
   ];
 
   const stats = [
@@ -164,8 +148,30 @@ function OverviewSection({ profile }) {
     { label: "Earnings",      value: `₹${((profile?.stats?.totalEarnings ?? 0) / 1000).toFixed(1)}k`, icon: TrendingUp },
   ];
 
+  // FIX: schema field is `weeklyAvailability`, not `availability`.
+  const hasAvailability = (profile?.weeklyAvailability ?? []).some(
+    (d) => d.isAvailable && d.slots?.length > 0
+  );
+
   return (
     <div className="space-y-5">
+      {/* Profile-incomplete nudge */}
+      {completion < 100 && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="alert alert-warning"
+        >
+          <AlertCircle size={16} className="flex-shrink-0 mt-0.5 text-warning" />
+          <div>
+            <p className="text-sm font-semibold text-warning">Your profile is {completion}% complete</p>
+            <p className="text-xs text-base-content/60 mt-0.5">
+              Finish the checklist below to unlock full visibility to patients.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Hero card */}
       <SectionCard>
         <div className="flex flex-col sm:flex-row gap-6 items-start">
@@ -191,8 +197,8 @@ function OverviewSection({ profile }) {
             </div>
             <p className="text-xs text-primary font-semibold mb-2 font-poppins">{profile?.specialization || "—"}</p>
             <div className="flex flex-wrap gap-1.5 mb-3">
-              <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-semibold ${kyc.color}`}>{kyc.label}</span>
-              <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-semibold ${partner.color}`}>{partner.label}</span>
+              <span className={`badge badge-sm ${kyc.cls}`}>{kyc.label}</span>
+              <span className={`badge badge-sm ${partner.cls}`}>{partner.label}</span>
             </div>
             <div className="flex flex-wrap gap-4 text-[10px] text-base-content/50">
               {user?.email && <span className="flex items-center gap-1"><Mail size={12} />{user.email}</span>}
@@ -209,7 +215,7 @@ function OverviewSection({ profile }) {
                 </RadialBarChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xs font-black text-base-content font-montserrat">{profile?.profileCompletionPercent ?? 0}%</span>
+                <span className="text-xs font-black text-base-content font-montserrat">{completion}%</span>
               </div>
             </div>
             <p className="text-[10px] text-base-content/40 font-poppins">Profile</p>
@@ -217,14 +223,14 @@ function OverviewSection({ profile }) {
         </div>
       </SectionCard>
 
-      {/* Stats grid */}
+      {/* Stats grid — using globals.css .stat-card family */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {stats.map(({ label, value, icon: Icon }) => (
-          <SectionCard key={label} className="p-4 text-center hover:-translate-y-0.5 transition-transform cursor-default">
+          <div key={label} className="stat-card text-center hover:-translate-y-0.5 transition-transform cursor-default">
             <Icon size={18} className="text-primary mx-auto mb-1.5" />
-            <p className="text-md font-black text-base-content font-montserrat">{value}</p>
-            <p className="text-[10px] text-base-content/40 font-poppins mt-0.5">{label}</p>
-          </SectionCard>
+            <p className="stat-card-value !text-lg">{value}</p>
+            <p className="stat-card-label !mt-0.5">{label}</p>
+          </div>
         ))}
       </div>
 
@@ -239,6 +245,9 @@ function OverviewSection({ profile }) {
               {profile.primaryHospital?.address?.city && (
                 <p className="text-[10px] text-base-content/40">{profile.primaryHospital.address.city}, {profile.primaryHospital.address.state}</p>
               )}
+              {profile.primaryHospital?.managementModel === "hospital-manager" && (
+                <span className="badge badge-sm badge-info mt-1.5">Hospital sets your pricing</span>
+              )}
             </div>
           </div>
         </SectionCard>
@@ -249,12 +258,12 @@ function OverviewSection({ profile }) {
         <SectionHeader title="Onboarding Checklist" subtitle="Complete all steps to go live" icon={CheckCircle2} />
         <div className="space-y-2.5">
           {[
-            { label: "Specialization set",       done: !!profile?.specialization },
+            { label: "Specialization set",        done: !!profile?.specialization },
             { label: "Registration number added", done: !!profile?.registrationNumber },
             { label: "Aadhaar verified",          done: !!profile?.kyc?.aadhaarVerified },
             { label: "PAN verified",              done: !!profile?.kyc?.panVerified },
             { label: "Primary hospital linked",   done: !!profile?.primaryHospital },
-            { label: "Availability schedule set", done: (profile?.availability?.length ?? 0) > 0 },
+            { label: "Availability schedule set", done: hasAvailability },
             { label: "Consultation fee set",      done: (profile?.fees?.inPersonFee ?? 0) > 0 },
             { label: "Bank details submitted",    done: !!profile?.bankDetails?.isBankVerified },
             { label: "Profile photo uploaded",    done: !!profile?.profilePhotoUrl },
@@ -357,7 +366,7 @@ function ProfessionalSection({ profile, dispatch }) {
             <label className={labelCls}>Achievements</label>
             <div className="flex flex-wrap gap-2 mb-2">
               {form.achievements.map((a, i) => (
-                <span key={i} className="flex items-center gap-1.5 text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20">
+                <span key={i} className="badge badge-primary">
                   {a}
                   <button onClick={() => setForm((f) => ({ ...f, achievements: f.achievements.filter((_, j) => j !== i) }))}><X size={11} /></button>
                 </span>
@@ -365,7 +374,7 @@ function ProfessionalSection({ profile, dispatch }) {
             </div>
             <div className="flex gap-2">
               <input className={inputCls} value={newAch} onChange={(e) => setNewAch(e.target.value)} placeholder="Add achievement…" onKeyDown={(e) => e.key === "Enter" && addAch()} />
-              <button onClick={addAch} className="px-3 py-2 rounded-xl bg-primary text-primary-content text-xs font-bold hover:brightness-110 transition-all"><Plus size={16} /></button>
+              <button onClick={addAch} className="btn btn-sm btn-primary"><Plus size={16} /></button>
             </div>
           </div>
         </div>
@@ -380,7 +389,7 @@ function ProfessionalSection({ profile, dispatch }) {
               <p className={labelCls}>Achievements</p>
               <div className="flex flex-wrap gap-2 mt-1">
                 {profile.achievements.map((a, i) => (
-                  <span key={i} className="text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20">{a}</span>
+                  <span key={i} className="badge badge-primary">{a}</span>
                 ))}
               </div>
             </div>
@@ -543,10 +552,8 @@ function BioSection({ profile, dispatch }) {
                 <button
                   key={lang}
                   onClick={() => toggleLang(lang)}
-                  className={`text-[10px] px-3 py-1.5 rounded-full border font-semibold transition-all ${
-                    form.languagesSpoken.includes(lang)
-                      ? "bg-primary text-primary-content border-primary"
-                      : "bg-base-200 text-base-content/60 border-base-300 hover:border-primary hover:text-primary"
+                  className={`badge badge-sm cursor-pointer transition-all ${
+                    form.languagesSpoken.includes(lang) ? "badge-primary" : "badge-secondary"
                   }`}
                 >
                   {lang}
@@ -568,7 +575,7 @@ function BioSection({ profile, dispatch }) {
             {(profile?.languagesSpoken?.length ?? 0) > 0 ? (
               <div className="flex flex-wrap gap-2 mt-1">
                 {profile.languagesSpoken.map((l) => (
-                  <span key={l} className="text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20">{l}</span>
+                  <span key={l} className="badge badge-primary">{l}</span>
                 ))}
               </div>
             ) : <p className="text-xs text-base-content/30 italic">No languages added.</p>}
@@ -608,18 +615,31 @@ function FeesSection({ profile, dispatch }) {
     { key: "followUpFee",  label: "Follow-Up",              type: null,        icon: Calendar },
   ];
 
+  const isHospitalManaged = profile?.primaryHospital?.managementModel === "hospital-manager";
+
   return (
     <SectionCard>
       <SectionHeader
         title="Consultation Fees"
-        subtitle="Set your fees for each consultation type"
+        subtitle={isHospitalManaged ? "Set by your hospital manager" : "Set your fees for each consultation type"}
         icon={CircleDollarSign}
-        onEdit={() => setEditing(true)}
+        onEdit={isHospitalManaged ? undefined : () => setEditing(true)}
         isEditing={editing}
         onCancel={reset}
         onSave={save}
         saving={saving}
       />
+
+      {isHospitalManaged && (
+        <div className="alert alert-info mb-4">
+          <AlertCircle size={16} className="flex-shrink-0 mt-0.5 text-info" />
+          <p className="text-xs text-base-content/70">
+            {profile.primaryHospital?.name} controls consultation pricing for all its linked doctors.
+            Talk to your hospital manager to change fees.
+          </p>
+        </div>
+      )}
+
       {editing ? (
         <div className="space-y-4">
           {feeFields.map(({ key, label, type, icon: Icon }) => (
@@ -633,7 +653,7 @@ function FeesSection({ profile, dispatch }) {
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="toggle toggle-xs toggle-primary"
+                      className="checkbox checkbox-sm"
                       checked={form.consultationTypes?.[type] || false}
                       onChange={(e) => setForm((f) => ({ ...f, consultationTypes: { ...f.consultationTypes, [type]: e.target.checked } }))}
                     />
@@ -678,16 +698,16 @@ function FeesSection({ profile, dispatch }) {
             );
           })}
           {profile?.platformFee && (
-            <div className="mt-2 p-3 bg-warning/10 border border-warning/20 rounded-xl">
-              <div className="flex items-center gap-2 mb-1">
-                <AlertCircle size={13} className="text-warning" />
+            <div className="alert alert-warning mt-2">
+              <AlertCircle size={13} className="text-warning flex-shrink-0" />
+              <div>
                 <p className="text-[10px] font-semibold text-warning font-montserrat">Custom Platform Fee Applied</p>
+                <p className="text-[10px] text-base-content/60 font-poppins">
+                  {profile.platformFee.type === "fixed"
+                    ? `₹${profile.platformFee.value} flat per transaction`
+                    : `${profile.platformFee.value}% of transaction value`}
+                </p>
               </div>
-              <p className="text-[10px] text-base-content/60 font-poppins">
-                {profile.platformFee.type === "fixed"
-                  ? `₹${profile.platformFee.value} flat per transaction`
-                  : `${profile.platformFee.value}% of transaction value`}
-              </p>
             </div>
           )}
         </div>
@@ -748,26 +768,16 @@ function PhotoSection({ profile, dispatch }) {
             Upload a clear, professional headshot. Accepted formats: JPG, PNG, WEBP. Max 5MB.
           </p>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-xs font-semibold hover:bg-primary/20 transition-all"
-            >
+            <button onClick={() => fileRef.current?.click()} className="btn btn-sm btn-outline">
               <ImageIcon size={15} /> Choose Photo
             </button>
             {file && (
               <>
-                <button
-                  onClick={handleUpload}
-                  disabled={uploading}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-content text-xs font-semibold hover:brightness-110 transition-all disabled:opacity-50"
-                >
+                <button onClick={handleUpload} disabled={uploading} className="btn btn-sm btn-primary">
                   {uploading ? <span className="spinner w-4 h-4" /> : <Upload size={15} />}
                   {uploading ? "Uploading…" : "Upload"}
                 </button>
-                <button
-                  onClick={cancel}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs text-base-content/50 hover:bg-base-200 transition-all"
-                >
+                <button onClick={cancel} className="btn btn-sm btn-ghost">
                   <RotateCcw size={13} /> Reset
                 </button>
               </>
@@ -803,8 +813,8 @@ function SignatureSection({ profile, dispatch }) {
     setPreview(null);
   };
 
-  const cancel       = () => { setFile(null); setPreview(null); };
-  const currentSignature = profile?.doctorSignature;
+  const cancel            = () => { setFile(null); setPreview(null); };
+  const currentSignature  = profile?.doctorSignature;
 
   return (
     <SectionCard>
@@ -833,26 +843,16 @@ function SignatureSection({ profile, dispatch }) {
             Upload a clear image of your signature on a plain white background. This will be used automatically on your generated prescriptions and medical certificates.
           </p>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-xs font-semibold hover:bg-primary/20 transition-all"
-            >
+            <button onClick={() => fileRef.current?.click()} className="btn btn-sm btn-outline">
               <ImageIcon size={15} /> Choose Signature
             </button>
             {file && (
               <>
-                <button
-                  onClick={handleUpload}
-                  disabled={uploading}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-content text-xs font-semibold hover:brightness-110 transition-all disabled:opacity-50"
-                >
+                <button onClick={handleUpload} disabled={uploading} className="btn btn-sm btn-primary">
                   {uploading ? <span className="spinner w-4 h-4" /> : <Upload size={15} />}
                   {uploading ? "Uploading…" : "Upload"}
                 </button>
-                <button
-                  onClick={cancel}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs text-base-content/50 hover:bg-base-200 transition-all"
-                >
+                <button onClick={cancel} className="btn btn-sm btn-ghost">
                   <RotateCcw size={13} /> Reset
                 </button>
               </>
@@ -896,7 +896,7 @@ function SidebarNav({ activeId }) {
 
 function MobileTabs({ activeId }) {
   return (
-    <div className="flex overflow-x-auto gap-2   scrollbar-hide">
+    <div className="flex overflow-x-auto gap-2 scrollbar-hide">
       {SECTIONS.map(({ id, label, icon: Icon, href }) => {
         const isActive = activeId === id;
         return (
@@ -918,20 +918,14 @@ function MobileTabs({ activeId }) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  ROOT COMPONENT
-//  Works for BOTH pages:
-//    app/doctor/profile/page.jsx            → useParams() = {}
-//    app/doctor/profile/[section]/page.jsx  → useParams() = { section: "fees" }
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function MyProfile() {
-  const params   = useParams();                         // Next.js App Router
+  const params   = useParams();
   const dispatch = useDispatch();
   const profile  = useSelector(selectMyDoctorProfile);
   const loading  = useSelector(selectHospitalLoading);
   const error    = useSelector(selectHospitalError);
 
-  // Derive active section from URL — no useState, no prop needed.
-  // params.section is undefined on /doctor/profile → resolves to "overview"
-  // params.section is "fees" on /doctor/profile/fees → resolves to "fees"
   const activeId = resolveSection(params?.section);
 
   useEffect(() => {
@@ -942,7 +936,7 @@ export default function MyProfile() {
     return (
       <div className="min-h-screen bg-base-200 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto" />
+          <div className="loading-spinner loading-lg" />
           <p className="text-xs text-base-content/50 font-poppins">Loading your profile…</p>
         </div>
       </div>
@@ -956,7 +950,7 @@ export default function MyProfile() {
           <AlertCircle size={36} className="text-error mx-auto" />
           <p className="text-base font-semibold text-base-content font-montserrat">Failed to load profile</p>
           <p className="text-xs text-base-content/50 font-poppins">{error}</p>
-          <button onClick={() => dispatch(fetchMyDoctorProfile())} className="btn-primary-cta text-[10px] px-5 py-2.5">Retry</button>
+          <button onClick={() => dispatch(fetchMyDoctorProfile())} className="btn btn-primary-cta text-[10px] px-5 py-2.5">Retry</button>
         </div>
       </div>
     );
@@ -981,16 +975,16 @@ export default function MyProfile() {
         </div>
       </div>
 
-      <div className="w-full mx-auto md:px-4 px-2   py-6">
-        {/* Mobile tab bar — uses Next.js <Link>, highlights by activeId */}
+      <div className="w-full mx-auto md:px-4 px-2 py-6">
+        {/* Mobile tab bar */}
         <div className="lg:hidden mb-4">
           <MobileTabs activeId={activeId} />
         </div>
 
         <div className="flex gap-2 md:gap-4 items-start">
-          {/* Desktop sidebar — uses Next.js <Link> for real navigation */}
+          {/* Desktop sidebar */}
           <aside className="hidden lg:block w-56 flex-shrink-0 sticky top-6">
-            <div className="bg-base-100 border border-base-300 rounded-2xl p-3 shadow-sm">
+            <div className="card p-3">
               <div className="px-2 py-2 mb-2">
                 <p className="text-[10px] font-bold text-base-content/30 uppercase tracking-widest font-montserrat">Sections</p>
               </div>
@@ -998,10 +992,10 @@ export default function MyProfile() {
             </div>
 
             {/* Quick info panel */}
-            <div className="mt-4 bg-base-100 border border-base-300 rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="mt-4 card p-4 space-y-3">
               <p className="text-[10px] font-bold text-base-content/30 uppercase tracking-widest font-montserrat mb-2">Quick Info</p>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${profile?.isOnline ? "bg-success" : "bg-base-300"}`} />
+                <span className={`status-dot ${profile?.isOnline ? "status-dot-success" : "bg-base-300"}`} />
                 <span className="text-[10px] font-poppins text-base-content/60">{profile?.isOnline ? "Online" : "Offline"}</span>
               </div>
               <div className="flex items-center gap-2">
@@ -1025,14 +1019,14 @@ export default function MyProfile() {
             </div>
           </aside>
 
-          {/* Main content — AnimatePresence re-animates whenever the URL section changes */}
-          <main className="flex-1   min-w-0">
+          {/* Main content */}
+          <main className="flex-1 min-w-0">
             <AnimatePresence mode="wait">
               <motion.div key={activeId}>
                 {activeId === "overview"       && <OverviewSection       {...sectionProps} />}
                 {activeId === "professional"   && <ProfessionalSection   {...sectionProps} />}
                 {activeId === "qualifications" && <QualificationsSection {...sectionProps} />}
-               {activeId === "bio"            && <BioSection            {...sectionProps} />}
+                {activeId === "bio"            && <BioSection            {...sectionProps} />}
                 {activeId === "fees"           && <FeesSection           {...sectionProps} />}
                 {activeId === "photo"          && <PhotoSection          {...sectionProps} />}
                 {activeId === "signature"      && <SignatureSection      {...sectionProps} />}

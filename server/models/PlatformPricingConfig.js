@@ -446,12 +446,24 @@ platformPricingConfigSchema.statics.resolveLabPlatformFee = function (config, la
   return config?.diagnostics?.platformFee ?? null;
 };
 
+// Priority chain (matches the comment on Hospital.consultationPricing.platformFeeOverride):
+//   1. Hospital.consultationPricing.platformFeeOverride  — hospital's own override
+//   2. PlatformPricingConfig.hospital.hospitalOverrides[hospitalId] — admin-set per-hospital override
+//   3. PlatformPricingConfig.hospital.platformFee — global default
+// Doctor-level override sits above all of this and is applied by the caller
+// (DoctorProfile.resolveEffectivePricing), not here.
 platformPricingConfigSchema.statics.resolveHospitalPlatformFee = function (config, hospital) {
+  const ownOverride = hospital?.consultationPricing?.platformFeeOverride;
+  if (ownOverride?.type && ownOverride?.value != null) {
+    return ownOverride;
+  }
+
   const overrides  = config?.hospital?.hospitalOverrides;
   const hospitalId = hospital?._id?.toString();
   if (overrides && hospitalId && overrides.has(hospitalId)) {
     return overrides.get(hospitalId);
   }
+
   return config?.hospital?.platformFee ?? null;
 };
 

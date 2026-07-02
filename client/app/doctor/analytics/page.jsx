@@ -142,12 +142,16 @@ export default function Analytics() {
     if (profile?._id) dispatch(fetchDoctorStats(profile._id));
   }, [dispatch, profile?._id]);
 
-  const s = stats?.stats || {};
+// Legacy denormalized cache — used only where no live equivalent exists below
+  const s = stats?.profile?.stats || {};
+  const live = stats?.liveStats || {};
   const isLoading = loading.fetchMyDoctorProfile || loading.fetchDoctorStats;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const monthlyData = useMemo(() => buildMonthlyData(s), [s.totalConsultations, s.totalEarnings]);
 
+// NOTE: no live per-type (video/homeVisit/inPerson) breakdown from backend
+  // yet — liveStats.consultations only has byStatus. Falls back to legacy cache.
   const consultTypeData = [
     { name: 'In-Person', value: (s.totalConsultations || 0) - (s.totalVideoConsultations || 0) - (s.totalHomeVisits || 0) },
     { name: 'Video', value: s.totalVideoConsultations || 0 },
@@ -172,13 +176,13 @@ export default function Analytics() {
     { name: 'Pending', value: s.pendingSettlement || 0, fill: C.warning },
   ];
 
-  const chips = [
-    { icon: Stethoscope, label: 'Consultations',  value: s.totalConsultations || 0,                                               delay: 1 },
-    { icon: Video,       label: 'Video Sessions', value: s.totalVideoConsultations || 0,                                          delay: 2 },
-    { icon: Home,        label: 'Home Visits',    value: s.totalHomeVisits || 0,                                                  delay: 3 },
-    { icon: Users,       label: 'Referrals',      value: s.totalReferrals || 0,                                                   delay: 4 },
-    { icon: DollarSign,  label: 'Total Earned',   value: `₹${(s.totalEarnings || 0).toLocaleString('en-IN')}`,                   delay: 5 },
-    { icon: TrendingUp,  label: 'Commission',     value: `₹${(s.totalCommissionEarned || 0).toLocaleString('en-IN')}`,           delay: 6 },
+const chips = [
+    { icon: Stethoscope, label: 'Consultations', value: live.consultations?.total ?? s.totalConsultations ?? 0,       delay: 1 },
+    { icon: Video,       label: 'Bookings',      value: live.bookings?.total ?? 0,                                    delay: 2 },
+    { icon: Home,        label: 'OP Records',    value: live.outPatientRecords?.total ?? 0,                           delay: 3 },
+    { icon: Users,       label: 'Referrals',     value: s.totalReferrals || 0,                                        delay: 4 },
+    { icon: DollarSign,  label: 'Doctor Share',  value: `₹${(live.earnings?.totalDoctorShare ?? 0).toLocaleString('en-IN')}`, delay: 5 },
+    { icon: TrendingUp,  label: 'Collected',     value: `₹${(live.earnings?.totalCollected ?? 0).toLocaleString('en-IN')}`,   delay: 6 },
   ];
 
   const axisStyle = { fill: 'color-mix(in oklch, var(--base-content) 40%, transparent)', fontSize: 11 };

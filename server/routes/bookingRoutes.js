@@ -154,10 +154,19 @@ const createOrSendOpOnConfirmation = async ({ booking, triggeredBy = 'system' })
     if (!booking.doctor) return;
     let op = await OutPatientRecord.findOne({ booking: booking._id }).lean();
     if (!op) {
+      // FIX: booking.hospital is very often unset (doctor picked directly, no hospital
+      // step). Falling back to doctor.primaryHospital means OP records — and every
+      // hospital-scoped query reading OutPatientRecord.hospital — actually surface
+      // this consultation instead of silently dropping it.
+      let opHospital = booking.hospital || null;
+      if (!opHospital) {
+        const doctorProfile = await DoctorProfile.findById(booking.doctor).select('primaryHospital').lean();
+        opHospital = doctorProfile?.primaryHospital || null;
+      }
       const opDoc = await OutPatientRecord.create({
         booking:          booking._id,
         doctor:           booking.doctor,
-        hospital:         booking.hospital || null,
+        hospital:         opHospital,
         patient:          booking.customer,
         consultationType: booking.consultationType || 'inPerson',
         scheduledAt:      booking.scheduledAt,
@@ -1199,16 +1208,51 @@ router.get('/:id/care/tracking-snapshot',
 
 router.get('/hospital/upcoming', protect, authorize('hospital'), async (req, res) => {
   try {
-    const hospital = await Hospital.findOne({ managedBy: req.user._id }).select('_id').lean();
+    const hospital = await Hospital.findOne({ managedBy: req.user._id, managementModel: 'hospital-manager', isActive: true })
+      .select('_id linkedDoctors').lean();
     if (!hospital) return res.status(404).json({ success: false, message: 'Hospital not found' });
-    const bookings = await Booking.find({ hospital: hospital._id, status: { $in: ['pending', 'confirmed', 'in_progress'] }, scheduledAt: { $gte: new Date() }, bookingType: { $in: ['full_care_ride', 'doctor_consultation', 'doctor_online', 'physiotherapist', 'follow_up'] } })
-      .select('bookingCode patientInfo scheduledAt bookingType status consultationType doctorSnapshot careAssistantSnapshot fareBreakdown primaryRide consultationSessionId')
+
+    // FIX: booking.hospital often unset even for this hospital's own linked doctors —
+    // match on hospital field OR doctor-in-hospital so nothing gets silently dropped.
+    const bookings = await Booking.find({
+      status: { $in: ['pending', 'confirmed', 'in_progress'] },
+      scheduledAt: { $gte: new Date() },
+      bookingType: { $in: ['full_care_ride', 'doctor_consultation', 'doctor_online', 'physiotherapist', 'follow_up'] },
+      $or: [{ hospital: hospital._id }, { doctor: { $in: hospital.linkedDoctors } }],
+    })
+      .select('bookingCode patientInfo scheduledAt bookingType status consultationType doctorSnapshot careAssistantSnapshot fareBreakdown primaryRide consultationSessionId hospital doctor')
       .populate({ path: 'doctor', select: 'specialization registrationNumber profilePhotoUrl', populate: { path: 'user', select: 'name phone email' } })
       .populate('careAssistant', 'fullName phone photoUrl experienceYears')
       .populate('customer', 'name phone email')
       .populate('primaryRide', 'status driverSnapshot vehicleSnapshot estimatedDistanceKm estimatedDurationMin')
       .sort({ scheduledAt: 1 }).lean();
-    return res.json({ success: true, data: { bookings } });
+
+    // FIX: OP + follow-up window was never attached here — hospital had no visibility
+    // into which upcoming bookings are follow-ups or have an active follow-up window.
+    const bookingIds = bookings.map(b => b._id);
+    const ops = bookingIds.length
+      ? await OutPatientRecord.find({ booking: { $in: bookingIds } })
+          .select('booking opNumber status followUpExpiry followUpFee isFollowUp').lean()
+      : [];
+    const opByBooking = new Map(ops.map(op => [String(op.booking), op]));
+    const now = new Date();
+    const enrichedBookings = bookings.map(b => {
+      const op = opByBooking.get(String(b._id));
+      return {
+        ...b,
+        op: op ? {
+          opNumber:           op.opNumber,
+          status:              op.status,
+          isFollowUp:          op.isFollowUp,
+          followUpExpiry:      op.followUpExpiry,
+          followUpFee:         op.followUpFee,
+          isFollowUpEligible:  op.followUpExpiry ? now < new Date(op.followUpExpiry) : false,
+          daysRemaining:       op.followUpExpiry ? Math.max(0, Math.ceil((new Date(op.followUpExpiry) - now) / 86400000)) : 0,
+        } : null,
+      };
+    });
+
+    return res.json({ success: true, data: { bookings: enrichedBookings } });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -1216,10 +1260,19 @@ router.get('/hospital/upcoming', protect, authorize('hospital'), async (req, res
 
 router.patch('/:id/hospital/confirm', protect, authorize('hospital'), async (req, res) => {
   try {
-    const hospital = await Hospital.findOne({ managedBy: req.user._id }).select('_id').lean();
+    const hospital = await Hospital.findOne({ managedBy: req.user._id, managementModel: 'hospital-manager', isActive: true }).select('_id linkedDoctors').lean();
     if (!hospital) return res.status(404).json({ success: false, message: 'Hospital not found' });
-    const booking = await Booking.findOne({ _id: req.params.id, hospital: hospital._id });
+
+    // FIX: booking.hospital may be unset even though booking.doctor is linked to this hospital —
+    // widen lookup so the hospital manager can confirm their own doctors' bookings.
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      $or: [{ hospital: hospital._id }, { doctor: { $in: hospital.linkedDoctors } }],
+    });
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found or not your hospital' });
+
+    // Backfill hospital link so downstream queries (ops list, dashboard revenue, valid-ops) find it by hospital too.
+    if (!booking.hospital) booking.hospital = hospital._id;
 
     booking.statusLog.push({ fromStatus: booking.status, toStatus: booking.status, changedBy: req.user._id, reason: 'Hospital confirmed appointment slot' });
     booking.notificationsSent.bookingConfirmation = true;
@@ -1242,12 +1295,24 @@ router.get('/hospital/:hospitalId/ops',
   async (req, res) => {
     try {
       const { hospitalId } = req.params;
-      if (!['admin', 'superadmin'].includes(req.user.role)) {
-        const hospital = await Hospital.findOne({ _id: hospitalId, managedBy: req.user._id }).lean();
-        if (!hospital) return res.status(403).json({ success: false, message: 'Access denied: not your hospital' });
+
+      // Add MongoDB ObjectId validation
+      if (!hospitalId || !hospitalId.match(/^[0-9a-fA-F]{24}$/)) {
+        return res.status(400).json({ success: false, message: 'Invalid Hospital ID format.' });
       }
+
+      let hospitalDoc = null;
+      if (!['admin', 'superadmin'].includes(req.user.role)) {
+        hospitalDoc = await Hospital.findOne({ _id: hospitalId, managedBy: req.user._id, managementModel: 'hospital-manager', isActive: true }).select('linkedDoctors').lean();
+        if (!hospitalDoc) return res.status(403).json({ success: false, message: 'Access denied: not your hospital' });
+      } else {
+        hospitalDoc = await Hospital.findById(hospitalId).select('linkedDoctors').lean();
+      }
+
       const { status, doctorId, date, page = 1, limit = 20 } = req.query;
-      const filter = { hospital: hospitalId };
+      // FIX: op.hospital can be null even for this hospital's own doctor — widen so
+      // ops aren't silently dropped just because the hospital link was never set.
+      const filter = { $or: [{ hospital: hospitalId }, { doctor: { $in: hospitalDoc?.linkedDoctors || [] } }] };
       if (status)   filter.status  = status;
       if (doctorId) filter.doctor  = doctorId;
       if (date) { const d = new Date(date), n = new Date(d); n.setDate(n.getDate() + 1); filter.scheduledAt = { $gte: d, $lt: n }; }
@@ -1256,23 +1321,53 @@ router.get('/hospital/:hospitalId/ops',
         OutPatientRecord.find(filter).populate({ path: 'doctor', select: 'user specialization registrationNumber profilePhotoUrl', populate: { path: 'user', select: 'name phone email' } }).populate('patient', 'name phone email').populate('booking', 'bookingCode bookingType fareBreakdown paymentStatus').sort({ scheduledAt: -1 }).skip(skip).limit(parseInt(limit)).lean(),
         OutPatientRecord.countDocuments(filter),
       ]);
-      return res.json({ success: true, data: { ops, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) } });
+
+      // FIX: follow-up window was only ever surfaced on /valid-ops and /op/:opNumber —
+      // this general ops list gave no follow-up visibility at all.
+      const now = new Date();
+      const enrichedOps = ops.map(op => ({
+        ...op,
+        isFollowUpEligible: op.followUpExpiry ? now < new Date(op.followUpExpiry) : false,
+        daysRemaining:      op.followUpExpiry ? Math.max(0, Math.ceil((new Date(op.followUpExpiry) - now) / 86400000)) : 0,
+      }));
+
+      return res.json({ success: true, data: { ops: enrichedOps, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) } });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
     }
   }
 );
-
 router.get('/hospital/:hospitalId/valid-ops',
   protect, authorize('hospital', 'doctor', 'admin', 'superadmin'),
   cache(CACHE_TTL.ops, req => `GET:/hospital/${req.params.hospitalId}/valid-ops:${req.originalUrl}`),
   async (req, res) => {
     try {
       const { hospitalId } = req.params;
-      if (!hospitalId || hospitalId === 'undefined' || hospitalId === 'null')
+      
+      // Update validation to check for a valid ObjectId format
+      if (!hospitalId || hospitalId === 'undefined' || hospitalId === 'null' || !hospitalId.match(/^[0-9a-fA-F]{24}$/)) {
         return res.status(400).json({ success: false, message: 'Valid Hospital ID required.' });
+      }
+
+      // FIX: no ownership check existed for the 'hospital' role — any hospital manager
+      // FIX: no ownership check existed for the 'hospital' role — any hospital manager
+      // could pass an arbitrary hospitalId and read another hospital's follow-up OPs.
+      let linkedDoctorIds = [];
+      if (req.user.role === 'hospital') {
+        const hospitalDoc = await Hospital.findOne({ _id: hospitalId, managedBy: req.user._id, managementModel: 'hospital-manager', isActive: true }).select('linkedDoctors').lean();
+        if (!hospitalDoc) return res.status(403).json({ success: false, message: 'Access denied: not your hospital' });
+        linkedDoctorIds = hospitalDoc.linkedDoctors;
+      } else {
+        const hospitalDoc = await Hospital.findById(hospitalId).select('linkedDoctors').lean();
+        linkedDoctorIds = hospitalDoc?.linkedDoctors || [];
+      }
+
       const { doctorId, patientId, page = 1, limit = 20 } = req.query;
-      const filter = { hospital: hospitalId, isFollowUp: false, followUpExpiry: { $gt: new Date() }, status: { $in: ['scheduled', 'completed'] } };
+      // FIX: widen to doctor-in-hospital — op.hospital being unset previously hid these entirely.
+      const filter = {
+        $or: [{ hospital: hospitalId }, { doctor: { $in: linkedDoctorIds } }],
+        isFollowUp: false, followUpExpiry: { $gt: new Date() }, status: { $in: ['scheduled', 'completed'] },
+      };
       if (doctorId)  filter.doctor  = doctorId;
       if (patientId) filter.patient = patientId;
       const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -2167,9 +2262,15 @@ router.post('/admin/bookings/:id/assign/care-assistant', protect, authorize('adm
 router.post('/admin/bookings/:id/assign/hospital', protect, authorize('admin', 'superadmin'), async (req, res) => {
   try {
     const { hospitalId } = req.body;
-    if (!hospitalId) return res.status(400).json({ success: false, message: 'hospitalId required' });
+    
+    // Add MongoDB ObjectId validation
+    if (!hospitalId || !hospitalId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Valid hospitalId required in proper format' });
+    }
+
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    
     const hospital = await Hospital.findById(hospitalId).populate('managedBy', 'name email phone').select('name isActive isVerified managedBy address contact').lean();
     if (!hospital?.isActive || !hospital?.isVerified) return res.status(400).json({ success: false, message: 'Hospital not operational' });
 

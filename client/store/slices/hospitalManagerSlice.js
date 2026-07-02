@@ -150,15 +150,20 @@ export const updateOperatingHours = createAsyncThunk(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §4  DOCTOR PRICING MANAGEMENT (Updated)
+// §4  HOSPITAL-WIDE CONSULTATION PRICING
 // ─────────────────────────────────────────────────────────────────────────────
+// BUG FIX: this used to call GET/PATCH /doctors/:doctorProfileId/pricing.
+// Router deprecated those to 410 stubs — pricing for a hospital-manager
+// hospital is NOT per-doctor, it's hospital-wide (Hospital.consultationPricing),
+// applied to every linked doctor. Correct endpoints are GET/PATCH /pricing.
 
-/** GET /hospital-manager/doctors/:doctorProfileId/pricing */
-export const fetchDoctorPricing = createAsyncThunk(
-  'hospitalManager/fetchDoctorPricing',
-  async (doctorProfileId, { rejectWithValue }) => {
+/** GET /hospital-manager/pricing */
+export const fetchHospitalPricing = createAsyncThunk(
+  'hospitalManager/fetchHospitalPricing',
+  async (_, { rejectWithValue }) => {
     try {
-      const { data } = await API.get(`/hospital-manager/doctors/${doctorProfileId}/pricing`);
+      const { data } = await API.get('/hospital-manager/pricing');
+      // { consultationPricing, platformFee, settlementCycle, note }
       return data.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
@@ -166,12 +171,30 @@ export const fetchDoctorPricing = createAsyncThunk(
   }
 );
 
-/** PATCH /hospital-manager/doctors/:doctorProfileId/pricing */
-export const updateDoctorPricing = createAsyncThunk(
-  'hospitalManager/updateDoctorPricing',
-  async ({ doctorProfileId, payload }, { rejectWithValue }) => {
+/** PATCH /hospital-manager/pricing */
+export const updateHospitalPricing = createAsyncThunk(
+  'hospitalManager/updateHospitalPricing',
+  async (payload, { rejectWithValue }) => {
     try {
-      const { data } = await API.patch(`/hospital-manager/doctors/${doctorProfileId}/pricing`, payload);
+      const { data } = await API.patch('/hospital-manager/pricing', payload);
+      // returns consultationPricing only
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §4b  PLATFORM FEE (READ-ONLY)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** GET /hospital-manager/platform-fee */
+export const fetchPlatformFee = createAsyncThunk(
+  'hospitalManager/fetchPlatformFee',
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await API.get('/hospital-manager/platform-fee');
       return data.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
@@ -234,7 +257,7 @@ export const createAndOnboardDoctor = createAsyncThunk(
   async (doctorData, { rejectWithValue }) => {
     try {
       const { data } = await API.post('/hospital-manager/doctors/create-and-link', doctorData);
-      return data; 
+      return data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to onboard doctor');
     }
@@ -533,13 +556,16 @@ export const fetchImageKitAuth = createAsyncThunk(
 
 const initialState = {
   // §1 Profile
-  hospital:   null,
+  hospital: null,
 
   // §3 Operating hours
   operatingHours: null,
 
-  // §4 Doctor Pricing
-  doctorPricing: null, // Specific to the currently viewed/edited doctor
+  // §4 Hospital-wide consultation pricing (renamed from doctor-scoped — see BUG FIX note above)
+  hospitalPricing: null, // { consultationPricing, platformFee, settlementCycle, note }
+
+  // §4b Platform Fee
+  platformFee: null, // { platformFee: {type, value}, settlementCycle, note }
 
   // §5 Doctors
   linkedDoctors:      [],
@@ -553,9 +579,9 @@ const initialState = {
   onboarding: null,
 
   // §8 Notifications
-  notifications:      [],
+  notifications:           [],
   notificationsPagination: {},
-  unreadCount:        0,
+  unreadCount:             0,
 
   // §9 Security
   sessions:     [],
@@ -731,29 +757,47 @@ const hospitalManagerSlice = createSlice({
         toast.success('Operating hours updated.');
       });
 
-    // ── §4 Doctor Pricing ───────────────────────────────────────────────────
+    // ── §4 Hospital-wide Consultation Pricing ──────────────────────────────
 
     builder
-      .addCase(fetchDoctorPricing.pending,   setPending)
-      .addCase(fetchDoctorPricing.rejected,  (state, action) => {
+      .addCase(fetchHospitalPricing.pending,   setPending)
+      .addCase(fetchHospitalPricing.rejected,  (state, action) => {
         setRejected(state, action);
         toast.error(action.payload);
       })
-      .addCase(fetchDoctorPricing.fulfilled, (state, action) => {
+      .addCase(fetchHospitalPricing.fulfilled, (state, action) => {
         clearLoad(state, action);
-        state.doctorPricing = action.payload;
+        state.hospitalPricing = action.payload;
       });
 
     builder
-      .addCase(updateDoctorPricing.pending,   setPending)
-      .addCase(updateDoctorPricing.rejected,  (state, action) => {
+      .addCase(updateHospitalPricing.pending,   setPending)
+      .addCase(updateHospitalPricing.rejected,  (state, action) => {
         setRejected(state, action);
         toast.error(action.payload);
       })
-      .addCase(updateDoctorPricing.fulfilled, (state, action) => {
+      .addCase(updateHospitalPricing.fulfilled, (state, action) => {
         clearLoad(state, action);
-        state.doctorPricing = action.payload;
-        toast.success('Doctor pricing updated.');
+        // PATCH returns consultationPricing only — merge into existing pricing bundle,
+        // leave platformFee/settlementCycle/note as last fetched.
+        state.hospitalPricing = {
+          ...(state.hospitalPricing || {}),
+          consultationPricing: action.payload,
+        };
+        toast.success('Consultation pricing updated.');
+      });
+
+    // ── §4b Platform Fee ────────────────────────────────────────────────────
+
+    builder
+      .addCase(fetchPlatformFee.pending,   setPending)
+      .addCase(fetchPlatformFee.rejected,  (state, action) => {
+        setRejected(state, action);
+        toast.error(action.payload);
+      })
+      .addCase(fetchPlatformFee.fulfilled, (state, action) => {
+        clearLoad(state, action);
+        state.platformFee = action.payload;
       });
 
     // ── §5 Doctors ──────────────────────────────────────────────────────────
@@ -1072,25 +1116,33 @@ export const isLoading  = (thunk) => (state) =>
 export const getError   = (thunk) => (state) =>
   state.hospitalManager.errors[thunk.typePrefix.split('/')[1]] ?? null;
 
-export const selectHospital            = (s) => s.hospitalManager.hospital;
-export const selectOperatingHours      = (s) => s.hospitalManager.operatingHours;
-export const selectDoctorPricing       = (s) => s.hospitalManager.doctorPricing;
-export const selectLinkedDoctors       = (s) => s.hospitalManager.linkedDoctors;
-export const selectDoctorsPagination   = (s) => s.hospitalManager.doctorsPagination;
-export const selectSelectedDoctor      = (s) => s.hospitalManager.selectedDoctor;
-export const selectSearchResults       = (s) => s.hospitalManager.searchResults;
-export const selectDoctorStats         = (s) => s.hospitalManager.doctorStats;
-export const selectDoctorAvailability  = (s) => s.hospitalManager.doctorAvailability;
-export const selectOnboarding          = (s) => s.hospitalManager.onboarding;
-export const selectNotifications       = (s) => s.hospitalManager.notifications;
+export const selectHospital       = (s) => s.hospitalManager.hospital;
+export const selectOperatingHours = (s) => s.hospitalManager.operatingHours;
+
+export const selectHospitalPricing            = (s) => s.hospitalManager.hospitalPricing;
+export const selectHospitalConsultationPricing = (s) => s.hospitalManager.hospitalPricing?.consultationPricing ?? null;
+export const selectHospitalPricingPlatformFee  = (s) => s.hospitalManager.hospitalPricing?.platformFee ?? null;
+export const selectPlatformFee                 = (s) => s.hospitalManager.platformFee;
+
+export const selectLinkedDoctors           = (s) => s.hospitalManager.linkedDoctors;
+export const selectDoctorsPagination       = (s) => s.hospitalManager.doctorsPagination;
+export const selectSelectedDoctor          = (s) => s.hospitalManager.selectedDoctor;
+export const selectSearchResults           = (s) => s.hospitalManager.searchResults;
+export const selectDoctorStats             = (s) => s.hospitalManager.doctorStats;
+export const selectDoctorAvailability      = (s) => s.hospitalManager.doctorAvailability;
+export const selectOnboarding              = (s) => s.hospitalManager.onboarding;
+export const selectNotifications           = (s) => s.hospitalManager.notifications;
 export const selectNotificationsPagination = (s) => s.hospitalManager.notificationsPagination;
-export const selectUnreadCount         = (s) => s.hospitalManager.unreadCount;
-export const selectSessions            = (s) => s.hospitalManager.sessions;
-export const selectDeviceTokens        = (s) => s.hospitalManager.deviceTokens;
-export const selectNotifPrefs          = (s) => s.hospitalManager.notifPrefs;
-export const selectDashboard           = (s) => s.hospitalManager.dashboard;
-export const selectAccount             = (s) => s.hospitalManager.account;
-export const selectImageKitAuth        = (s) => s.hospitalManager.imagekitAuth;
+export const selectUnreadCount             = (s) => s.hospitalManager.unreadCount;
+export const selectSessions                = (s) => s.hospitalManager.sessions;
+export const selectDeviceTokens            = (s) => s.hospitalManager.deviceTokens;
+export const selectNotifPrefs              = (s) => s.hospitalManager.notifPrefs;
+export const selectDashboard               = (s) => s.hospitalManager.dashboard;
+export const selectDashboardBookings       = (s) => s.hospitalManager.dashboard?.bookings ?? null;
+export const selectDashboardRevenue        = (s) => s.hospitalManager.dashboard?.revenue ?? null;
+export const selectDashboardPlatformFee    = (s) => s.hospitalManager.dashboard?.platformFee ?? null;
+export const selectAccount                 = (s) => s.hospitalManager.account;
+export const selectImageKitAuth            = (s) => s.hospitalManager.imagekitAuth;
 
 // ─────────────────────────────────────────────────────────────────────────────
 

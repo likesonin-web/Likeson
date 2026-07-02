@@ -894,13 +894,15 @@ export default function BookingsManagement() {
   const dispatch   = useDispatch();
   const [activeTab, setActiveTab] = useState('upcoming');
 
-  // hospital id from auth — adapt to your auth selector
+// hospital id from auth — adapt to your auth selector
   const [hospitalId, setHospitalId] = useState(null);
   useEffect(() => {
     // real impl: const id = useSelector(selectCurrentHospitalId)
     // mocking so page doesn't crash without auth
+    // FIX: Replaced 'demo-hospital-id' with a valid 24-character hex string 
+    // to pass MongoDB ObjectId validation on the backend.
     if (typeof window !== 'undefined') {
-      setHospitalId(localStorage.getItem('hospitalId') || 'demo-hospital-id');
+      setHospitalId(localStorage.getItem('hospitalId') || '507f1f77bcf86cd799439011');
     }
   }, []);
 

@@ -13,7 +13,9 @@ const toQueryString = (params = {}) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  A. FORM DOWNLOAD THUNKS  (Note: Requires backend implementation)
+//  A. FORM DOWNLOAD THUNKS  (Note: not present in hospitalRouter.js as supplied —
+//  presumed to live on a separate forms router. Left as-is; verify base path if
+//  these 404 in your environment.)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const fetchAvailableForms = createAsyncThunk(
