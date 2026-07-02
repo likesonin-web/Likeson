@@ -773,6 +773,14 @@ function StoreDetailPanel({ store, onLifecycle }) {
     dispatch(fetchExpiryAlerts({ storeId }));
   }, [dispatch, storeId]);
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // THE FIX: Automatically load data when the storeId changes or mounts
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+  // ──────────────────────────────────────────────────────────────────────────
+
   const filteredInv = useMemo(() => {
     if (!invSearch) return inventory;
     const q = invSearch.toLowerCase();

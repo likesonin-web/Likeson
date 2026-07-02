@@ -18,8 +18,8 @@ export default function BackButton({
       whileTap={{ scale: 0.95 }}
       transition={{ type: "spring", stiffness: 400, damping: 17 }}
       className={`
-        hover:text-primary border border-base-200 p-1 flex gap-3 text-base-content 
-        hover:bg-base-200 transition-colors
+        rounded-md px-4 py-2 text-white bg-gradient-to-r from-primary/40 to-secondary/40 flex gap-3 text-base-content 
+         transition-colors
         ${className}
       `}
     >

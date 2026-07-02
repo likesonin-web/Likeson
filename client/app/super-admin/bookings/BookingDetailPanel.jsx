@@ -100,7 +100,7 @@ export function BookingDetailPanel({ bookingId, dispatch, onTabNavigate }) {
     ['confirmed', 'in_progress', 'waiting'].includes(booking.status);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full  ">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="shrink-0 px-5 py-3.5 border-b border-base-300 bg-base-100">
@@ -194,7 +194,7 @@ export function BookingDetailPanel({ bookingId, dispatch, onTabNavigate }) {
                     spam 400s against the API on every booking that hasn't been
                     assigned a ride yet). */}
                 {booking.primaryRide?._id && (
-                  <div className="mb-4">
+                  <div className="mb-4 overflow-auto">
                     <RideOpsLiveTracking
                       bookingId={booking._id}
                       rideId={booking.primaryRide._id}

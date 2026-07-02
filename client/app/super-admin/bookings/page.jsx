@@ -31,7 +31,6 @@ import {
   adminAssignTransportPartner,
   adminAssignCareAssistant,
   adminAssignHospital,
-  adminReassignDriver,
   adminReassignCareAssistant,
 
   // Refund
@@ -124,7 +123,6 @@ export const ADMIN_THUNKS = {
   adminAssignTransportPartner,
   adminAssignCareAssistant,
   adminAssignHospital,
-  adminReassignDriver,
   adminReassignCareAssistant,
   adminProcessRefund,
   fetchAdminOps,
@@ -413,7 +411,7 @@ export default function BookingsManagement() {
           </div>
 
           {/* Right — detail */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto">
             <BookingDetailPanel
               bookingId={selectedId}
               dispatch={dispatch}

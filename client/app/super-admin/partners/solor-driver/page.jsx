@@ -593,8 +593,8 @@ export default function SoloDriversManagement() {
                     </td>
                   </tr>
                 ) : (
-                  partners.map((p, idx) => {
-                    const dp = p.driverProfile || {};
+              partners.map((p, idx) => {
+                    const dp = p.dispatch || p.driverProfile || {};
                     const vStatus = p.vehicleStatus || {};
                     return (
                       <motion.tr
@@ -734,9 +734,9 @@ export default function SoloDriversManagement() {
     }
     if (!selected) return null;
 
-    const p = selected;
+const p = selected;
     const u = p.user || {};
-    const dp = p.driverProfile || {};
+    const dp = p.dispatch || p.driverProfile || {};
 
     return (
       <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5">
@@ -1876,7 +1876,7 @@ function TabBank({ p, onView, onVerify }) {
 function TabPerformance({ p }) {
   const stats = p.stats || {};
   const rating = p.rating || {};
-  const dPerf = p.driverProfile?.performance || {};
+  const dPerf = p.performance || p.driverProfile?.performance || p.stats || {};
 
   const metrics = [
     { label: 'Total Rides',       value: stats.totalRidesCompleted  || 0, icon: Activity,    color: 'text-primary' },
@@ -1922,7 +1922,7 @@ function TabPerformance({ p }) {
 
 // ── Rewards Tab ───────────────────────────────────────────────────────────────
 function TabRewards({ p, onAwardBadge, onAdjustCoins }) {
-  const r = p.driverProfile?.rewards || {};
+  const r = p.rewards || p.driverProfile?.rewards || {};
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5">
       <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -2003,7 +2003,7 @@ function TabRewards({ p, onAwardBadge, onAdjustCoins }) {
 
 // ── Dispatch Tab ──────────────────────────────────────────────────────────────
 function TabDispatch({ p }) {
-  const dp = p.driverProfile || {};
+  const dp = p.dispatch || p.driverProfile || {};
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5">
@@ -2037,11 +2037,11 @@ function TabDispatch({ p }) {
 
         <SectionCard title="Shift Preferences" icon={Calendar}>
           <div className="space-y-0">
-            <DocField label="Shift Type"      value={dp.shift?.shiftType}       onView={() => {}} />
-            <DocField label="Start Time"      value={dp.shift?.startTime}       onView={() => {}} />
-            <DocField label="End Time"        value={dp.shift?.endTime}         onView={() => {}} />
-            <DocField label="Days Available"  value={dp.shift?.daysAvailable?.join(', ')} onView={() => {}} />
-            <DocField label="Next Available"  value={fmtDate(dp.shift?.nextAvailableAt)} onView={() => {}} />
+<DocField label="Shift Type"      value={dp.shift?.shiftType || dp.shiftType}       onView={() => {}} />
+            <DocField label="Start Time"      value={dp.shift?.startTime || dp.shiftStart}       onView={() => {}} />
+            <DocField label="End Time"        value={dp.shift?.endTime || dp.shiftEnd}         onView={() => {}} />
+            <DocField label="Days Available"  value={dp.shift?.daysAvailable?.join(', ') || dp.daysAvailable?.join(', ')} onView={() => {}} />
+            <DocField label="Next Available"  value={fmtDate(dp.shift?.nextAvailableAt || dp.nextAvailableAt)} onView={() => {}} />
           </div>
         </SectionCard>
 

@@ -26,7 +26,7 @@ const montserrat = Montserrat({
 });
 
 export const viewport: Viewport = {
-  themeColor: '#0F172A', // dark theme default → dark themeColor, match defaultTheme below
+  themeColor: '#0F172A',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
@@ -85,7 +85,7 @@ export const metadata: Metadata = {
     siteName: 'Likeson Healthcare',
     images: [
       {
-        url: '../public/Logo.ico', // must exist at /public/og-image.jpg, 1200x630
+        url: '/Logo.ico', // Fixed path
         width: 1200,
         height: 630,
         alt: 'Likeson Healthcare Services Overview',
@@ -98,14 +98,14 @@ export const metadata: Metadata = {
     title: 'Likeson Healthcare | Family Medical Care',
     description:
       'Tech-enabled healthcare solution delivering essential non-emergency services, medical transport, and clinical support.',
-    images: ['/twitter-image.jpg'], // must exist at /public/twitter-image.jpg
+    images: ['/twitter-image.jpg'], 
     creator: '@LikesonHealth',
   },
 
   icons: {
     icon: [
-      { url: '../public/Logo.ico' }, // fixed: file lives at public/Logo.ico → served at root /Logo.ico
-      { url: '../public/Logo.ico', type: 'image/png' },
+      { url: '/Logo.ico' }, // Fixed path
+      { url: '/Logo.ico', type: 'image/x-icon' }, // Fixed path and corrected MIME type for .ico
     ],
     shortcut: ['/Logo.ico'],
     apple: [{ url: '/apple-icon.png' }],

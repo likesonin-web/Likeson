@@ -48,10 +48,14 @@ import {
   MessageSquare,
   PhoneCall,
   ExternalLink,
+  Video,
+  Home,
 } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { MdOutlineWheelchairPickup } from "react-icons/md";
+import SpecialButton from "@/components/SpecialButton";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,6 +118,86 @@ const SectionTitle = ({ icon: Icon, children }) => (
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BOOKING HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Adjust this if the booking flow lives at a different route.
+const BOOKING_ROUTE = "/book-appointment";
+
+// Maps a doctor's consultationTypes flag → booking config.
+// bookingType mirrors the values BookingSystem.jsx reads from `type` in the URL
+// (see BOOKING_TYPES / handleSubmit's `map` object: doctor_consultation, doctor_online).
+// homeVisit doesn't have its own dedicated booking type in that file yet, so it
+// is routed through doctor_consultation with consultationType=homeVisit carried
+// in the query string for whenever that step reads it — wire it up on that end
+// if/when a dedicated home-visit doctor flow exists.
+const CONSULTATION_TYPE_CONFIG = {
+  inPerson: {
+    key: "inPerson",
+    label: "In-Person",
+    icon: Stethoscope,
+    bookingType: "doctor_consultation",
+    consultationType: "inPerson",
+    feeKey: "inPersonFee",
+    needsHospital: true,
+  },
+  video: {
+    key: "video",
+    label: "Video Call",
+    icon: Video,
+    bookingType: "doctor_online",
+    consultationType: "video",
+    feeKey: "videoFee",
+    needsHospital: false,
+  },
+  homeVisit: {
+    key: "homeVisit",
+    label: "Home Visit",
+    icon: Home,
+    bookingType: "doctor_consultation",
+    consultationType: "homeVisit",
+    feeKey: "homeVisitFee",
+    needsHospital: true,
+  },
+};
+
+// Resolves the fee for a specific consultation type, falling back to the
+// doctor's common consultationFee when that type doesn't have its own fee set.
+const resolveDoctorFee = (doctor, config) => {
+  const fees = doctor.fees || {};
+  const specific = fees[config.feeKey];
+  const hasSpecific = specific !== null && specific !== undefined;
+  return {
+    amount: hasSpecific ? specific : fees.consultationFee || 0,
+    isFallback: !hasSpecific,
+  };
+};
+
+// Builds a book link carrying both hospital + doctor context, plus the
+// booking type so the flow lands on the right step already primed.
+const buildDoctorBookHref = (hospital, doctor, config) => {
+  const params = new URLSearchParams();
+  if (config.needsHospital && hospital?._id) {
+    params.set("hospital", hospital._id);
+  }
+  if (doctor?._id) params.set("doctor", doctor._id);
+  if (doctor?.user?.name) params.set("name", doctor.user.name);
+  if (doctor?.specialization) params.set("spec", doctor.specialization);
+  params.set("type", config.bookingType);
+  params.set("consultationType", config.consultationType);
+  return `${BOOKING_ROUTE}?${params.toString()}`;
+};
+
+// Hospital-only book link — no doctor, no type. Lets the person pick the
+// service themselves once they land on the booking flow.
+const buildHospitalBookHref = (hospital) => {
+  const params = new URLSearchParams();
+  if (hospital?._id) params.set("hospital", hospital._id);
+  if (hospital?.name) params.set("name", hospital.name);
+  return `${BOOKING_ROUTE}?${params.toString()}`;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SKELETON
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -156,13 +240,17 @@ const SkeletonLoader = () => (
 // DOCTOR CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DoctorCard = ({ doctor }) => {
+const DoctorCard = ({ doctor, hospital }) => {
   const initials = doctor.user?.name
     ?.split(" ")
     .map((n) => n[0])
     .slice(0, 2)
     .join("")
     .toUpperCase();
+
+  const bookOptions = Object.values(CONSULTATION_TYPE_CONFIG).filter(
+    (c) => doctor.consultationTypes?.[c.key]
+  );
 
   return (
     <div className="card p-5 hover:border-primary/30 transition-all">
@@ -225,18 +313,65 @@ const DoctorCard = ({ doctor }) => {
         </div>
       </div>
 
-      {/* Consultation types */}
-      <div className="mt-3 flex gap-2 flex-wrap">
-        {doctor.consultationTypes?.inPerson && (
-          <span className="badge badge-xs badge-primary">In-Person</span>
-        )}
-        {doctor.consultationTypes?.video && (
-          <span className="badge badge-xs badge-secondary">Video</span>
-        )}
-        {doctor.consultationTypes?.homeVisit && (
-          <span className="badge badge-xs badge-accent">Home Visit</span>
-        )}
-      </div>
+      {/* Book buttons — one per available consultation type, each showing
+          its own fee (falling back to the common consultationFee) and
+          clearly labelled so it's obvious which mode is being booked. */}
+      {bookOptions.length > 0 ? (
+        <div className="mt-4 pt-4 border-t border-base-300 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {bookOptions.map((config) => {
+            const { amount, isFallback } = resolveDoctorFee(doctor, config);
+            const Icon = config.icon;
+            return (
+              <SpecialButton
+                key={config.key}
+                href={buildDoctorBookHref(hospital, doctor, config)}
+                nav="doctors"
+                variant="solid"
+                size="sm"
+                animation="lift"
+                textAnimation="fade"
+                uppercase={false}
+                icon={Icon}
+              >
+                <span className="flex flex-col items-start leading-tight">
+                  <span className="text-[11px] font-bold">
+                    {config.label}
+                  </span>
+                  <span className="text-[10px] font-semibold opacity-70">
+                    ₹{amount}
+                    {isFallback && " · standard fee"}
+                  </span>
+                </span>
+              </SpecialButton>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="mt-4 pt-4 border-t border-base-300">
+          <SpecialButton
+            href={buildDoctorBookHref(
+              hospital,
+              doctor,
+              CONSULTATION_TYPE_CONFIG.inPerson
+            )}
+            nav="doctor"
+            variant="soft"
+            role='doctor'
+            size="sm"
+            animation="lift"
+            textAnimation="fade"
+            uppercase={false}
+            icon={CalendarCheck}
+          >
+            <span className="flex flex-col items-start leading-tight">
+              <span className="text-[11px] font-bold">Book Consultation</span>
+              <span className="text-[10px] font-semibold opacity-70">
+                ₹{doctor.fees?.consultationFee || 0} · standard fee
+              </span>
+            </span>
+          </SpecialButton>
+        </div>
+      )}
 
       {/* Qualifications */}
       {doctor.qualifications?.length > 0 && (
@@ -401,6 +536,8 @@ const HospitalDetails = () => {
     { id: "hours", label: "Hours" },
     { id: "legal", label: "Legal" },
   ];
+
+  const hospitalBookHref = buildHospitalBookHref(hospital);
 
   return (
     <main className="min-h-screen bg-base-100 pb-24">
@@ -595,6 +732,23 @@ const HospitalDetails = () => {
                   {hospital.description}
                 </p>
               )}
+
+              {/* Book at hospital CTA — hospital-only, no doctor/type,
+                  navigates straight to the booking page. */}
+              <div className="pt-2">
+                <SpecialButton
+                  href={hospitalBookHref}
+                  nav="hospitals"
+                  variant="solid"
+                  size="lg"
+                  animation="lift"
+                  textAnimation="fade"
+                  icon={CalendarCheck}
+                  fullWidth
+                >
+                  Book Appointment at {hospital.name}
+                </SpecialButton>
+              </div>
             </section>
 
             {/* ── Tabs ── */}
@@ -793,7 +947,11 @@ const HospitalDetails = () => {
                       <div className="space-y-4">
                         {hospital.linkedDoctors?.length > 0 ? (
                           hospital.linkedDoctors.map((doc) => (
-                            <DoctorCard key={doc._id} doctor={doc} />
+                            <DoctorCard
+                              key={doc._id}
+                              doctor={doc}
+                              hospital={hospital}
+                            />
                           ))
                         ) : (
                           <div className="text-center py-16 text-base-content/40">
@@ -1119,6 +1277,23 @@ const HospitalDetails = () => {
                       <Globe size={16} /> No Website
                     </button>
                   )}
+                </div>
+
+                {/* Book CTA — hospital-only booking link, mirrors the one
+                    up top so it's reachable from the sticky panel too. */}
+                <div className="mt-3 relative z-10">
+                  <SpecialButton
+                    href={hospitalBookHref}
+                    nav="hospitals"
+                    variant="pill"
+                    size="md"
+                    animation="lift"
+                    textAnimation="fade"
+                    icon={CalendarCheck}
+                    fullWidth
+                  >
+                    Book Appointment
+                  </SpecialButton>
                 </div>
               </div>
 

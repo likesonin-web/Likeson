@@ -357,7 +357,7 @@ export const careRequestRide = mkThunk(
   }
 );
 
-/** POST /:id/care/join-ride — CA attaches to RideTracking doc */
+/** POST /:id/care/join-ride — CA attaches to RideTracking doc (bookingRouter2) */
 export const careJoinRide = mkThunk(
   "operations/careJoinRide",
   async ({ bookingId, currentLat, currentLng }) => {
@@ -366,19 +366,6 @@ export const careJoinRide = mkThunk(
       currentLng,
     });
     toast.success("Joined ride session");
-    return data.data;
-  }
-);
-
-/** PATCH /:id/care/join-ride — CA boards vehicle mid-ride */
-export const caJoinRideAndTrackDriver = mkThunk(
-  "operations/caJoinRideAndTrackDriver",
-  async ({ bookingId, currentLat, currentLng }) => {
-    const { data } = await API.patch(`${BASE}/${bookingId}/care/join-ride`, {
-      currentLat,
-      currentLng,
-    });
-    toast.success(data.message || "Joined ride — tracking driver");
     return data.data;
   }
 );
@@ -853,23 +840,6 @@ export const adminAssignHospital = mkThunk(
   }
 );
 
-/**
- * NOTE: No backend route for admin direct driver reassign.
- * Use tpReassignDriver (TP fleet) or adminAssignSoloDriver (solo).
- * Kept to avoid import breaks; will 404 if called.
- */
-export const adminReassignDriver = mkThunk(
-  "operations/adminReassignDriver",
-  async ({ bookingId, newDriverId, reason }) => {
-    const { data } = await API.patch(
-      `${BASE}/admin/bookings/${bookingId}/reassign/driver`,
-      { newDriverId, reason }
-    );
-    toast.success("Driver reassigned");
-    return data.data;
-  }
-);
-
 export const adminReassignCareAssistant = mkThunk(
   "operations/adminReassignCareAssistant",
   async ({ bookingId, newCareAssistantId }) => {
@@ -1297,22 +1267,8 @@ export const fetchBookingAssignmentHistory = mkThunk(
   }
 );
 
-// ── Driver waypoint (existing, kept) ─────────────────────────────────────────
-
-export const driverCompleteWaypoint = mkThunk(
-  "operations/driverCompleteWaypoint",
-  async ({ rideId, waypointType = "care_assistant_join" }) => {
-    const { data } = await API.patch(`/ride-requests/${rideId}/status`, {
-      action: "complete_waypoint",
-      waypointType,
-    });
-    toast.success("Waypoint completed");
-    return data.data;
-  }
-);
-
 // ═════════════════════════════════════════════════════════════════════════════
-// THUNKS — SOCKET
+// THUNKS — SOCKET (no HTTP route; not part of the 3 routers, kept as infra)
 // ═════════════════════════════════════════════════════════════════════════════
 
 export const joinBookingRoom = createAsyncThunk(
@@ -1773,16 +1729,6 @@ const operationsSlice = createSlice({
       state.careRideStatus = { ...state.careRideStatus, status: "at_pickup" };
     });
 
-    wire(driverCompleteWaypoint, (state, { payload }) => {
-      if (payload?.jpCompleted && state.caJoinPoint) {
-        state.caJoinPoint = {
-          ...state.caJoinPoint,
-          isCompleted: true,
-          completedAt: new Date().toISOString(),
-        };
-      }
-    });
-
     // POST /:id/care/join-ride
     wire(careJoinRide, (state, { payload }) => {
       state.caHasJoined = true;
@@ -1799,37 +1745,6 @@ const operationsSlice = createSlice({
       if (state.careTrackingSnapshot?.careAssistant) {
         state.careTrackingSnapshot.careAssistant.isLinkedToRide = true;
         state.careTrackingSnapshot.careAssistant.status = "in_ride";
-      }
-    });
-
-    // PATCH /:id/care/join-ride
-    wire(caJoinRideAndTrackDriver, (state, { payload }) => {
-      state.caHasJoined = true;
-      state.caViewMode = payload?.caViewMode || "driver_tracking_only";
-      state.caAtJoinPoint = false;
-      state.careRideStatus = {
-        ...state.careRideStatus,
-        status: payload?.careAssistantStatus || "in_ride",
-        careAssistantJoined: true,
-      };
-      if (payload?.jpCompleted) {
-        state.caJoinPoint = state.caJoinPoint
-          ? {
-              ...state.caJoinPoint,
-              isCompleted: true,
-              completedAt: new Date().toISOString(),
-            }
-          : state.caJoinPoint;
-        if (state.careTrackingSnapshot?.route?.caJoinWaypoint) {
-          state.careTrackingSnapshot.route.caJoinWaypoint.isCompleted = true;
-          state.careTrackingSnapshot.route.caJoinWaypoint.completedAt =
-            new Date().toISOString();
-        }
-      }
-      if (state.careTrackingSnapshot?.careAssistant) {
-        state.careTrackingSnapshot.careAssistant.isLinkedToRide = true;
-        state.careTrackingSnapshot.careAssistant.status =
-          payload?.careAssistantStatus || "in_ride";
       }
     });
 
@@ -2045,11 +1960,6 @@ const operationsSlice = createSlice({
       state.adminAssignment = payload ?? null;
       if (state.selectedBooking && payload?.booking)
         state.selectedBooking = { ...state.selectedBooking, ...payload.booking };
-    });
-    // No backend route — wired to avoid dead cases
-    wire(adminReassignDriver, (state, { payload }) => {
-      state.adminAssignment = payload ?? null;
-      state.activeRide = payload?.ride ?? null;
     });
     wire(adminReassignCareAssistant, (state, { payload }) => {
       state.adminAssignment = payload ?? null;
@@ -2393,7 +2303,6 @@ export const selectCaJoinPoint      = (s) => s.operations.caJoinPoint;
 // Loading helpers
 export const selectCareReachedJpLoading      = (s) => s.operations.loading["careReachedJoinPoint"] ?? false;
 export const selectCareJoinRideLoading       = (s) => s.operations.loading["careJoinRide"] ?? false;
-export const selectCaJoinRideAndTrackLoading = (s) => s.operations.loading["caJoinRideAndTrackDriver"] ?? false;
 
 // Admin bookings
 export const selectAdminBookings          = (s) => s.operations.adminBookings;
@@ -2515,7 +2424,6 @@ export const selectAdminAssignLoading = (s) =>
   (s.operations.loading["adminAssignTransportPartner"] ?? false) ||
   (s.operations.loading["adminAssignCareAssistant"] ?? false) ||
   (s.operations.loading["adminAssignHospital"] ?? false) ||
-  (s.operations.loading["adminReassignDriver"] ?? false) ||
   (s.operations.loading["adminReassignCareAssistant"] ?? false);
 export const selectRideOpsLoading = (s) =>
   (s.operations.loading["fetchRideParticipants"] ?? false) ||

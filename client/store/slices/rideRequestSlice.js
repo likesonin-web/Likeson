@@ -3,7 +3,7 @@ import API from '../api';
 import toast from 'react-hot-toast';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ASYNC THUNKS
+// ASYNC THUNKS — one per actual router route
 // ─────────────────────────────────────────────────────────────────────────────
 
 // POST /ride-requests/customer
@@ -90,23 +90,6 @@ export const adminAssignRide = createAsyncThunk(
   }
 );
 
-// PATCH /ride-requests/admin/:rideId/replace-driver
-export const adminReplaceDriver = createAsyncThunk(
-  'rideRequest/adminReplaceDriver',
-  async ({ rideId, newDriverId, newSoloPartnerId, reason }, { rejectWithValue }) => {
-    try {
-      const { data } = await API.patch(`/ride-requests/admin/${rideId}/replace-driver`, {
-        ...(newDriverId        && { newDriverId }),
-        ...(newSoloPartnerId   && { newSoloPartnerId }),
-        ...(reason             && { reason }),
-      });
-      return { rideId, ...data.data };
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
-    }
-  }
-);
-
 // PATCH /ride-requests/tp/:rideId/assign-driver
 export const tpAssignDriver = createAsyncThunk(
   'rideRequest/tpAssignDriver',
@@ -165,7 +148,7 @@ export const fetchRideTracking = createAsyncThunk(
       const { data } = await API.get(`/ride-requests/${rideId}/tracking`, {
         params: { breadcrumbs },
       });
-      return data.data; // { ride, stops, tracking, socketHint, _serverTime }
+      return data.data; // { ride, tracking, socketHint, _serverTime }
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
     }
@@ -181,118 +164,6 @@ export const postMilestone = createAsyncThunk(
         name, coordinates, stopSequence, meta,
       });
       return data.data; // { rideId, milestone, bookingRoom }
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
-    }
-  }
-);
-
-// GET /ride-requests/:rideId/stops
-export const fetchRideStops = createAsyncThunk(
-  'rideRequest/fetchRideStops',
-  async (rideId, { rejectWithValue }) => {
-    try {
-      const { data } = await API.get(`/ride-requests/${rideId}/stops`);
-      return data.data; // { rideId, currentStopId, stops, total }
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
-    }
-  }
-);
-
-// PATCH /ride-requests/:rideId/stop/:stopId/arrived
-export const markStopArrived = createAsyncThunk(
-  'rideRequest/markStopArrived',
-  async ({ rideId, stopId }, { rejectWithValue }) => {
-    try {
-      const { data } = await API.patch(`/ride-requests/${rideId}/stop/${stopId}/arrived`);
-      return { rideId, stopId, ...data.data }; // { stopId, stopType, status, otp? }
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
-    }
-  }
-);
-
-// PATCH /ride-requests/:rideId/stop/:stopId/verify-otp
-export const verifyStopOtp = createAsyncThunk(
-  'rideRequest/verifyStopOtp',
-  async ({ rideId, stopId, otp }, { rejectWithValue }) => {
-    try {
-      const { data } = await API.patch(`/ride-requests/${rideId}/stop/${stopId}/verify-otp`, { otp });
-      return { rideId, stopId, ...data.data }; // { status, nextStop? }
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
-    }
-  }
-);
-
-// PATCH /ride-requests/:rideId/stop/:stopId/depart
-export const departStop = createAsyncThunk(
-  'rideRequest/departStop',
-  async ({ rideId, stopId }, { rejectWithValue }) => {
-    try {
-      const { data } = await API.patch(`/ride-requests/${rideId}/stop/${stopId}/depart`);
-      return { rideId, stopId, ...data.data }; // { status, nextStop? }
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
-    }
-  }
-);
-
-// GET /ride-requests/:rideId/participants
-export const fetchRideParticipants = createAsyncThunk(
-  'rideRequest/fetchRideParticipants',
-  async (rideId, { rejectWithValue }) => {
-    try {
-      const { data } = await API.get(`/ride-requests/${rideId}/participants`);
-      return data.data; // { rideId, participants, total }
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
-    }
-  }
-);
-
-// GET /ride-requests/:rideId/sos
-export const fetchRideSosEvents = createAsyncThunk(
-  'rideRequest/fetchRideSosEvents',
-  async (rideId, { rejectWithValue }) => {
-    try {
-      const { data } = await API.get(`/ride-requests/${rideId}/sos`);
-      return data.data; // { rideId, events, total }
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
-    }
-  }
-);
-
-// POST /ride-requests/:rideId/sos
-// sosType: MEDICAL | SAFETY | VEHICLE_BREAKDOWN | ACCIDENT | PATIENT_CONDITION | OTHER
-export const triggerRideSos = createAsyncThunk(
-  'rideRequest/triggerRideSos',
-  async ({ rideId, sosType, description, coordinates }, { rejectWithValue }) => {
-    try {
-      const { data } = await API.post(`/ride-requests/${rideId}/sos`, {
-        sosType,
-        ...(description  && { description }),
-        ...(coordinates  && { coordinates }),
-      });
-      return { rideId, ...data.data }; // { sosEventId, sosType }
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
-    }
-  }
-);
-
-// PATCH /ride-requests/:rideId/sos/:sosEventId/resolve
-export const resolveRideSos = createAsyncThunk(
-  'rideRequest/resolveRideSos',
-  async ({ rideId, sosEventId, resolutionNotes }, { rejectWithValue }) => {
-    try {
-      const { data } = await API.patch(
-        `/ride-requests/${rideId}/sos/${sosEventId}/resolve`,
-        { resolutionNotes }
-      );
-      return { rideId, sosEventId, ...data.data };
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
     }
@@ -325,16 +196,6 @@ const initialState = {
 
   // Full tracking doc (breadcrumbs, milestones, polylines)
   trackingData: null,
-
-  // Active stops for current ride (from GET /stops or embedded in /tracking)
-  stops: [],
-  currentStopId: null,
-
-  // Participants
-  participants: [],
-
-  // SOS events
-  sosEvents: [],
 
   // Care assistant live (role-gated view)
   caLiveData: null,
@@ -390,51 +251,33 @@ const initialState = {
 
   // Loading states per operation
   loading: {
-    customerRequest:    false,
-    careRequest:        false,
-    fetchRide:          false,
-    adminAll:           false,
-    nearby:             false,
-    adminAssign:        false,
-    adminReplace:       false,
-    tpAssign:           false,
-    statusUpdate:       false,
-    live:               false,
-    tracking:           false,
-    milestone:          false,
-    stops:              false,
-    stopArrived:        false,
-    stopOtp:            false,
-    stopDepart:         false,
-    participants:       false,
-    sosEvents:          false,
-    sosTrigger:         false,
-    sosResolve:         false,
-    caLive:             false,
+    customerRequest: false,
+    careRequest:     false,
+    fetchRide:       false,
+    adminAll:        false,
+    nearby:          false,
+    adminAssign:     false,
+    tpAssign:        false,
+    statusUpdate:    false,
+    live:            false,
+    tracking:        false,
+    milestone:       false,
+    caLive:          false,
   },
 
   errors: {
-    customerRequest:    null,
-    careRequest:        null,
-    fetchRide:          null,
-    adminAll:           null,
-    nearby:             null,
-    adminAssign:        null,
-    adminReplace:       null,
-    tpAssign:           null,
-    statusUpdate:       null,
-    live:               null,
-    tracking:           null,
-    milestone:          null,
-    stops:              null,
-    stopArrived:        null,
-    stopOtp:            null,
-    stopDepart:         null,
-    participants:       null,
-    sosEvents:          null,
-    sosTrigger:         null,
-    sosResolve:         null,
-    caLive:             null,
+    customerRequest: null,
+    careRequest:     null,
+    fetchRide:       null,
+    adminAll:        null,
+    nearby:          null,
+    adminAssign:     null,
+    tpAssign:        null,
+    statusUpdate:    null,
+    live:            null,
+    tracking:        null,
+    milestone:       null,
+    caLive:          null,
   },
 };
 
@@ -547,7 +390,6 @@ const rideRequestSlice = createSlice({
     },
 
     // care_assistant_at_jp — CA reached join point
-    // FIX: writes to state.caAtJoinPoint (top-level), NOT state.socketLive.caAtJoinPoint
     socketCaAtJoinPoint(state, action) {
       state.caAtJoinPoint = true;
       state.caViewMode    = 'navigate_to_jp';
@@ -560,7 +402,6 @@ const rideRequestSlice = createSlice({
     },
 
     // care_assistant_joined_ride — CA boarded, switch to driver-only view
-    // FIX: writes to state.caHasJoined (top-level)
     socketCaJoinedRide(state, action) {
       state.caHasJoined   = true;
       state.caViewMode    = 'driver_tracking_only';
@@ -569,15 +410,8 @@ const rideRequestSlice = createSlice({
     },
 
     // ca_join_waypoint_completed — driver picked up CA
-    // FIX: writes to state.jpCompleted (top-level)
-    socketJpWaypointCompleted(state, action) {
+    socketJpWaypointCompleted(state) {
       state.jpCompleted = true;
-      // Also patch stops array if loaded
-      if (state.stops?.length) {
-        state.stops = state.stops.map(s =>
-          s.stopType === 'CARE_ASSISTANT_JOIN' ? { ...s, status: 'COMPLETED', isCompleted: true } : s
-        );
-      }
     },
 
     // navigation_target_changed
@@ -607,40 +441,15 @@ const rideRequestSlice = createSlice({
       }
     },
 
-    // stop_arrived / stop_departed — patch local stops array
-    socketStopArrived(state, action) {
-      const { stopId } = action.payload;
-      if (state.stops?.length) {
-        state.stops = state.stops.map(s =>
-          s.stopId?.toString() === stopId ? { ...s, status: 'ARRIVED' } : s
-        );
-      }
-    },
-    socketStopDeparted(state, action) {
-      const { departedStopId } = action.payload;
-      if (state.stops?.length) {
-        state.stops = state.stops.map(s =>
-          s.stopId?.toString() === departedStopId ? { ...s, status: 'COMPLETED' } : s
-        );
-      }
-      if (action.payload.nextStop) {
-        state.currentStopId = action.payload.nextStop.stopId;
-      }
-    },
-
     // ── Manual resets ──────────────────────────────────────────────────────
     clearCurrentRide(state) {
-      state.currentRide  = null;
-      state.liveData     = null;
-      state.trackingData = null;
-      state.nearbyResult = null;
-      state.createdRide  = null;
-      state.stops        = [];
-      state.currentStopId = null;
-      state.participants = [];
-      state.sosEvents    = [];
-      state.caLiveData   = null;
-      state.socketLive   = initialState.socketLive;
+      state.currentRide   = null;
+      state.liveData      = null;
+      state.trackingData  = null;
+      state.nearbyResult  = null;
+      state.createdRide   = null;
+      state.caLiveData    = null;
+      state.socketLive    = initialState.socketLive;
       state.caAtJoinPoint = false;
       state.caHasJoined   = false;
       state.caViewMode    = null;
@@ -743,19 +552,6 @@ const rideRequestSlice = createSlice({
         toast.error(action.payload || 'Assignment failed');
       });
 
-    // ── adminReplaceDriver ────────────────────────────────────────────────
-    builder
-      .addCase(adminReplaceDriver.pending,   (state) => { state.loading.adminReplace = true;  state.errors.adminReplace = null; })
-      .addCase(adminReplaceDriver.fulfilled, (state, action) => {
-        state.loading.adminReplace = false;
-        toast.success('Driver replaced.');
-      })
-      .addCase(adminReplaceDriver.rejected,  (state, action) => {
-        state.loading.adminReplace = false;
-        state.errors.adminReplace  = action.payload;
-        toast.error(action.payload || 'Driver replacement failed');
-      });
-
     // ── tpAssignDriver ────────────────────────────────────────────────────
     builder
       .addCase(tpAssignDriver.pending,   (state) => { state.loading.tpAssign = true;  state.errors.tpAssign = null; })
@@ -784,14 +580,8 @@ const rideRequestSlice = createSlice({
         }
         if (newStatus) state.socketLive.status = newStatus;
 
-        // complete_waypoint → mark CA join stop completed
-        if (action.payload.jpCompleted && state.stops?.length) {
-          state.stops = state.stops.map(s =>
-            s.stopType === 'CARE_ASSISTANT_JOIN' ? { ...s, status: 'COMPLETED', isCompleted: true } : s
-          );
-          state.jpCompleted = true;
-        }
-        if (action.payload.nextStopId) state.currentStopId = action.payload.nextStopId;
+        // complete_waypoint → mark CA join completed
+        if (action.payload.jpCompleted) state.jpCompleted = true;
 
         const toastMap = {
           driver_accepted: 'Ride accepted.',
@@ -821,12 +611,11 @@ const rideRequestSlice = createSlice({
         state.socketLive.etaMinutes = action.payload.currentEtaMinutes ?? state.socketLive.etaMinutes;
         state.socketLive.etaTarget  = action.payload.currentEtaTarget  ?? state.socketLive.etaTarget;
         state.socketLive.liveLocation = action.payload.liveLocation ?? state.socketLive.liveLocation;
-        if (action.payload.currentStop) state.currentStopId = action.payload.currentStop.stopId;
       })
       .addCase(fetchRideLive.rejected,  (state, action) => { state.loading.live = false; state.errors.live = action.payload; });
 
     // ── fetchRideTracking ─────────────────────────────────────────────────
-    // FIX: router returns { ride, stops, tracking, ... } — stops is top-level, NOT ride.waypoints
+    // Router returns { ride, tracking, socketHint, _serverTime } — ride.stops is embedded
     builder
       .addCase(fetchRideTracking.pending,   (state) => { state.loading.tracking = true;  state.errors.tracking = null; })
       .addCase(fetchRideTracking.fulfilled, (state, action) => {
@@ -835,11 +624,6 @@ const rideRequestSlice = createSlice({
         if (action.payload.ride) {
           state.currentRide       = action.payload.ride;
           state.socketLive.status = action.payload.ride.status;
-          state.currentStopId     = action.payload.ride.currentStopId || state.currentStopId;
-        }
-        // Hydrate stops from top-level stops array (router returns stops[] separately)
-        if (Array.isArray(action.payload.stops)) {
-          state.stops = action.payload.stops;
         }
       })
       .addCase(fetchRideTracking.rejected,  (state, action) => {
@@ -863,123 +647,6 @@ const rideRequestSlice = createSlice({
         toast.error(action.payload || 'Milestone record failed');
       });
 
-    // ── fetchRideStops ────────────────────────────────────────────────────
-    builder
-      .addCase(fetchRideStops.pending,   (state) => { state.loading.stops = true;  state.errors.stops = null; })
-      .addCase(fetchRideStops.fulfilled, (state, action) => {
-        state.loading.stops    = false;
-        state.stops            = action.payload.stops || [];
-        state.currentStopId    = action.payload.currentStopId || state.currentStopId;
-      })
-      .addCase(fetchRideStops.rejected,  (state, action) => { state.loading.stops = false; state.errors.stops = action.payload; });
-
-    // ── markStopArrived ───────────────────────────────────────────────────
-    builder
-      .addCase(markStopArrived.pending,   (state) => { state.loading.stopArrived = true;  state.errors.stopArrived = null; })
-      .addCase(markStopArrived.fulfilled, (state, action) => {
-        state.loading.stopArrived = false;
-        const { stopId, status } = action.payload;
-        state.stops = state.stops.map(s =>
-          s.stopId?.toString() === stopId ? { ...s, status } : s
-        );
-        if (action.payload.otp) {
-          // OTP returned for PATIENT_PICKUP — store temporarily for UI
-          state.socketLive.otpResult = { otp: action.payload.otp, stopType: action.payload.stopType };
-        }
-      })
-      .addCase(markStopArrived.rejected,  (state, action) => {
-        state.loading.stopArrived = false;
-        state.errors.stopArrived  = action.payload;
-        toast.error(action.payload || 'Mark arrived failed');
-      });
-
-    // ── verifyStopOtp ─────────────────────────────────────────────────────
-    builder
-      .addCase(verifyStopOtp.pending,   (state) => { state.loading.stopOtp = true;  state.errors.stopOtp = null; })
-      .addCase(verifyStopOtp.fulfilled, (state, action) => {
-        state.loading.stopOtp       = false;
-        state.socketLive.status     = action.payload.status; // otp_verified
-        if (state.currentRide) state.currentRide.status = action.payload.status;
-        const { stopId } = action.payload;
-        state.stops = state.stops.map(s =>
-          s.stopId?.toString() === stopId ? { ...s, status: 'COMPLETED' } : s
-        );
-        if (action.payload.nextStop) state.currentStopId = action.payload.nextStop.stopId;
-        toast.success('OTP verified.');
-      })
-      .addCase(verifyStopOtp.rejected,  (state, action) => {
-        state.loading.stopOtp = false;
-        state.errors.stopOtp  = action.payload;
-        toast.error(action.payload || 'Invalid OTP');
-      });
-
-    // ── departStop ────────────────────────────────────────────────────────
-    builder
-      .addCase(departStop.pending,   (state) => { state.loading.stopDepart = true;  state.errors.stopDepart = null; })
-      .addCase(departStop.fulfilled, (state, action) => {
-        state.loading.stopDepart    = false;
-        state.socketLive.status     = action.payload.status; // in_progress
-        if (state.currentRide) state.currentRide.status = action.payload.status;
-        const { stopId } = action.payload;
-        state.stops = state.stops.map(s =>
-          s.stopId?.toString() === stopId ? { ...s, status: 'COMPLETED' } : s
-        );
-        if (action.payload.nextStop) state.currentStopId = action.payload.nextStop.stopId;
-      })
-      .addCase(departStop.rejected,  (state, action) => {
-        state.loading.stopDepart = false;
-        state.errors.stopDepart  = action.payload;
-        toast.error(action.payload || 'Depart stop failed');
-      });
-
-    // ── fetchRideParticipants ─────────────────────────────────────────────
-    builder
-      .addCase(fetchRideParticipants.pending,   (state) => { state.loading.participants = true;  state.errors.participants = null; })
-      .addCase(fetchRideParticipants.fulfilled, (state, action) => {
-        state.loading.participants = false;
-        state.participants         = action.payload.participants || [];
-      })
-      .addCase(fetchRideParticipants.rejected,  (state, action) => { state.loading.participants = false; state.errors.participants = action.payload; });
-
-    // ── fetchRideSosEvents ────────────────────────────────────────────────
-    builder
-      .addCase(fetchRideSosEvents.pending,   (state) => { state.loading.sosEvents = true;  state.errors.sosEvents = null; })
-      .addCase(fetchRideSosEvents.fulfilled, (state, action) => {
-        state.loading.sosEvents = false;
-        state.sosEvents         = action.payload.events || [];
-      })
-      .addCase(fetchRideSosEvents.rejected,  (state, action) => { state.loading.sosEvents = false; state.errors.sosEvents = action.payload; });
-
-    // ── triggerRideSos ────────────────────────────────────────────────────
-    builder
-      .addCase(triggerRideSos.pending,   (state) => { state.loading.sosTrigger = true;  state.errors.sosTrigger = null; })
-      .addCase(triggerRideSos.fulfilled, (state, action) => {
-        state.loading.sosTrigger = false;
-        toast.success('SOS triggered. Admin notified.');
-      })
-      .addCase(triggerRideSos.rejected,  (state, action) => {
-        state.loading.sosTrigger = false;
-        state.errors.sosTrigger  = action.payload;
-        toast.error(action.payload || 'SOS trigger failed');
-      });
-
-    // ── resolveRideSos ────────────────────────────────────────────────────
-    builder
-      .addCase(resolveRideSos.pending,   (state) => { state.loading.sosResolve = true;  state.errors.sosResolve = null; })
-      .addCase(resolveRideSos.fulfilled, (state, action) => {
-        state.loading.sosResolve = false;
-        const { sosEventId } = action.payload;
-        state.sosEvents = state.sosEvents.map(e =>
-          e._id?.toString() === sosEventId ? { ...e, isResolved: true } : e
-        );
-        toast.success('SOS resolved.');
-      })
-      .addCase(resolveRideSos.rejected,  (state, action) => {
-        state.loading.sosResolve = false;
-        state.errors.sosResolve  = action.payload;
-        toast.error(action.payload || 'SOS resolve failed');
-      });
-
     // ── fetchCareAssistantLive ────────────────────────────────────────────
     builder
       .addCase(fetchCareAssistantLive.pending,   (state) => { state.loading.caLive = true;  state.errors.caLive = null; })
@@ -987,22 +654,8 @@ const rideRequestSlice = createSlice({
         state.loading.caLive = false;
         state.caLiveData     = action.payload;
         // Hydrate CA workflow flags from server response
-        if (action.payload.caViewMode)    state.caViewMode    = action.payload.caViewMode;
-        if (action.payload.caHasJoined !== undefined) state.caHasJoined = action.payload.caHasJoined;
-        if (action.payload.caJoinPoint)   {
-          // Store in stops as CA JOIN stop if not already there
-          const caJoinExists = state.stops.some(s => s.stopType === 'CARE_ASSISTANT_JOIN');
-          if (!caJoinExists && action.payload.caJoinPoint?.stopId) {
-            state.stops.push({
-              stopId:    action.payload.caJoinPoint.stopId,
-              stopType:  'CARE_ASSISTANT_JOIN',
-              location:  { coordinates: action.payload.caJoinPoint.coordinates, address: action.payload.caJoinPoint.address },
-              status:    action.payload.caJoinPoint.status || 'PENDING',
-              isCompleted: action.payload.caJoinPoint.isCompleted || false,
-              meta:      { zone: action.payload.caJoinPoint.zone, distCaToJoinKm: action.payload.caJoinPoint.distCaToJoinKm },
-            });
-          }
-        }
+        if (action.payload.caViewMode)                 state.caViewMode  = action.payload.caViewMode;
+        if (action.payload.caHasJoined !== undefined)  state.caHasJoined = action.payload.caHasJoined;
       })
       .addCase(fetchCareAssistantLive.rejected,  (state, action) => {
         state.loading.caLive = false;
@@ -1036,8 +689,6 @@ export const {
   socketOtpResult,
   socketOtpWrongAttempt,
   socketRideAssigned,
-  socketStopArrived,
-  socketStopDeparted,
   clearCurrentRide,
   clearCreatedRide,
   clearNearby,
@@ -1074,24 +725,10 @@ export const selectWrongOtpAttempts   = (s) => s.rideRequest.socketLive.wrongOtp
 export const selectHospitalEta        = (s) => s.rideRequest.socketLive.hospitalEta;
 export const selectCareAssistantTracking = (s) => s.rideRequest.socketLive.careAssistantTracking;
 
-// Stops
-export const selectStops              = (s) => s.rideRequest.stops;
-export const selectCurrentStopId      = (s) => s.rideRequest.currentStopId;
-export const selectCurrentStop        = (s) => {
-  const id = s.rideRequest.currentStopId;
-  return id ? s.rideRequest.stops.find(st => st.stopId?.toString() === id?.toString()) ?? null : null;
-};
-
-// Participants
-export const selectParticipants       = (s) => s.rideRequest.participants;
-
-// SOS
-export const selectSosEvents          = (s) => s.rideRequest.sosEvents;
-
 // CA live
 export const selectCaLiveData         = (s) => s.rideRequest.caLiveData;
 
-// CA workflow — FIX: reads top-level, not socketLive sub-object
+// CA workflow — top-level
 export const selectCaAtJoinPoint      = (s) => s.rideRequest.caAtJoinPoint;
 export const selectCaHasJoined        = (s) => s.rideRequest.caHasJoined;
 export const selectCaViewMode         = (s) => s.rideRequest.caViewMode;
@@ -1130,8 +767,6 @@ export function wireRideSocketEvents(on, SOCKET_EVENTS, dispatch) {
     on(EV.OTP_RESULT,                         (d) => dispatch(socketOtpResult(d))),
     on(EV.OTP_WRONG_ATTEMPT,                  ()  => dispatch(socketOtpWrongAttempt())),
     on(EV.HOSPITAL_ETA_UPDATE,                (d) => dispatch(socketHospitalEtaUpdate(d))),
-    on(EV.STOP_ARRIVED,                       (d) => dispatch(socketStopArrived(d))),
-    on(EV.STOP_DEPARTED,                      (d) => dispatch(socketStopDeparted(d))),
 
     // CA workflow — each event mapped ONCE
     on(EV.CARE_ASSISTANT_AT_JP,               (d) => dispatch(socketCaAtJoinPoint(d))),

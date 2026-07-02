@@ -43,6 +43,19 @@ export const fetchPublicLabs = createAsyncThunk(
   }
 );
 
+/** GET /api/labs/public/search — Unified public lab + test search */
+export const searchPublicLabs = createAsyncThunk(
+  'labs/searchPublicLabs',
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { data } = await API.get('/labs/public/search', { params });
+      return data;
+    } catch (err) {
+      return rejectWithValue(extractError(err));
+    }
+  }
+);
+
 /** GET /api/labs/public/featured */
 export const fetchFeaturedLabs = createAsyncThunk(
   'labs/fetchFeaturedLabs',
@@ -108,50 +121,6 @@ export const fetchPublicLabReviews = createAsyncThunk(
   }
 );
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  CUSTOMER THUNKS  —  /api/labs/customer/*
-// ═══════════════════════════════════════════════════════════════════════════
-
-/** POST /api/labs/customer/:id/reviews */
-export const submitLabReview = createAsyncThunk(
-  'labs/submitLabReview',
-  async ({ id, rating, comment }, { rejectWithValue }) => {
-    try {
-      const { data } = await API.post(`/labs/customer/${id}/reviews`, { rating, comment });
-      toast.success(data.message || 'Review submitted!');
-      return data;
-    } catch (err) {
-      toast.error(extractError(err));
-      return rejectWithValue(extractError(err));
-    }
-  }
-);
-
-/** GET /api/labs/customer/search */
-export const searchLabsAsCustomer = createAsyncThunk(
-  'labs/searchLabsAsCustomer',
-  async (params = {}, { rejectWithValue }) => {
-    try {
-      const { data } = await API.get('/labs/customer/search', { params });
-      return data;
-    } catch (err) {
-      return rejectWithValue(extractError(err));
-    }
-  }
-);
-
-/** GET /api/labs/customer/:id */
-export const fetchCustomerLabById = createAsyncThunk(
-  'labs/fetchCustomerLabById',
-  async (id, { rejectWithValue }) => {
-    try {
-      const { data } = await API.get(`/labs/customer/${id}`);
-      return data;
-    } catch (err) {
-      return rejectWithValue(extractError(err));
-    }
-  }
-);
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  LAB PARTNER THUNKS  —  /api/labs/partner/me/*
@@ -1152,12 +1121,12 @@ const initialState = {
   publicLabs: [],
   featuredLabs: [],
   publicPagination: {},
-  selectedLab: null,          // single lab detail (public or customer view)
+  selectedLab: null,          // single lab detail (public view)
   publicTests: [],
   publicPackages: [],
   publicReviews: [],
   reviewsPagination: {},
-  customerSearchResults: [],
+  publicSearchResults: [],    // Replaces customer search
 
   // ── Lab Partner ────────────────────────────────────────────────────────
   partnerProfile: null,
@@ -1237,6 +1206,14 @@ const labSlice = createSlice({
         state.publicLabs     = payload.data;
         state.publicPagination = payload.pagination;
       });
+      
+    builder
+      .addCase(searchPublicLabs.pending, pending)
+      .addCase(searchPublicLabs.rejected, rejected)
+      .addCase(searchPublicLabs.fulfilled, (state, { payload }) => {
+        state.loading = false;
+        state.publicSearchResults = payload.data;
+      });
 
     builder
       .addCase(fetchFeaturedLabs.pending,  pending)
@@ -1279,30 +1256,6 @@ const labSlice = createSlice({
         state.reviewsPagination  = payload.pagination;
       });
 
-    // ── CUSTOMER ───────────────────────────────────────────────────────
-
-    builder
-      .addCase(submitLabReview.pending,  actionPending)
-      .addCase(submitLabReview.rejected, rejected)
-      .addCase(submitLabReview.fulfilled, (state) => {
-        state.actionLoading = false;
-      });
-
-    builder
-      .addCase(searchLabsAsCustomer.pending,  pending)
-      .addCase(searchLabsAsCustomer.rejected, rejected)
-      .addCase(searchLabsAsCustomer.fulfilled, (state, { payload }) => {
-        state.loading               = false;
-        state.customerSearchResults = payload.data;
-      });
-
-    builder
-      .addCase(fetchCustomerLabById.pending,  pending)
-      .addCase(fetchCustomerLabById.rejected, rejected)
-      .addCase(fetchCustomerLabById.fulfilled, (state, { payload }) => {
-        state.loading     = false;
-        state.selectedLab = payload.data;
-      });
 
     // ── PARTNER — PROFILE ──────────────────────────────────────────────
 
@@ -1894,7 +1847,7 @@ export const {
   resetLabState,
 } = labSlice.actions;
 
-// ── Public / Customer selectors ──────────────────────────────────────────
+// ── Public selectors ─────────────────────────────────────────────────────
 export const selectPublicLabs           = (s) => s.labs.publicLabs;
 export const selectFeaturedLabs         = (s) => s.labs.featuredLabs;
 export const selectPublicPagination     = (s) => s.labs.publicPagination;
@@ -1903,7 +1856,7 @@ export const selectPublicTests          = (s) => s.labs.publicTests;
 export const selectPublicPackages       = (s) => s.labs.publicPackages;
 export const selectPublicReviews        = (s) => s.labs.publicReviews;
 export const selectReviewsPagination    = (s) => s.labs.reviewsPagination;
-export const selectCustomerSearchResults= (s) => s.labs.customerSearchResults;
+export const selectPublicSearchResults  = (s) => s.labs.publicSearchResults; // replaces customerSearch
 
 // ── Partner selectors ────────────────────────────────────────────────────
 export const selectPartnerProfile            = (s) => s.labs.partnerProfile;

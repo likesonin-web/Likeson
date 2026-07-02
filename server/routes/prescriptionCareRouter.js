@@ -150,7 +150,7 @@ router.post('/prescriptions', ...isDoctor, wrap(async (req, res) => {
     qualifications:      doctorProfile.qualifications?.map(q => q.degree).filter(Boolean).join(', ') || '',
     phone:               doctorProfile.user.phone,
     email:               doctorProfile.user.email,
-    doctorSignature:     doctorProfile.doctorSignature,
+    signatureUrl:        doctorProfile.doctorSignature, // FIXED: Matches ePrescriptionSchema
   };
 
   const rx = await EPrescription.create({
@@ -174,18 +174,46 @@ router.post('/prescriptions', ...isDoctor, wrap(async (req, res) => {
   // ── Post-response async work ──────────────────────────────────────────────
   setImmediate(async () => {
     try {
-      // 1. Stat increment
+      // 1. Update Customer Profile (Stats + Timeline + Medicine History)
       if (patient?.userId) {
+        
+        // Map new medicines to the schema structure in CustomerProfile
+        const mappedMedicines = (rx.medicines || []).map(med => ({
+          medicineName:      med.medicineName,
+          dosage:            med.dosage,
+          frequency:         med.frequency,
+          startDate:         rx.issuedAt || new Date(),
+          isOngoing:         true,
+          prescribingDoctor: doctorSnap.name,
+          instructions:      med.instructions,
+          prescriptionId:    rx._id
+        }));
+
+        // Create a chronological timeline event
+        const timelineEntry = {
+          date:           rx.issuedAt || new Date(),
+          eventTitle:     `Prescription Issued (${rx.rxNumber})`,
+          hospitalName:   hospital?.name || '',
+          description:    `Diagnosis: ${diagnosis || 'Not specified'}. Prescribed ${rx.medicines?.length || 0} medicines and ${rx.labTests?.length || 0} lab tests.`,
+          doctorName:     doctorSnap.name,
+          prescriptionId: rx._id
+        };
+
+        // Execute atomic update
         await CustomerProfile.findOneAndUpdate(
           { user: patient.userId },
           {
             $inc: { 'stats.totalConsultations': 1, 'stats.totalBookings': 1 },
             $set: { 'stats.lastBookingAt': new Date(), 'stats.lastActiveAt': new Date() },
+            $push: { 
+              medicineHistory: { $each: mappedMedicines },
+              medicalTimeline: timelineEntry
+            }
           }
         );
       }
 
-      // 2. Email + PDF
+      // 2. Resolve Patient Email & Send PDF
       let patientEmail = patient.email || null;
 
       if (!patientEmail && patient.userId) {
@@ -197,15 +225,14 @@ router.post('/prescriptions', ...isDoctor, wrap(async (req, res) => {
         patientEmail = bk?.customer?.email || null;
       }
       if (!patientEmail) {
-        console.warn(`[ePrescription] No patient email for RX ${rx.rxNumber} — skipping.`);
+        console.warn(`[ePrescription] No patient email for RX ${rx.rxNumber} — skipping email delivery.`);
         return;
       }
 
       const rxData = rx.toObject();
-      if (rxData.doctor) rxData.doctor.doctorSignature = doctorSnap.doctorSignature;
 
-   const rawPdf    = await generateEPrescriptionPdf(rxData);
-   const pdfBuffer = await securePdf(rawPdf);
+      const rawPdf    = await generateEPrescriptionPdf(rxData);
+      const pdfBuffer = await securePdf(rawPdf);
       const verifyUrl   = `${process.env.FRONTEND_URL || 'https://likeson.in'}/rx/verify/${rx.rxNumber}`;
       const downloadUrl = `${process.env.BACKEND_URL  || 'https://api.likeson.in'}/api/clinical/prescriptions/${rx._id}/pdf`;
 

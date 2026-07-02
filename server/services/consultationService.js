@@ -967,16 +967,55 @@ export const issuePrescription = async (consultationId, prescriptionData, actorI
   consultation.sessionMetrics.prescriptionIssued = true;
   await consultation.save();
 
-  // Async: PDF + email (non-blocking)
+  // ─── UPDATE CUSTOMER PROFILE (Timeline & Medicine History) ────────────────
+  try {
+    if (consultation.patient?._id) {
+      const mappedMedicines = (rx.medicines || []).map(med => ({
+        medicineName:      med.medicineName,
+        dosage:            med.dosage,
+        frequency:         med.frequency,
+        startDate:         rx.issuedAt || new Date(),
+        isOngoing:         true,
+        prescribingDoctor: doctorUser.name,
+        instructions:      med.instructions,
+        prescriptionId:    rx._id
+      }));
+
+      const timelineEntry = {
+        date:           rx.issuedAt || new Date(),
+        eventTitle:     `Prescription Issued (${rx.rxNumber})`,
+        hospitalName:   prescriptionData.hospital?.name || '',
+        description:    `Diagnosis: ${prescriptionData.diagnosis || 'Not specified'}. Prescribed ${rx.medicines?.length || 0} medicines and ${rx.labTests?.length || 0} lab tests.`,
+        doctorName:     doctorUser.name,
+        prescriptionId: rx._id
+      };
+
+      await mongoose.model('CustomerProfile').findOneAndUpdate(
+        { user: consultation.patient._id },
+        {
+          $inc: { 'stats.totalConsultations': 1, 'stats.totalBookings': 1 },
+          $set: { 'stats.lastBookingAt': new Date(), 'stats.lastActiveAt': new Date() },
+          $push: { 
+            medicineHistory: { $each: mappedMedicines },
+            medicalTimeline: timelineEntry
+          }
+        }
+      );
+    }
+  } catch (err) {
+    console.error(`[issuePrescription] Failed to update CustomerProfile for RX ${rx.rxNumber}:`, err.message);
+  }
+
+  // ─── ASYNC: PDF + EMAIL NOTIFICATION ──────────────────────────────────────
   if (consultation.patient?.email) {
     setImmediate(async () => {
       try {
-const { default: generateEPrescriptionPdf } = await import('../utils/generateEPrescriptionPdf.js');
-const { buildEPrescriptionEmail }           = await import('../utils/ePrescriptionEmailTemplate.js');
-const { default: securePdf }               = await import('../utils/securePdf.js');
+        const { default: generateEPrescriptionPdf } = await import('../utils/generateEPrescriptionPdf.js');
+        const { buildEPrescriptionEmail }           = await import('../utils/ePrescriptionEmailTemplate.js');
+        const { default: securePdf }                = await import('../utils/securePdf.js');
 
-const rawPdf    = await generateEPrescriptionPdf(rx);
-const pdfBuffer = await securePdf(rawPdf);
+        const rawPdf    = await generateEPrescriptionPdf(rx);
+        const pdfBuffer = await securePdf(rawPdf);
 
         const fmtD = (d) => d
           ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })

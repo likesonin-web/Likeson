@@ -1,8 +1,42 @@
 /**
  * @file    referralRoutes.js
- * @version 2.0.0
+ * @version 2.1.0
  *
- * KEY DESIGN DECISIONS:
+ * CHANGELOG vs 2.0.0 (bug fixes):
+ *
+ * 1. THE MAIN BUG — referrals silently not working:
+ *    User.js schema had no `referredByCode`, `referrals`, `redeemPoints`, or
+ *    `referralRewardCredited` fields. Mongoose strict mode (default) drops
+ *    writes to undefined paths without throwing, so attachPendingReferral()
+ *    and processReferralReward() ran successfully and logged success, but
+ *    nothing was ever actually persisted. Fixed in User.js — this file's
+ *    logic did not need to change for that part, it was already correct.
+ *
+ * 2. Wallet purpose mislabeling:
+ *    - POST /redeem-coins credited the wallet with purpose 'Referral_Bonus'.
+ *      That purpose is in WITHDRAWABLE_PURPOSES, but per Wallet.js's own
+ *      documented policy, coins-converted-to-wallet-balance must be
+ *      NON-withdrawable ('Coin_Conversion'). Mislabeling it as
+ *      'Referral_Bonus' silently made redeemed coins withdrawable — a
+ *      policy violation — and inflated "totalReferralCredited" /
+ *      admin/transactions figures with money that was never a referral.
+ *      Fixed: now uses 'Coin_Conversion'.
+ *    - POST /admin/manual-award used purpose 'Referral_Bonus' for what is
+ *      an unrelated admin action. Same inflation problem, plus it made
+ *      manually-granted coins withdrawable when they should go through
+ *      admin oversight. Fixed: now uses 'Admin_Credit'.
+ *
+ * 3. No retry on transient transaction write-conflicts. processReferralReward
+ *    runs on every login, so concurrent logins referencing the same referrer
+ *    (or double-tap login requests for the same invitee) can hit a MongoDB
+ *    WriteConflict. Previously that just threw. Added a bounded retry helper.
+ *
+ * 4. Constants (COINS_PER_REFERRAL / REFEREE_COINS_BONUS / POINTS_PER_RUPEE)
+ *    were re-declared locally, duplicating (and drifting from) the ones
+ *    already exported by User.js. Now imported from a single source of
+ *    truth to avoid values ever silently diverging.
+ *
+ * KEY DESIGN DECISIONS (unchanged from 2.0.0):
  *
  * attachPendingReferral(newUserId, referralCode)
  *   - Accepts a userId (string/ObjectId), NOT a Mongoose document.
@@ -22,7 +56,11 @@ import express   from 'express';
 import mongoose  from 'mongoose';
 import { body, param, query, validationResult } from 'express-validator';
 
-import User   from '../models/User.js';
+import User, {
+  REFERRAL_INVITER_COINS,
+  REFERRAL_INVITEE_COINS,
+  COINS_PER_RUPEE,
+} from '../models/User.js';
 import Wallet from '../models/Wallet.js';
 
 import { protect, authorize } from '../middleware/authMiddleware.js';
@@ -31,13 +69,14 @@ import asyncHandler           from '../utils/asyncHandler.js';
 const router = express.Router();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONSTANTS
+// CONSTANTS — single source of truth is User.js; aliased here to keep the
+// rest of this file's existing naming intact.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const COINS_PER_REFERRAL  = 1_000;  // referrer earns per completed referral
-export const REFEREE_COINS_BONUS =   500;  // invitee earns on first login
-export const POINTS_PER_RUPEE    =   100;  // 100 coins = ₹1
-export const MIN_REDEEM_POINTS   =   500;  // minimum to redeem
+export const COINS_PER_REFERRAL  = REFERRAL_INVITER_COINS; // referrer earns per completed referral
+export const REFEREE_COINS_BONUS = REFERRAL_INVITEE_COINS; // invitee earns on first login
+export const POINTS_PER_RUPEE    = COINS_PER_RUPEE;         // 100 coins = ₹1
+export const MIN_REDEEM_POINTS   = 500;                     // minimum to redeem
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LOGGER
@@ -59,6 +98,41 @@ const validate = (req, res, next) => {
     return res.status(400).json({ status: 'fail', errors: errors.array() });
   next();
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRANSACTION RETRY HELPER
+//
+// FIX: added. MongoDB transactions can fail with a transient WriteConflict
+// when two sessions touch the same document (e.g. two logins for referrals
+// pointing at the same referrer, or a double-submit). Previously any such
+// conflict just propagated as an unhandled 500. This retries a bounded
+// number of times only for genuinely transient errors, and always aborts +
+// ends the session cleanly on every attempt.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function withTransactionRetry(work, { maxRetries = 3 } = {}) {
+  let lastErr;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const session = await mongoose.startSession();
+    try {
+      session.startTransaction();
+      const result = await work(session);
+      await session.commitTransaction();
+      return result;
+    } catch (err) {
+      await session.abortTransaction().catch(() => {});
+      lastErr = err;
+      const transient =
+        err?.errorLabelSet?.has?.('TransientTransactionError') ||
+        err?.errorLabels?.includes?.('TransientTransactionError');
+      if (!transient || attempt === maxRetries) throw err;
+      log.warn('Transient transaction conflict, retrying', { attempt, err: err.message });
+    } finally {
+      session.endSession();
+    }
+  }
+  throw lastErr;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WALLET HELPERS
@@ -154,7 +228,7 @@ export async function attachPendingReferral(newUserId, referralCode) {
  *
  * Flow:
  *   1. Pre-check (no session): if already rewarded or no referredByCode → return false.
- *   2. Open transaction.
+ *   2. Open transaction (with retry on transient write conflicts).
  *   3. Re-fetch invitee + referrer with write-lock.
  *   4. Credit 500 coins + ₹5 wallet to invitee.
  *   5. Credit 1000 coins + ₹10 wallet to referrer.
@@ -185,98 +259,89 @@ export async function processReferralReward(userId) {
   }
   if (referrer._id.toString() === userId.toString()) return false;
 
-  // ── Transaction ────────────────────────────────────────────────────────────
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
+  // ── Transaction (with retry on transient write conflicts) ──────────────────
   try {
-    // Re-fetch inside transaction (final idempotency check + write-lock)
-    const invitee = await User.findById(userId).session(session);
-    if (!invitee || invitee.referralRewardCredited) {
-      await session.abortTransaction();
-      return false;
-    }
+    return await withTransactionRetry(async (session) => {
+      // Re-fetch inside transaction (final idempotency check + write-lock)
+      const invitee = await User.findById(userId).session(session);
+      if (!invitee || invitee.referralRewardCredited) {
+        return false;
+      }
 
-    const lockedReferrer = await User.findById(referrer._id).session(session);
-    if (!lockedReferrer) {
-      await session.abortTransaction();
-      return false;
-    }
+      const lockedReferrer = await User.findById(referrer._id).session(session);
+      if (!lockedReferrer) {
+        return false;
+      }
 
-    const now = new Date();
+      const now = new Date();
 
-    // ── 1. Credit invitee 500 coins ────────────────────────────────────────
-    invitee.redeemPoints           = (invitee.redeemPoints ?? 0) + REFEREE_COINS_BONUS;
-    invitee.referredBy             = lockedReferrer._id;
-    invitee.referralRewardCredited = true;
-    await invitee.save({ session });
+      // ── 1. Credit invitee 500 coins ────────────────────────────────────────
+      invitee.redeemPoints           = (invitee.redeemPoints ?? 0) + REFEREE_COINS_BONUS;
+      invitee.referredBy             = lockedReferrer._id;
+      invitee.referralRewardCredited = true;
+      await invitee.save({ session });
 
-    // ── 2. Credit referrer 1000 coins ──────────────────────────────────────
-    lockedReferrer.redeemPoints = (lockedReferrer.redeemPoints ?? 0) + COINS_PER_REFERRAL;
+      // ── 2. Credit referrer 1000 coins ──────────────────────────────────────
+      lockedReferrer.redeemPoints = (lockedReferrer.redeemPoints ?? 0) + COINS_PER_REFERRAL;
 
-    // Update pending → completed
-    const entry = (lockedReferrer.referrals ?? []).find(
-      (r) => r.referredUser?.toString() === invitee._id.toString()
-    );
+      // Update pending → completed
+      const entry = (lockedReferrer.referrals ?? []).find(
+        (r) => r.referredUser?.toString() === invitee._id.toString()
+      );
 
-    if (entry) {
-      entry.status        = 'completed';
-      entry.pointsAwarded = COINS_PER_REFERRAL;
-      entry.completedAt   = now;
-    } else {
-      // Fallback: entry was never pre-created (code added late)
-      if (!Array.isArray(lockedReferrer.referrals)) lockedReferrer.referrals = [];
-      lockedReferrer.referrals.push({
-        referredUser:      invitee._id,
-        referredUserName:  invitee.name,
-        referredUserEmail: invitee.email,
-        pointsAwarded:     COINS_PER_REFERRAL,
-        status:            'completed',
-        completedAt:       now,
+      if (entry) {
+        entry.status        = 'completed';
+        entry.pointsAwarded = COINS_PER_REFERRAL;
+        entry.completedAt   = now;
+      } else {
+        // Fallback: entry was never pre-created (code added late)
+        if (!Array.isArray(lockedReferrer.referrals)) lockedReferrer.referrals = [];
+        lockedReferrer.referrals.push({
+          referredUser:      invitee._id,
+          referredUserName:  invitee.name,
+          referredUserEmail: invitee.email,
+          pointsAwarded:     COINS_PER_REFERRAL,
+          status:            'completed',
+          completedAt:       now,
+        });
+      }
+
+      await lockedReferrer.save({ session });
+
+      // ── 3. Credit both wallets ─────────────────────────────────────────────
+      const inviteeRupees  = +(REFEREE_COINS_BONUS / POINTS_PER_RUPEE).toFixed(2); // ₹5
+      const referrerRupees = +(COINS_PER_REFERRAL  / POINTS_PER_RUPEE).toFixed(2); // ₹10
+
+      await creditWallet({
+        userId:      invitee._id,
+        amount:      inviteeRupees,
+        purpose:     'Referral_Bonus',
+        description: `Welcome bonus: ${REFEREE_COINS_BONUS} coins → ₹${inviteeRupees}`,
+        session,
       });
-    }
 
-    await lockedReferrer.save({ session });
+      await creditWallet({
+        userId:      lockedReferrer._id,
+        amount:      referrerRupees,
+        purpose:     'Referral_Bonus',
+        description: `Referral reward for inviting ${invitee.name}: ${COINS_PER_REFERRAL} coins → ₹${referrerRupees}`,
+        session,
+      });
 
-    // ── 3. Credit both wallets ─────────────────────────────────────────────
-    const inviteeRupees  = +(REFEREE_COINS_BONUS / POINTS_PER_RUPEE).toFixed(2); // ₹5
-    const referrerRupees = +(COINS_PER_REFERRAL  / POINTS_PER_RUPEE).toFixed(2); // ₹10
+      log.info('Referral reward processed ✔', {
+        inviteeId:      invitee._id,
+        referrerId:     lockedReferrer._id,
+        inviteeCoins:   REFEREE_COINS_BONUS,
+        referrerCoins:  COINS_PER_REFERRAL,
+        inviteeRupees,
+        referrerRupees,
+      });
 
-    await creditWallet({
-      userId:      invitee._id,
-      amount:      inviteeRupees,
-      purpose:     'Referral_Bonus',
-      description: `Welcome bonus: ${REFEREE_COINS_BONUS} coins → ₹${inviteeRupees}`,
-      session,
+      return true;
     });
-
-    await creditWallet({
-      userId:      lockedReferrer._id,
-      amount:      referrerRupees,
-      purpose:     'Referral_Bonus',
-      description: `Referral reward for inviting ${invitee.name}: ${COINS_PER_REFERRAL} coins → ₹${referrerRupees}`,
-      session,
-    });
-
-    await session.commitTransaction();
-
-    log.info('Referral reward processed ✔', {
-      inviteeId:      invitee._id,
-      referrerId:     lockedReferrer._id,
-      inviteeCoins:   REFEREE_COINS_BONUS,
-      referrerCoins:  COINS_PER_REFERRAL,
-      inviteeRupees,
-      referrerRupees,
-    });
-
-    return true;
-
   } catch (err) {
-    await session.abortTransaction();
     log.error('Referral reward transaction failed', { err: err.message, userId });
     throw err;
-  } finally {
-    session.endSession();
   }
 }
 
@@ -386,52 +451,64 @@ router.post(
   ],
   asyncHandler(async (req, res) => {
     const pointsToRedeem = parseInt(req.body.points, 10);
-    const session = await mongoose.startSession();
-    session.startTransaction();
 
-    try {
+    const result = await withTransactionRetry(async (session) => {
       const user = await User.findById(req.user._id).session(session);
-      if (!user) { await session.abortTransaction(); return res.status(404).json({ message: 'User not found.' }); }
+      if (!user) return { notFound: true };
 
       if ((user.redeemPoints ?? 0) < pointsToRedeem) {
-        await session.abortTransaction();
-        return res.status(400).json({
-          message: `Insufficient coins. You have ${user.redeemPoints ?? 0} coins (₹${((user.redeemPoints ?? 0) / POINTS_PER_RUPEE).toFixed(2)}).`,
-        });
+        return {
+          insufficient: true,
+          available: user.redeemPoints ?? 0,
+        };
       }
 
-      const rupeesEarned    = +(pointsToRedeem / POINTS_PER_RUPEE).toFixed(2);
-      user.redeemPoints     = (user.redeemPoints ?? 0) - pointsToRedeem;
+      const rupeesEarned = +(pointsToRedeem / POINTS_PER_RUPEE).toFixed(2);
+      user.redeemPoints  = (user.redeemPoints ?? 0) - pointsToRedeem;
       await user.save({ session });
 
+      // FIX: was 'Referral_Bonus'. This is a coin→wallet conversion, not a
+      // referral reward. Wallet.js's own WITHDRAWABLE_PURPOSES policy
+      // explicitly excludes 'Coin_Conversion' from withdrawable balance —
+      // using 'Referral_Bonus' here bypassed that policy and inflated
+      // referral totals in admin/transactions and admin/user/:userId.
       const wallet = await creditWallet({
         userId:      user._id,
         amount:      rupeesEarned,
-        purpose:     'Referral_Bonus',
+        purpose:     'Coin_Conversion',
         description: `${pointsToRedeem} coins redeemed → ₹${rupeesEarned}`,
         session,
       });
 
-      await session.commitTransaction();
       log.info('Coins redeemed', { userId: user._id, pointsToRedeem, rupeesEarned });
 
-      return res.json({
-        status:  'success',
-        message: `${pointsToRedeem} coins successfully converted to ₹${rupeesEarned}.`,
-        data: {
-          pointsRedeemed: pointsToRedeem,
-          rupeesEarned,
-          walletBalance:  wallet.balance,
-          remainingCoins: user.redeemPoints,
-          remainingValue: `₹${(user.redeemPoints / POINTS_PER_RUPEE).toFixed(2)}`,
-        },
+      return {
+        ok: true,
+        pointsToRedeem,
+        rupeesEarned,
+        walletBalance: wallet.balance,
+        remainingCoins: user.redeemPoints,
+      };
+    });
+
+    if (result.notFound) return res.status(404).json({ message: 'User not found.' });
+    if (result.insufficient) {
+      return res.status(400).json({
+        message: `Insufficient coins. You have ${result.available} coins (₹${(result.available / POINTS_PER_RUPEE).toFixed(2)}).`,
       });
-    } catch (err) {
-      await session.abortTransaction();
-      throw err;
-    } finally {
-      session.endSession();
     }
+
+    return res.json({
+      status:  'success',
+      message: `${result.pointsToRedeem} coins successfully converted to ₹${result.rupeesEarned}.`,
+      data: {
+        pointsRedeemed: result.pointsToRedeem,
+        rupeesEarned:   result.rupeesEarned,
+        walletBalance:  result.walletBalance,
+        remainingCoins: result.remainingCoins,
+        remainingValue: `₹${(result.remainingCoins / POINTS_PER_RUPEE).toFixed(2)}`,
+      },
+    });
   })
 );
 
@@ -460,7 +537,7 @@ router.get(
 router.get('/admin/overview', protect, authorize('superadmin', 'admin'), asyncHandler(async (req, res) => {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const [overviewResult] = await User.aggregate([
-    { $unwind: { path: '$referrals', preserveNullAndEmpty: false } },
+    { $unwind: { path: '$referrals', preserveNullAndEmptyArrays: false } },
     {
       $group: {
         _id: null,
@@ -562,24 +639,56 @@ router.get('/admin/transactions', protect, authorize('superadmin'), asyncHandler
 
 router.post('/admin/manual-award', protect, authorize('superadmin'), [body('userId').isMongoId(), body('coins').isInt({ min: 1 }), body('reason').notEmpty().trim(), validate], asyncHandler(async (req, res) => {
   const { userId, coins, reason } = req.body;
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
+
+  const result = await withTransactionRetry(async (session) => {
     const user = await User.findById(userId).session(session);
-    if (!user) { await session.abortTransaction(); return res.status(404).json({ message: 'User not found.' }); }
-    const rupees = +(coins / POINTS_PER_RUPEE).toFixed(2);
+    if (!user) return { notFound: true };
+
+    const rupees      = +(coins / POINTS_PER_RUPEE).toFixed(2);
     user.redeemPoints = (user.redeemPoints ?? 0) + coins;
     await user.save({ session });
-    const wallet = await creditWallet({ userId: user._id, amount: rupees, purpose: 'Referral_Bonus', description: `Admin manual award: ${coins} coins → ₹${rupees}. Reason: ${reason}`, session });
-    await session.commitTransaction();
+
+    // FIX: was 'Referral_Bonus'. This is an admin-initiated award, not a
+    // referral reward — mislabeling it inflated referral analytics
+    // (admin/transactions, admin/user/:userId totalReferralCredited) with
+    // amounts that have nothing to do with referrals, and made these
+    // credits withdrawable when 'Admin_Credit' is the correct, auditable
+    // category for manual grants.
+    const wallet = await creditWallet({
+      userId:      user._id,
+      amount:      rupees,
+      purpose:     'Admin_Credit',
+      description: `Admin manual award: ${coins} coins → ₹${rupees}. Reason: ${reason}`,
+      session,
+    });
+
     log.info('Manual coin award', { by: req.user._id, to: userId, coins, rupees });
-    return res.json({ status: 'success', message: `${coins} coins (₹${rupees}) awarded to ${user.name}.`, data: { userId: user._id, userName: user.name, coinsAwarded: coins, rupeesAwarded: rupees, totalCoins: user.redeemPoints, walletBalance: wallet.balance } });
-  } catch (err) {
-    await session.abortTransaction();
-    throw err;
-  } finally {
-    session.endSession();
-  }
+
+    return {
+      ok: true,
+      userName: user.name,
+      coinsAwarded: coins,
+      rupeesAwarded: rupees,
+      totalCoins: user.redeemPoints,
+      walletBalance: wallet.balance,
+      userId: user._id,
+    };
+  });
+
+  if (result.notFound) return res.status(404).json({ message: 'User not found.' });
+
+  return res.json({
+    status: 'success',
+    message: `${result.coinsAwarded} coins (₹${result.rupeesAwarded}) awarded to ${result.userName}.`,
+    data: {
+      userId: result.userId,
+      userName: result.userName,
+      coinsAwarded: result.coinsAwarded,
+      rupeesAwarded: result.rupeesAwarded,
+      totalCoins: result.totalCoins,
+      walletBalance: result.walletBalance,
+    },
+  });
 }));
 
 // ─────────────────────────────────────────────────────────────────────────────

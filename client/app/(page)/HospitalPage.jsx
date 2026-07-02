@@ -522,7 +522,7 @@ const HomeHospitals = () => {
         aria-hidden="true"
       />
 
-      <div className="container-custom relative z-10">
+      <div className="  relative z-10">
 
         {/* ── Header ── */}
         <header className="flex flex-col xl:flex-row xl:items-end justify-between mb-12 px-4 gap-10">

@@ -22,6 +22,7 @@ import toast from 'react-hot-toast';
 import Container from '../../../components/ui/Container';
 import Ads from '../../../components/Ads';
 import Link from 'next/link';
+import SpecialButton from '../../../components/SpecialButton';
 
 // ─── Redux ────────────────────────────────────────────────────────────────────
 import {
@@ -60,8 +61,6 @@ const SCHEDULES  = ['H', 'H1', 'G', 'X', 'None'];
 const SORT_OPTIONS = [
   { label: 'Name (A–Z)',       value: 'brandName_asc'     },
   { label: 'Name (Z–A)',       value: 'brandName_desc'    },
-  { label: 'Price: Low–High',  value: 'referenceMrp_asc'  },
-  { label: 'Price: High–Low',  value: 'referenceMrp_desc' },
   { label: 'Newest First',     value: 'createdAt_desc'    },
   { label: 'Most Popular',     value: 'popularity_desc'   },
 ];
@@ -352,22 +351,33 @@ const PrescriptionUploadModal = ({ medicine, onUpload, onSkip, onClose, isUpload
         </div>
 
         <div className="px-6 py-4 border-t border-base-200 flex gap-3">
-          <button
+          <SpecialButton
+            as="button"
+            role="pharmacy"
+            variant="soft"
+            size="md"
+            animation="press"
+            textAnimation="none"
+            fullWidth
+            title="Add Without Rx"
             onClick={onSkip}
             disabled={isUploading}
-            className="flex-1 btn-secondary py-2.5 text-xs rounded-xl disabled:opacity-40"
-          >
-            Add Without Rx
-          </button>
-          <button
+            className="rounded-[22px]"
+          />
+          <SpecialButton
+            as="button"
+            role="pharmacy"
+            variant="solid"
+            size="md"
+            animation="press"
+            textAnimation="none"
+            fullWidth
+            icon={isUploading ? (p) => <Loader2 {...p} className={`${p.className} animate-spin`} /> : Upload}
+            title={isUploading ? 'Uploading…' : 'Upload & Add'}
             onClick={handleUpload}
             disabled={!file || isUploading}
-            className="flex-1 btn-primary-cta py-2.5 text-xs rounded-xl flex items-center justify-center gap-2 disabled:opacity-40"
-          >
-            {isUploading
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
-              : <><Upload className="w-4 h-4" /> Upload & Add</>}
-          </button>
+            className="rounded-[22px]"
+          />
         </div>
       </motion.div>
     </motion.div>
@@ -425,15 +435,20 @@ const CouponInput = ({ orderTotal, coupon, couponLoading, couponError, onApply, 
             disabled={couponLoading}
             className="input-field flex-1 text-xs uppercase tracking-widest placeholder:normal-case placeholder:tracking-normal placeholder:text-base-content/30"
           />
-          <button
+          <SpecialButton
+            as="button"
+            role="pharmacy"
+            variant="solid"
+            size="md"
+            animation="press"
+            textAnimation="none"
+            uppercase
+            icon={couponLoading ? (p) => <Loader2 {...p} className={`${p.className} animate-spin`} /> : Ticket}
+            title="Apply"
             onClick={handleApply}
             disabled={couponLoading || !inputCode.trim()}
-            className="shrink-0 px-4 py-2 rounded-xl bg-primary text-primary-content text-[10px] font-black uppercase tracking-widest disabled:opacity-40 flex items-center gap-1.5 transition-all hover:brightness-110"
-          >
-            {couponLoading
-              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              : <><Ticket className="w-3.5 h-3.5" /> Apply</>}
-          </button>
+            className="shrink-0 w-auto px-4 rounded-xl"
+          />
         </div>
       )}
 
@@ -814,39 +829,80 @@ const BuyNowModal = ({
         <div className="px-5 py-4 border-t border-base-200 flex gap-3 bg-base-200/30">
           {step === 'address' ? (
             <>
-              <button onClick={onClose} className="flex-1 btn-secondary py-2.5 text-xs rounded-xl">
-                Cancel
-              </button>
-              <button
+              <SpecialButton
+                as="button"
+                role="pharmacy"
+                variant="soft"
+                size="md"
+                animation="press"
+                textAnimation="none"
+                fullWidth
+                title="Cancel"
+                onClick={onClose}
+                className="rounded-[22px]"
+              />
+              <SpecialButton
+                as="button"
+                role="pharmacy"
+                variant="solid"
+                size="md"
+                animation="press"
+                textAnimation="none"
+                fullWidth
+                icon={ChevronRightIcon}
+                iconPosition="right"
+                title="Continue"
                 onClick={() => {
                   if (!isAddressValid) { toast.error('Please fill all required fields.'); return; }
                   setStep('payment');
                 }}
-                className="flex-1 btn-primary-cta py-2.5 text-xs rounded-xl flex items-center justify-center gap-2"
-              >
-                Continue <ChevronRightIcon className="w-3.5 h-3.5" />
-              </button>
+                className="rounded-[22px]"
+              />
             </>
           ) : (
             <>
-              <button onClick={() => setStep('address')} className="flex-1 btn-secondary py-2.5 text-xs rounded-xl flex items-center justify-center gap-1.5">
-                <ChevronLeft className="w-3.5 h-3.5" /> Back
-              </button>
-              <button
+              <SpecialButton
+                as="button"
+                role="pharmacy"
+                variant="soft"
+                size="md"
+                animation="press"
+                textAnimation="none"
+                fullWidth
+                icon={ChevronLeft}
+                iconPosition="left"
+                title="Back"
+                onClick={() => setStep('address')}
+                className="rounded-[22px]"
+              />
+              <SpecialButton
+                as="button"
+                role="pharmacy"
+                variant="solid"
+                size="md"
+                animation="press"
+                textAnimation="none"
+                fullWidth
+                icon={
+                  isActing
+                    ? (p) => <RefreshCw {...p} className={`${p.className} animate-spin`} />
+                    : paymentMethod === 'COD'
+                    ? Package
+                    : paymentMethod === 'Wallet'
+                    ? Wallet
+                    : CreditCard
+                }
+                title={
+                  isActing
+                    ? 'Processing…'
+                    : paymentMethod === 'COD'
+                    ? 'Place Order'
+                    : `Pay ₹${grandTotal?.toFixed(2)}`
+                }
                 onClick={handleConfirm}
                 disabled={isActing || isWalletInsufficient || deliveryPricingLoading}
-                className="flex-1 btn-primary-cta py-2.5 text-xs rounded-xl flex items-center justify-center gap-2 disabled:opacity-40"
-              >
-                {isActing ? (
-                  <><RefreshCw className="w-4 h-4 animate-spin" /> Processing…</>
-                ) : paymentMethod === 'COD' ? (
-                  <><Package className="w-4 h-4" /> Place Order</>
-                ) : paymentMethod === 'Wallet' ? (
-                  <><Wallet className="w-4 h-4" /> Pay ₹{grandTotal?.toFixed(2)}</>
-                ) : (
-                  <><CreditCard className="w-4 h-4" /> Pay ₹{grandTotal?.toFixed(2)}</>
-                )}
-              </button>
+                className="rounded-[22px]"
+              />
             </>
           )}
         </div>
@@ -921,12 +977,30 @@ const OrderSuccessModal = ({ order, onClose, onViewOrders }) => (
       </div>
 
       <div className="px-5 pb-5 flex gap-3">
-        <button onClick={onClose} className="flex-1 btn-secondary py-2.5 text-xs rounded-xl">
-          Continue Shopping
-        </button>
-        <button onClick={onViewOrders} className="flex-1 btn-primary-cta py-2.5 text-xs rounded-xl">
-          View Orders
-        </button>
+        <SpecialButton
+          as="button"
+          role="pharmacy"
+          variant="soft"
+          size="md"
+          animation="press"
+          textAnimation="none"
+          fullWidth
+          title="Continue Shopping"
+          onClick={onClose}
+          className="rounded-[22px]"
+        />
+        <SpecialButton
+          as="button"
+          role="pharmacy"
+          variant="solid"
+          size="md"
+          animation="press"
+          textAnimation="none"
+          fullWidth
+          title="View Orders"
+          onClick={onViewOrders}
+          className="rounded-[22px]"
+        />
       </div>
     </motion.div>
   </motion.div>
@@ -1130,31 +1204,41 @@ const MedicineCard = ({ medicine, viewMode, onViewDetail, onAddToCart, onBuyNow,
 
           {!isOutOfStock ? (
             <div className="grid grid-cols-2 gap-2">
-              <button
+              <SpecialButton
+                as="button"
+                role="pharmacy"
+                variant="outline"
+                size="sm"
+                animation="press"
+                textAnimation="none"
+                icon={
+                  isThisActing
+                    ? (p) => <RefreshCw {...p} className={`${p.className} animate-spin`} />
+                    : needsRx
+                    ? FileImage
+                    : ShoppingCart
+                }
+                title={isThisActing ? '' : (needsRx ? 'Add + Rx' : 'Cart')}
                 onClick={() => onAddToCart(medicine)}
                 disabled={isThisActing}
                 aria-label={`Add ${medicine.brandName} to cart`}
-                className="flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-black uppercase tracking-wider rounded-xl border-2 border-primary text-primary hover:bg-primary hover:text-primary-content disabled:opacity-40 transition-all duration-200"
-              >
-                {isThisActing
-                  ? <RefreshCw size={11} className="animate-spin" />
-                  : needsRx
-                  ? <FileImage size={11} />
-                  : <ShoppingCart size={11} />}
-                {!isThisActing && (needsRx ? 'Add + Rx' : 'Cart')}
-              </button>
+                className="rounded-[22px]"
+              />
 
-              <button
+              <SpecialButton
+                as="button"
+                role="pharmacy"
+                variant="solid"
+                size="sm"
+                animation="press"
+                textAnimation="none"
+                icon={isThisActing ? (p) => <RefreshCw {...p} className={`${p.className} animate-spin`} /> : Zap}
+                title={isThisActing ? '' : 'Buy Now'}
                 onClick={() => onBuyNow(medicine)}
                 disabled={isThisActing}
                 aria-label={`Buy ${medicine.brandName} now`}
-                className="flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-black uppercase tracking-wider rounded-xl bg-primary text-primary-content hover:brightness-110 disabled:opacity-40 transition-all duration-200 shadow-sm"
-              >
-                {isThisActing
-                  ? <RefreshCw size={11} className="animate-spin" />
-                  : <Zap size={11} />}
-                {!isThisActing && 'Buy Now'}
-              </button>
+                className="rounded-[22px]"
+              />
             </div>
           ) : (
             <div className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-base-200/60 border border-base-300">
@@ -1768,10 +1852,18 @@ export default function MedicinePage({ router }) {
                   <p className="text-sm text-base-content/40 max-w-xs mx-auto mb-7 font-medium">
                     We couldn&apos;t find anything matching those filters. Try a broader search.
                   </p>
-                  <button onClick={resetFilters}
-                    className="px-6 py-2.5 bg-primary text-primary-content rounded-xl font-bold text-xs uppercase tracking-widest hover:brightness-110 transition-all shadow-sm">
-                    Clear All Filters
-                  </button>
+                  <SpecialButton
+                    as="button"
+                    role="pharmacy"
+                    variant="solid"
+                    size="md"
+                    animation="lift"
+                    textAnimation="none"
+                    fullWidth={false}
+                    title="Clear All Filters"
+                    onClick={resetFilters}
+                    className="rounded-xl w-auto px-6 mx-auto"
+                  />
                 </div>
 
               ) : (
@@ -1897,10 +1989,18 @@ export default function MedicinePage({ router }) {
                 </div>
 
                 <div className="px-5 py-4 border-t border-base-200 flex flex-col gap-2.5">
-                  <button onClick={() => setIsSidebarOpen(false)}
-                    className="w-full h-11 bg-primary text-primary-content rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm hover:brightness-110 transition-all">
-                    View {pagination.total ?? ''} Results
-                  </button>
+                  <SpecialButton
+                    as="button"
+                    role="pharmacy"
+                    variant="solid"
+                    size="lg"
+                    animation="press"
+                    textAnimation="none"
+                    fullWidth
+                    title={`View ${pagination.total ?? ''} Results`}
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="rounded-[22px]"
+                  />
                   {activeFiltersCount > 0 && (
                     <button onClick={() => { resetFilters(); setIsSidebarOpen(false); }}
                       className="text-xs font-bold uppercase text-error/70 hover:text-error tracking-wider text-center hover:underline">

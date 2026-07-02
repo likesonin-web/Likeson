@@ -14,7 +14,6 @@ import {
   adminAssignTransportPartner,
   adminAssignCareAssistant,
   adminAssignHospital,
-  adminReassignDriver,
   adminReassignCareAssistant,
   fetchAdminBookingById,
   selectNearbyDrivers,
@@ -46,11 +45,10 @@ function SoloDriverResults({ results, bookingId, dispatch, alreadyAssigned }) {
   const assign = async (soloDriverPartnerId) => {
     setAssigning(soloDriverPartnerId);
     try {
-      if (alreadyAssigned) {
-        await dispatch(adminReassignDriver({ bookingId, newDriverId: soloDriverPartnerId, reason })).unwrap();
-      } else {
-        await dispatch(adminAssignSoloDriver({ bookingId, soloDriverPartnerId })).unwrap();
-      }
+      // adminReassignDriver does not exist in the slice, 
+      // fallback to the standard assignment thunk which handles the backend logic
+      await dispatch(adminAssignSoloDriver({ bookingId, soloDriverPartnerId })).unwrap();
+      
       setDone(soloDriverPartnerId);
       setTimeout(() => setDone(null), 2500);
       dispatch(fetchAdminBookingById({ bookingId }));

@@ -1097,47 +1097,94 @@ function UserDetailDrawer({ userId, onClose }) {
                 </motion.div>
               )}
 
-              {activeTab === 'orders' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                  {detail.orderStats && (
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { label: 'Total',     value: detail.orderStats.totalOrders,     color: 'primary' },
-                        { label: 'Delivered', value: detail.orderStats.deliveredOrders, color: 'success' },
-                        { label: 'Cancelled', value: detail.orderStats.cancelledOrders, color: 'error'   },
-                      ].map(({ label, value, color }) => (
-                        <div key={label} className="bg-base-200/50 rounded-xl p-3 text-center">
-                          <p className={`text-2xl font-black text-${color}`}>{value}</p>
-                          <p className="text-[10px] text-base-content/50 uppercase tracking-wider">{label}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {detail.orderStats?.totalSpent && (
-                    <div className="bg-success/5 border border-success/20 rounded-xl p-4 flex items-center justify-between">
-                      <span className="text-sm text-base-content/60 font-medium">Total Spent</span>
-                      <span className="text-2xl font-black text-success">₹{Number(detail.orderStats.totalSpent).toLocaleString('en-IN')}</span>
-                    </div>
-                  )}
-                  {detail.orderHistory?.length > 0 ? (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-black uppercase tracking-wider text-base-content/50">Order History</h4>
-                      {detail.orderHistory.map((order, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 bg-base-200/50 rounded-xl">
-                          <div>
-                            <p className="text-xs font-bold text-base-content">{order.orderId}</p>
-                            <p className="text-[10px] text-base-content/50">{new Date(order.createdAt).toLocaleDateString('en-IN')}</p>
+         {activeTab === 'orders' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                  {/* ── Pharmacy Orders ── */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-base-content/50">Pharmacy Orders</h4>
+                    {detail.orderStats && (
+                      <div className="grid grid-cols-3 gap-3">
+                        {[
+                          { label: 'Total',     value: detail.orderStats.totalOrders,     color: 'primary' },
+                          { label: 'Delivered', value: detail.orderStats.deliveredOrders, color: 'success' },
+                          { label: 'Cancelled', value: detail.orderStats.cancelledOrders, color: 'error'   },
+                        ].map(({ label, value, color }) => (
+                          <div key={label} className="bg-base-200/50 rounded-xl p-3 text-center">
+                            <p className={`text-2xl font-black text-${color}`}>{value}</p>
+                            <p className="text-[10px] text-base-content/50 uppercase tracking-wider">{label}</p>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm font-black text-base-content">₹{order.billing?.totalPayable?.toLocaleString('en-IN')}</p>
-                            <span className={`badge badge-${order.delivery?.status === 'Delivered' ? 'success' : order.delivery?.status === 'Cancelled' ? 'error' : 'warning'}`} style={{ fontSize: '9px' }}>
-                              {order.delivery?.status}
-                            </span>
+                        ))}
+                      </div>
+                    )}
+                    {detail.orderStats?.totalSpent && (
+                      <div className="bg-success/5 border border-success/20 rounded-xl p-4 flex items-center justify-between">
+                        <span className="text-sm text-base-content/60 font-medium">Total Spent</span>
+                        <span className="text-2xl font-black text-success">₹{Number(detail.orderStats.totalSpent).toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    {detail.orderHistory?.length > 0 ? (
+                      <div className="space-y-2">
+                        {detail.orderHistory.map((order, i) => (
+                          <div key={i} className="flex items-center justify-between p-3 bg-base-200/50 rounded-xl">
+                            <div>
+                              <p className="text-xs font-bold text-base-content">{order.orderId}</p>
+                              <p className="text-[10px] text-base-content/50">{new Date(order.createdAt).toLocaleDateString('en-IN')}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-black text-base-content">₹{order.billing?.totalPayable?.toLocaleString('en-IN')}</p>
+                              <span className={`badge badge-${order.delivery?.status === 'Delivered' ? 'success' : order.delivery?.status === 'Cancelled' ? 'error' : 'warning'}`} style={{ fontSize: '9px' }}>
+                                {order.delivery?.status}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : <EmptyState message="No orders yet" />}
+                        ))}
+                      </div>
+                    ) : <EmptyState message="No orders yet" />}
+                  </div>
+
+                  {/* ── Bookings (rides/consultations/etc) ── */}
+                  <div className="space-y-4 pt-4 border-t border-base-300">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-base-content/50">Bookings</h4>
+                    {detail.bookingStats && (
+                      <div className="grid grid-cols-3 gap-3">
+                        {[
+                          { label: 'Total',     value: detail.bookingStats.totalBookings,     color: 'primary' },
+                          { label: 'Completed', value: detail.bookingStats.completedBookings, color: 'success' },
+                          { label: 'Cancelled', value: detail.bookingStats.cancelledBookings, color: 'error'   },
+                        ].map(({ label, value, color }) => (
+                          <div key={label} className="bg-base-200/50 rounded-xl p-3 text-center">
+                            <p className={`text-2xl font-black text-${color}`}>{value}</p>
+                            <p className="text-[10px] text-base-content/50 uppercase tracking-wider">{label}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {detail.bookingStats?.totalSpent && (
+                      <div className="bg-success/5 border border-success/20 rounded-xl p-4 flex items-center justify-between">
+                        <span className="text-sm text-base-content/60 font-medium">Total Spent</span>
+                        <span className="text-2xl font-black text-success">₹{Number(detail.bookingStats.totalSpent).toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    {detail.bookingHistory?.length > 0 ? (
+                      <div className="space-y-2">
+                        {detail.bookingHistory.map((booking, i) => (
+                          <div key={i} className="flex items-center justify-between p-3 bg-base-200/50 rounded-xl">
+                            <div>
+                              <p className="text-xs font-bold text-base-content">{booking.bookingCode}</p>
+                              <p className="text-[10px] text-base-content/50 capitalize">{booking.bookingType?.replace(/_/g, ' ')}</p>
+                              <p className="text-[10px] text-base-content/50">{new Date(booking.createdAt).toLocaleDateString('en-IN')}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-black text-base-content">₹{booking.fareBreakdown?.totalAmount?.toLocaleString('en-IN') ?? 0}</p>
+                              <span className={`badge badge-${booking.status === 'completed' ? 'success' : ['cancelled','no_show'].includes(booking.status) ? 'error' : 'warning'}`} style={{ fontSize: '9px' }}>
+                                {booking.status}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <EmptyState message="No bookings yet" />}
+                  </div>
                 </motion.div>
               )}
 

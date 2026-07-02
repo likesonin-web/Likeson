@@ -70,13 +70,14 @@ import hospitalManagerRouter    from './routes/hospitalManagerRouter.js';
 import availabilityRouter       from './routes/availabilityRouter.js';
 import booking1Routes           from './routes/bookingrouterpaert1.js';
 import rideRequestRouter        from './routes/rideRequestRouter.js';
+import rideOperationsRoutes from './routes/rideOperationsRouter.js'
 import prescriptionCareRouter   from './routes/prescriptionCareRouter.js';
 import bloodBankRouter          from './routes/bloodbankRouter.js';
 import adminAnalyticsRouter     from './routes/super-admin/adminanalyticsRouter.js';
 import consultationRouter       from './routes/consultationrouter.js';
 import { protect, authorize }   from "./middleware/authMiddleware.js";
 import labPartnerRoutes         from './routes/labpartnerbookingRoutes.js';
- 
+import partnerWalletRoutes      from './routes/partnerWalletRouter.js';
 import payoutRouter             from './routes/payoutRouter.js';
 import bookingPayAtServiceRouter from './routes/bookingPayAtServiceRouter.js';
 import accountingRouter         from './routes/accountingRouter.js';
@@ -216,12 +217,13 @@ app.use("/api/labs",               labRoutes);
 app.use("/api/hospital-manager",   hospitalManagerRouter);
 app.use("/api/availability",       availabilityRouter);
 app.use("/api/ride-requests",      rideRequestRouter);
+app.use("/api/ride-ops",      rideOperationsRoutes);
 app.use("/api/clinical",           prescriptionCareRouter);
 app.use("/api/blood-banks",        bloodBankRouter);
 app.use("/api/admin/analytics",    adminAnalyticsRouter);
 app.use("/api/consultations",      consultationRouter);
 app.use('/api/lab-partner/bookings', protect, authorize('lab_partner'), labPartnerRoutes);
- 
+app.use('/api/partner-wallet',partnerWalletRoutes);
 
 // ⚠️ Warning: Three separate routers mounted to the exact same path
 // Consider combining these into a single router file in the future to avoid unexpected routing conflicts.

@@ -15,6 +15,7 @@ import TransportPartner from '../../models/TransportPartner.js';
 import Hospital from '../../models/Hospital.js';
 import PharmacyStore from '../../models/PharmacyStore.js';
 import PharmacyOrder from '../../models/PharmacyOrder.js';
+import Booking from '../../models/Booking.js';
 import Notification from '../../models/Notification.js';
 import SystemLog from '../../models/SystemLog.js';
 import sendEmail from '../../utils/sendEmail.js';
@@ -1554,6 +1555,8 @@ router.get('/:id', async (req, res) => {
 
     let orderHistory = [];
     let orderStats = {};
+    let bookingHistory = [];
+    let bookingStats = {};
     if (user.role === 'customer') {
       const orders = await PharmacyOrder.find({ customer: user._id })
         .select('orderId billing.totalPayable delivery.status payment.status createdAt')
@@ -1575,6 +1578,30 @@ router.get('/:id', async (req, res) => {
         deliveredOrders: allOrders.filter(o => o.delivery?.status === 'Delivered').length,
         pendingOrders: allOrders.filter(o =>
           ['Placed', 'Confirmed', 'Processing', 'Out-for-Delivery'].includes(o.delivery?.status)
+        ).length,
+      };
+
+      // ── Booking history (same pattern as PharmacyOrder) ──
+      const bookings = await Booking.find({ customer: user._id })
+        .select('bookingCode bookingType status paymentStatus fareBreakdown.totalAmount scheduledAt createdAt')
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean();
+
+      bookingHistory = bookings;
+
+      const allBookings = await Booking.find({ customer: user._id }).lean();
+      const totalBookingSpent = allBookings
+        .filter(b => ['paid', 'partially_paid', 'pay_at_service_paid'].includes(b.paymentStatus))
+        .reduce((sum, b) => sum + (b.fareBreakdown?.amountPaid || 0), 0);
+
+      bookingStats = {
+        totalBookings: allBookings.length,
+        totalSpent: totalBookingSpent.toFixed(2),
+        cancelledBookings: allBookings.filter(b => ['cancelled', 'no_show'].includes(b.status)).length,
+        completedBookings: allBookings.filter(b => b.status === 'completed').length,
+        pendingBookings: allBookings.filter(b =>
+          ['draft', 'payment_pending', 'pending', 'confirmed', 'in_progress'].includes(b.status)
         ).length,
       };
     }
@@ -1625,7 +1652,7 @@ router.get('/:id', async (req, res) => {
         location: user.location,
         lastKnownAddress: user.lastKnownAddress,
         profile: enrichedProfile,
-        ...(user.role === 'customer' && { orderHistory, orderStats }),
+       ...(user.role === 'customer' && { orderHistory, orderStats, bookingHistory, bookingStats }),
         notifications: {
           recent: notifications,
           unreadCount: unreadNotifications,

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, memo, useState, useRef, useCallback } from "
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   ExternalLink,
@@ -20,6 +21,9 @@ import {
   selectActiveHero,
   selectLoadingActiveHero,
 } from "@/store/slices/heroPageSlice";
+
+// 👇 Adjust this import path to point to your new SpecialButton file
+import SpecialButton from "@/components/SpecialButton"; 
 
 // ─── Animation Variants ────────────────────────────────────────────────────────
 
@@ -118,46 +122,6 @@ const Fallback = memo(() => (
 ));
 Fallback.displayName = "Fallback";
 
-// ─── CtaButton ──────────────────────────────────────────────────────────────
-const CtaButton = memo(({ btn }) => {
-  const getVariantClass = (variant) => {
-    switch (variant) {
-      case 'primary': return 'btn-primary-cta';
-      case 'secondary': return 'btn-secondary';
-      case 'outline': return 'btn-outline';
-      case 'ghost': return 'btn-ghost';
-      default: return 'btn-primary-cta';
-    }
-  };
-
-  const inner = (
-    <motion.span
-      whileHover={{ scale: 1.03, y: -2 }}
-      whileTap={{ scale: 0.97 }}
-      className={`btn btn-lg w-full sm:w-auto font-poppins shadow-sm group ${getVariantClass(btn.variant)}`}
-    >
-      {btn.label}
-      {btn.isExternal
-        ? <ExternalLink size={16} className="ml-1 opacity-80 group-hover:scale-110 transition-transform" aria-hidden="true" />
-        : <ArrowRight    size={16} className="ml-1 opacity-80 group-hover:translate-x-1 transition-transform" aria-hidden="true" />}
-    </motion.span>
-  );
-
-  if (btn.isExternal) {
-    return (
-      <a href={btn.href} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto outline-none" aria-label={`${btn.label} (opens in new tab)`}>
-        {inner}
-      </a>
-    );
-  }
-  return (
-    <Link href={btn.href} className="w-full sm:w-auto outline-none" aria-label={btn.label}>
-      {inner}
-    </Link>
-  );
-});
-CtaButton.displayName = "CtaButton";
-
 // ─── Trust Row ──────────────────────────────────────────────────────────────
 const TrustRow = memo(({ priority, centred }) => (
   <motion.div
@@ -166,8 +130,14 @@ const TrustRow = memo(({ priority, centred }) => (
   >
     <div className="flex -space-x-3" aria-label="Over 1000 trusted users">
       {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="w-10 h-10 rounded-full overflow-hidden border-2 border-base-100 shadow-sm relative">
-          <img src={`https://i.pravatar.cc/80?u=trust${i}`} alt={`Trusted User ${i}`} className="object-cover w-full h-full" loading="lazy" />
+        <div key={i} className="w-10 h-10 rounded-full overflow-hidden border-2 border-base-100 shadow-sm relative bg-base-300">
+          <Image 
+            src={`https://i.pravatar.cc/80?u=trust${i}`} 
+            alt={`Trusted User ${i}`} 
+            width={40} 
+            height={40} 
+            className="object-cover w-full h-full" 
+          />
         </div>
       ))}
       <div className="w-10 h-10 rounded-full border-2 border-base-100 bg-base-content text-base-100 flex items-center justify-center text-[10px] font-black font-montserrat shadow-sm">
@@ -179,7 +149,7 @@ const TrustRow = memo(({ priority, centred }) => (
         {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={13} fill="currentColor" aria-hidden="true" />)}
         <span className="font-bold ml-1.5 text-xs text-base-content">4.9/5</span>
       </div>
-      <p className="text-[11px] font-semibold text-base-content/60 uppercase tracking-wider">Trusted by Families & NRIs</p>
+      <p className="text-[11px] font-semibold text-base-content/70 uppercase tracking-wider">Trusted by Families & NRIs</p>
     </div>
     {priority > 0 && (
       <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold border badge-success font-poppins uppercase tracking-wider shadow-sm ml-auto lg:ml-0" aria-label={`High Priority Campaign #${priority}`}>
@@ -270,23 +240,17 @@ function PhoneStatusBar() {
 
   return (
     <div className="absolute top-0 left-0 right-0 z-40 flex items-start justify-between px-6 pt-3.5 pointer-events-none">
-      {/* Left Time */}
       <div className="w-[70px] flex justify-start pl-1">
         <span className="text-[14px] font-bold tracking-tight text-white/90 drop-shadow-md" style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
           {time}
         </span>
       </div>
-      
-      {/* Dynamic Island with Camera */}
       <div className="w-[110px] h-[32px] bg-black rounded-[20px] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] flex items-center justify-end pr-2.5">
-        {/* Subtle Camera Lens */}
         <div className="w-3.5 h-3.5 rounded-full bg-[#111] border border-white/5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.8)] flex items-center justify-center relative overflow-hidden">
           <div className="absolute w-1 h-1 rounded-full bg-blue-800/40" />
           <div className="absolute top-[3px] right-[3px] w-[1px] h-[1px] rounded-full bg-blue-300/80" />
         </div>
       </div>
-      
-      {/* Right Icons (Signal & Battery Only) */}
       <div className="w-[70px] flex justify-end items-center gap-[6px] pr-1 pt-0.5">
         <SignalBars strength={signal} />
         <BatteryIcon level={battery.level} charging={battery.charging} />
@@ -307,16 +271,11 @@ const MediaCard = memo(({ media, badge, analyticsTag, activeTo }) => {
     <div className="relative w-full max-w-[340px] lg:max-w-none flex justify-center lg:justify-end scale-[0.85] sm:scale-95 lg:scale-100 origin-center lg:origin-right" data-analytics={analyticsTag}>
       
       <motion.div variants={variants.float} animate="animate" className="relative z-10 lg:mr-10 drop-shadow-2xl">
-        
-        {/* Phone Chassis */}
         <div className="relative w-[320px] h-[650px]">
-          {/* Outer Titanium Frame */}
           <div className="absolute inset-0 rounded-[52px] z-10 bg-gradient-to-br from-[#4a4a4e] via-[#2a2a2e] to-[#1a1a1d] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),_0_0_0_1px_rgba(255,255,255,0.1),_0_30px_60px_rgba(0,0,0,0.4)]" />
-          {/* Inner Black Bezel */}
           <div className="absolute z-10 inset-[4px] rounded-[48px] bg-black" />
           
-          {/* Screen Area */}
-          <div className="absolute z-20 inset-[10px] rounded-[42px] overflow-hidden bg-base-300">
+          <div className="absolute z-20 inset-[10px] rounded-[42px] overflow-hidden bg-base-300 isolate [transform:translateZ(0)]">
             <PhoneStatusBar />
 
             {media.type === "video" ? (
@@ -329,13 +288,18 @@ const MediaCard = memo(({ media, badge, analyticsTag, activeTo }) => {
                 <p className="font-poppins text-sm text-base-content/60 font-bold uppercase tracking-widest">Interactive Media</p>
               </div>
             ) : (
-              <img src={media.url} alt={media.altText || "Hero visual"} className="w-full h-full object-cover" />
+              <Image 
+                src={media.url} 
+                alt={media.altText || "Hero visual"} 
+                fill 
+                priority
+                sizes="(max-width: 768px) 320px, 320px"
+                className="object-cover -z-10" 
+              />
             )}
 
-            {/* Gradient Scrims for Screen Legibility */}
-            <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80" />
+            <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80 z-20" />
             
-            {/* App-like overlay content */}
             <div className="absolute bottom-0 left-0 right-0 z-30 p-6 pb-10">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md border border-white/10">
                 <span className="relative flex h-2 w-2">
@@ -346,33 +310,27 @@ const MediaCard = memo(({ media, badge, analyticsTag, activeTo }) => {
                   {scheduleLabel}
                 </span>
               </div>
-              <h3 className="font-montserrat text-white text-lg font-black leading-tight mt-3">
+              <h3 className="font-montserrat text-lg font-black leading-tight mt-3 text-white drop-shadow-sm">
                 {badge?.text || "Premium Care Access"}
               </h3>
             </div>
           </div>
 
-          {/* Screen Glare Highlight */}
           <div className="absolute z-30 inset-[10px] rounded-[42px] pointer-events-none bg-gradient-to-br from-white/10 via-white/5 to-transparent opacity-50" />
           
-          {/* Physical Buttons */}
-          {/* Silent Switch */}
           <div className="absolute z-0 left-[-3px] top-[110px] w-[3px] h-[26px] rounded-l-sm bg-[#2a2a2e]" />
-          {/* Vol Up/Down */}
           <div className="absolute z-0 left-[-3px] top-[160px] w-[3px] h-[54px] rounded-l-sm bg-[#2a2a2e]" />
           <div className="absolute z-0 left-[-3px] top-[230px] w-[3px] h-[54px] rounded-l-sm bg-[#2a2a2e]" />
-          {/* Power */}
           <div className="absolute z-0 right-[-3px] top-[180px] w-[3px] h-[80px] rounded-r-sm bg-[#2a2a2e]" />
         </div>
       </motion.div>
 
-      {/* Floating Widgets */}
       {activeTo && (
         <motion.div variants={floatDelay(1.5)} animate="animate" className="absolute right-[-10px] sm:right-[10px] top-[15%] z-40 hidden sm:block">
           <div className="flex flex-col gap-1 px-5 py-4 rounded-[var(--r-box)] border bg-base-100/80 backdrop-blur-xl border-base-300 shadow-xl shadow-base-content/5">
             <div className="flex items-center gap-2 mb-1">
               <Clock size={14} className="text-primary" />
-              <p className="font-poppins text-[10px] font-bold uppercase tracking-widest text-base-content/50">Limited Time</p>
+              <p className="font-poppins text-[10px] font-bold uppercase tracking-widest text-base-content/60">Limited Time</p>
             </div>
             <p className="font-montserrat text-sm font-black text-base-content">{scheduleLabel}</p>
           </div>
@@ -385,13 +343,12 @@ const MediaCard = memo(({ media, badge, analyticsTag, activeTo }) => {
             <Zap size={18} fill="currentColor" />
           </div>
           <div>
-            <p className="font-poppins text-[10px] font-bold uppercase tracking-widest text-base-content/50">SLA Response</p>
+            <p className="font-poppins text-[10px] font-bold uppercase tracking-widest text-base-content/60">SLA Response</p>
             <p className="font-montserrat text-base font-black text-success">&lt; 2 Minutes</p>
           </div>
         </div>
       </motion.div>
 
-      {/* Ambient Color Bloom Behind Phone */}
       <div className="absolute inset-0 z-0 pointer-events-none bg-[radial-gradient(ellipse_60%_60%_at_50%_50%,color-mix(in_oklch,var(--primary)_25%,transparent),transparent_70%)] blur-[40px]" />
     </div>
   );
@@ -414,21 +371,26 @@ const buildHeadline = (headline, highlightedText) => {
 };
 
 // ─── Main Hero Component ──────────────────────────────────────────────────────
-export default function Hero() {
+
+export default function Hero({ serverHero = null }) {
   const dispatch = useDispatch();
-  const hero = useSelector(selectActiveHero);
+  const reduxHero = useSelector(selectActiveHero);
   const loading = useSelector(selectLoadingActiveHero);
   const reduceMotion = useReducedMotion();
 
+  const hero = serverHero || reduxHero;
+  const isLoading = !hero && loading;
+
   useEffect(() => {
-    if (!hero) dispatch(fetchActiveHero());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch]);
+    if (!hero && !serverHero) {
+      dispatch(fetchActiveHero());
+    }
+  }, [dispatch, hero, serverHero]);
 
   const headlineNode = useMemo(() => buildHeadline(hero?.headline, hero?.highlightedText), [hero?.headline, hero?.highlightedText]);
   const sortedBtns = useMemo(() => Array.isArray(hero?.ctaButtons) ? [...hero.ctaButtons].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)) : [], [hero?.ctaButtons]);
 
-  if (loading && !hero) return <Skeleton />;
+  if (isLoading) return <Skeleton />;
   if (!hero) return <Fallback />;
 
   const hasMedia = Boolean(hero.media?.url);
@@ -438,7 +400,7 @@ export default function Hero() {
     <Container>
       <AnimatePresence mode="wait">
         <motion.section
-          key={hero._id}
+          key={hero._id || 'hero'}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -480,7 +442,31 @@ export default function Hero() {
 
                 {sortedBtns.length > 0 && (
                   <motion.div variants={variants.fadeUp} className={`flex flex-col sm:flex-row flex-wrap gap-4 pt-2 ${centred ? "justify-center" : "justify-center lg:justify-start"}`}>
-                    {sortedBtns.map((btn, i) => <CtaButton key={btn._id ?? i} btn={btn} />)}
+                    {sortedBtns.map((btn, i) => {
+                      // Map the legacy variant names to SpecialButton variants
+                      let mappedVariant = "solid";
+                      if (btn.variant === 'secondary') mappedVariant = "soft";
+                      if (btn.variant === 'outline') mappedVariant = "outline";
+                      if (btn.variant === 'ghost') mappedVariant = "ghost";
+
+                      return (
+                        <SpecialButton
+                          key={btn._id ?? i}
+                          title={btn.label}
+                          href={btn.href}
+                          target={btn.isExternal ? "_blank" : undefined}
+                          as="link" // Renders it correctly as a Next.js Link / a tag
+                          variant={mappedVariant}
+                          size="lg" // Match the old btn-lg
+                          animation="lift" 
+                          role={'doctor'}
+                          textAnimation="letterStagger" 
+                          icon={btn.isExternal ? ExternalLink : ArrowRight}
+                          iconPosition="right"
+                          className="w-full sm:w-auto" // Keeps mobile scaling the same
+                        />
+                      );
+                    })}
                   </motion.div>
                 )}
 
@@ -498,9 +484,9 @@ export default function Hero() {
 
           {/* Scroll Down Indicator */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.2, duration: 0.5 }} className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-10" aria-hidden="true">
-            <span className="font-poppins text-[10px] uppercase tracking-widest font-bold text-base-content/40">Discover</span>
+            <span className="font-poppins text-[10px] uppercase tracking-widest font-bold text-base-content/60">Discover</span>
             <motion.div animate={reduceMotion ? {} : { y: [0, 8, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
-              <ChevronDown size={16} className="text-base-content/40" />
+              <ChevronDown size={16} className="text-base-content/60" />
             </motion.div>
           </motion.div>
         </motion.section>

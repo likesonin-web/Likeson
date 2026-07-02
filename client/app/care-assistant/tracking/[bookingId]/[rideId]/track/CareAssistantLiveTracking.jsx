@@ -3,84 +3,35 @@
 /**
  * CareAssistantLiveTracking.jsx
  *
- * NAV/AUTH FIXES this pass:
- *  A. Added missing `useSocket` import — was called below, crashed every
- *     mount with ReferenceError. Now imported from SocketProvider.
- *  B. Dropped local `useSelector((s) => s.user?.role)` — disagreed with
- *     TrackPage's own role selector, caused viewer-role mismatch. Single
- *     source now: `useSocket().role`, which is just the prop TrackPage
- *     already passed into <SocketProvider role={...}>. Can't drift.
- *  C. Component now reads bookingId off useParams() directly (matches
- *     [bookingId] folder segment) — no bookingIdProp needed since route
- *     always supplies it. Accepts `rideId` + `bookingType` as plain props
- *     from page.jsx (sourced from [rideId] segment + ?type= query) for
- *     future use by hooks that may need the explicit ride doc id rather
- *     than deriving it server-side from bookingId.primaryRide.
+ * NEW FIXES this pass:
+ *  E. Map pan/rotate was dead — `useMapCamera` exposes `initCameraListeners`
+ *     (drag/heading listeners that flip `followModeRef` off while the user
+ *     is interacting) but the page never called it. Result: every GPS tick
+ *     called `updateCamera`, which only checks `followModeRef`, and since
+ *     that ref never got set to false on drag, the camera snapped back to
+ *     follow position on the next tick — one-finger rotate/pan looked
+ *     "broken" because it was instantly overwritten. Now wired up in its
+ *     own effect, with the listener cleanup returned/disposed on unmount.
+ *  F. Bottom sheet is now collapsible. Tapping the handle (or the new
+ *     chevron) toggles between a compact one-line bar (phase + key metric
+ *     + SOS) and the full sheet (timeline, driver card, actions). State:
+ *     `sheetExpanded`.
+ *  G. FloatingControls anchor moved up and now reacts to sheet state, so
+ *     the zoom/voice/compass stack never sits under the (expanded) sheet.
+ *  H. Added a dedicated "My Location" button, distinct from "Recenter":
+ *     Recenter re-engages navigation follow-mode on the tracked subject
+ *     (CA or driver). My Location is a one-shot browser-geolocation pan
+ *     to the *viewer's own device position* with a small blue dot marker —
+ *     useful for the customer/admin viewer who wants to see where THEY
+ *     are relative to the ride, not toggle follow mode.
  *
- * FIXES carried over from prior pass:
- *  1. Join-point marker was created via `createStaticMarker(map, lat, lng,
- *     'joinpoint')` — that helper (useDriverMarker.js) only branches on
- *     `type === 'pickup'`, so anything else (including 'joinpoint') fell
- *     into the dropoff branch: red pin labeled "Drop-off" sitting on the
- *     CA's join point. Replaced with a dedicated `createJoinPointMarker`
- *     defined locally in this file — amber flag pin, labeled "Join Point",
- *     so it can't be confused with the real hospital dropoff pin on
- *     full_care_ride bookings (which DOES need the real dropoff pin).
- *  2. `caMarker.destroyMarker()` was being called unconditionally on every
- *     GPS-tick render once `phase === 'in_vehicle'` — harmless individually
- *     but pointless churn (cancels a non-existent rAF, nulls already-null
- *     refs, every ~1s for the rest of the ride). Guarded with a ref so it
- *     fires exactly once on the standalone/navigate_to_jp -> in_vehicle
- *     transition.
- *  3. `STATUS_STEPS.in_vehicle` used keys ('in_ride', 'enroute_hospital',
- *     'hospital_reached') that don't match any status string the backend
- *     actually emits once boarded — real ride statuses for this leg are
- *     DRIVER_STATUS values ('ride_started', 'otp_verified', 'completed',
- *     etc., per socketService.js). `activeStepKey` was also pulling from
- *     `t.caStatus` first, but caStatus stops updating once boarded (CA is
- *     a passenger, not driving) — for in_vehicle the only thing that
- *     actually advances is `t.rideStatus`. Fixed both: in_vehicle timeline
- *     keys now match driver status strings, and activeStepKey uses
- *     rideStatus (not caStatus) while in that phase.
- *  4. `announcedRef` (one-time proximity announcement) never reset across
- *     a phase change — if navigate_to_jp's "approaching join point" had
- *     already fired and the ride later needed a different one-time
- *     announcement in another phase, it would silently never speak.
- *     Reset on every phase transition.
- *
- * Booking-type aware:
- *
- *   bookingType === 'care_assistant'  (CA-only booking, no separate vehicle)
- *     -> CA's own position is "the ride." Map shows CA -> patient route.
- *     phase: 'standalone'
- *
- *   bookingType === 'full_care_ride'  (doctor + transport + CA combined)
- *     -> Two phases:
- *        'navigate_to_jp'    CA travels independently to the calculated
- *                            Join Point. Map shows CA marker, driver marker,
- *                            join-point flag, and CA's own route to it.
- *        'in_vehicle'        CA has boarded. Map switches to driver-tracking
- *                            mode (CA marker removed, driver's route to the
- *                            hospital takes over) — this is the exact
- *                            `caViewMode === 'driver_tracking_only'` switch
- *                            the rest of the codebase already models.
- *
- * Viewable by: the CA themself (push their own GPS), the customer, or an
- * admin (both read-only — no GPS push, no status-change buttons beyond SOS).
- *
- * Built on:
- *   useCareAssistantTracking  — data + sockets + GPS push + actions
- *   useGoogleMapsLoader       — singleton Maps JS SDK loader
- *   useMapCamera              — follow/recenter/tilt camera
- *   useCareAssistantMarker    — CA's own marker (purple)
- *   useDriverMarker           — driver marker + static pickup/dropoff pins
- *   useRouteRenderer          — CA route + driver route polylines
- *   useVoiceNavigation        — proximity announcements (optional, muteable)
- *   useSocket                 — SocketProvider context (connected, role, actions)
+ * FIXES carried over from prior passes (#1-4, A-C) — see git history /
+ * previous revision for full detail; kept intact below.
  */
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { useSocket } from '@/context/SocketProvider';
 import { useGoogleMapsLoader } from '@/hooks/useGoogleMapsLoader';
@@ -91,6 +42,22 @@ import { useRouteRenderer } from '@/hooks/useRouteRenderer';
 import { useVoiceNavigation } from '@/hooks/useVoiceNavigation';
 import { useCareAssistantTracking } from '@/hooks/useCareAssistantTracking';
 import { distanceKm, formatDistance, formatEta } from '@/utils/navigationUtils';
+import {
+  generatePayAtServiceLink,
+  fetchPayAtServiceStatus,
+  markCollectedByPartner,
+  linkGeneratedFromSocket,
+  paidFromSocket,
+  selectPayAtServiceSession,
+  selectPayAtServiceLoading,
+  selectMinutesUntilExpiry,
+  selectIsPaid,
+} from '@/store/slices/payAtServiceSlice';
+
+// Booking types this page can show — matches backend PAY_AT_SERVICE_TYPES,
+// filtered to the two types this CA tracking page ever renders.
+const PAY_AT_SERVICE_BOOKING_TYPES = ['care_assistant', 'full_care_ride'];
+const PAY_STATUS_POLL_MS = 5000;
 
 const MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || 'CA_LIVE_TRACKING';
 const DEFAULT_CENTER = { lat: 16.506, lng: 80.648 };
@@ -105,7 +72,7 @@ const PHASE_LABEL = {
   other:                'Tracking ride',
 };
 
-// FIX #3: in_vehicle keys now match the actual DRIVER_STATUS string enum
+// in_vehicle keys match the actual DRIVER_STATUS string enum
 // (see socketService.js DRIVER_STATUS) instead of CA-side statuses that
 // never get emitted once the CA is a passenger.
 const STATUS_STEPS = {
@@ -130,7 +97,7 @@ const STATUS_STEPS = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Local marker helper — join point flag (FIX #1)
+// Local marker helper — join point flag
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -181,6 +148,174 @@ function createJoinPointMarker(map, lat, lng) {
   });
 }
 
+/**
+ * createMyLocationMarker — small solid blue dot + halo for the VIEWER's own
+ * device position (FIX H). Visually distinct from every other marker on
+ * the map (CA = purple cross, driver = blue arrow bubble, pickup/dropoff/JP
+ * = flag pins) — this is just "you, the phone holding this app".
+ */
+function createMyLocationMarker(map, lat, lng) {
+  if (!window.google?.maps?.marker?.AdvancedMarkerElement) return null;
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText =
+    'position:absolute;width:0;height:0;overflow:visible;pointer-events:none;';
+  wrap.innerHTML = `
+    <div style="position:absolute;left:-9px;top:-9px;width:18px;height:18px;
+        border-radius:50%;background:#3b82f6;border:3px solid #fff;
+        box-shadow:0 0 0 6px rgba(59,130,246,0.25),0 2px 6px rgba(0,0,0,0.3);"></div>
+  `;
+
+  return new window.google.maps.marker.AdvancedMarkerElement({
+    map,
+    content:  wrap,
+    position: { lat, lng },
+    zIndex:   30,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PayAtServiceCard — gates "complete" on payment, lets partner generate
+// QR/link or record a cash fallback. Hidden entirely once booking is paid
+// (parent only mounts this while unpaid).
+//
+// Permission model (per booking type):
+//   care_assistant   — single partner on the booking. Only the CA themself
+//                       (`canManage` = t.isSelf) can generate/collect; every
+//                       other viewer (customer/admin) sees a read-only note.
+//   full_care_ride   — multiple partners (driver/CA/doctor/hospital) share
+//                       the booking. ANY non-customer partner viewing this
+//                       page can generate the link or mark cash collected —
+//                       whoever gets there first closes it out, no per-role
+//                       lock. `canManage` = viewerRole !== 'customer'.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PayAtServiceCard({ bookingId, canManage }) {
+  const dispatch = useDispatch();
+  const session  = useSelector(selectPayAtServiceSession(bookingId));
+  const loading  = useSelector(selectPayAtServiceLoading);
+  const minsLeft = useSelector(selectMinutesUntilExpiry(bookingId));
+
+  const [showCash, setShowCash]     = useState(false);
+  const [cashAmount, setCashAmount] = useState('');
+  const [cashNote, setCashNote]     = useState('');
+
+  // Hydrate + poll while this card is mounted (i.e. while unpaid).
+  useEffect(() => {
+    if (!bookingId) return undefined;
+    dispatch(fetchPayAtServiceStatus({ bookingId }));
+    const id = setInterval(() => dispatch(fetchPayAtServiceStatus({ bookingId })), PAY_STATUS_POLL_MS);
+    return () => clearInterval(id);
+  }, [bookingId, dispatch]);
+
+  const handleGenerate = useCallback(() => {
+    dispatch(generatePayAtServiceLink({ bookingId }));
+  }, [dispatch, bookingId]);
+
+  const handleCashSubmit = useCallback(() => {
+    const amt = Number(cashAmount);
+    if (!amt || amt <= 0) return;
+    dispatch(markCollectedByPartner({ bookingId, amount: amt, method: 'cash', note: cashNote || undefined }));
+    setShowCash(false);
+    setCashAmount('');
+    setCashNote('');
+  }, [dispatch, bookingId, cashAmount, cashNote]);
+
+  if (!canManage) {
+    return (
+      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+        Payment pending — service provider will collect it before marking complete.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Collect payment to complete</p>
+
+      {!session?.shortUrl && (
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={loading.generateLink}
+          className="mt-2 w-full rounded-lg bg-amber-600 py-2.5 text-sm font-semibold text-white active:scale-[0.99] transition disabled:opacity-60"
+        >
+          {loading.generateLink ? 'Generating…' : 'Generate QR / payment link'}
+        </button>
+      )}
+
+      {session?.shortUrl && (
+        <div className="mt-2 flex items-center gap-3">
+          {session.qrCodeDataUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={session.qrCodeDataUrl}
+              alt="Scan to pay"
+              className="h-20 w-20 shrink-0 rounded-lg border border-amber-200 bg-white"
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <a href={session.shortUrl} target="_blank" rel="noreferrer" className="block truncate text-xs font-medium text-violet-700 underline">
+              {session.shortUrl}
+            </a>
+            <p className="mt-1 text-[11px] text-amber-700">
+              {minsLeft == null ? '' : minsLeft > 0 ? `Expires in ${minsLeft} min` : 'Link expired — generate a new one'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-2 flex gap-2">
+        {session?.shortUrl && (
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={loading.generateLink}
+            className="flex-1 rounded-lg border border-amber-300 py-2 text-xs font-semibold text-amber-700 disabled:opacity-60"
+          >
+            {minsLeft === 0 ? 'New link' : 'Resend'}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowCash((v) => !v)}
+          className="flex-1 rounded-lg border border-amber-300 py-2 text-xs font-semibold text-amber-700"
+        >
+          Collected cash instead
+        </button>
+      </div>
+
+      {showCash && (
+        <div className="mt-2 space-y-2 rounded-lg bg-white p-2">
+          <input
+            type="number"
+            inputMode="decimal"
+            value={cashAmount}
+            onChange={(e) => setCashAmount(e.target.value)}
+            placeholder="Amount received (₹)"
+            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+          />
+          <input
+            type="text"
+            value={cashNote}
+            onChange={(e) => setCashNote(e.target.value)}
+            placeholder="Note (optional)"
+            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+          />
+          <button
+            type="button"
+            onClick={handleCashSubmit}
+            disabled={loading.markCollected || !cashAmount}
+            className="w-full rounded-md bg-amber-600 py-2 text-xs font-semibold text-white disabled:opacity-60"
+          >
+            {loading.markCollected ? 'Saving…' : 'Confirm cash collected'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Small presentational pieces
 // ─────────────────────────────────────────────────────────────────────────────
@@ -208,16 +343,35 @@ function TopBar({ bookingCode, phase, onBack }) {
   );
 }
 
-function FloatingControls({ onRecenter, onNorthUp, onZoomIn, onZoomOut, voiceEnabled, onToggleVoice }) {
+// FIX G: now takes `bottomClassName` so the page can push the stack up
+// when the bottom sheet is expanded (and let it settle lower when collapsed).
+function FloatingControls({
+  onRecenter,
+  onLocateMe,
+  onNorthUp,
+  onZoomIn,
+  onZoomOut,
+  voiceEnabled,
+  onToggleVoice,
+  bottomClassName,
+}) {
   const btn = 'flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md text-slate-700 active:scale-95 transition';
   return (
-    <div className="absolute right-3 bottom-44 z-20 flex flex-col gap-2">
+    <div className={`absolute right-3 z-20 flex flex-col gap-2 transition-[bottom] duration-200 ${bottomClassName}`}>
       <button type="button" className={btn} onClick={onToggleVoice} aria-label="Toggle voice announcements">
         {voiceEnabled ? '🔊' : '🔇'}
       </button>
       <button type="button" className={btn} onClick={onZoomIn} aria-label="Zoom in">+</button>
       <button type="button" className={btn} onClick={onZoomOut} aria-label="Zoom out">−</button>
       <button type="button" className={btn} onClick={onNorthUp} aria-label="Reset to north-up">⟲</button>
+      {/* FIX H: separate one-shot "where am I" pin, distinct from Recenter's
+          navigation-follow behavior below. */}
+      <button type="button" className={btn} onClick={onLocateMe} aria-label="Show my location">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeLinecap="round" />
+        </svg>
+      </button>
       <button
         type="button"
         onClick={onRecenter}
@@ -326,24 +480,18 @@ function SosSheet({ onConfirm, onCancel }) {
 
 /**
  * @param {{ rideId?: string, bookingType?: string }} props
- *   rideId       — [rideId] route segment, passed through by page.jsx.
- *                  Not consumed directly here yet — pass to
- *                  useCareAssistantTracking only if that hook's signature
- *                  accepts it; otherwise hook derives ride doc server-side
- *                  off bookingId.primaryRide.
- *   bookingType  — ?type= query param from the nav link, available as a
- *                  cheap initial hint before t.bookingType (socket data)
- *                  arrives. Currently unused below — t.bookingType wins
- *                  once loaded, this is just available if needed.
  */
 export default function CareAssistantLiveTracking({ rideId, bookingType: bookingTypeProp }) {
   const params = useParams();
   const bookingId = params?.bookingId; // matches [bookingId] folder segment
 
-  // FIX B: single role source — SocketProvider context, fed by the `role`
-  // prop TrackPage already passed into <SocketProvider>. No second,
-  // independently-derived Redux selector here to drift out of sync.
-  const { role: viewerRole } = useSocket();
+  // Single role source — SocketProvider context, fed by the `role` prop
+  // TrackPage already passed into <SocketProvider>. Also pulls `on` here so
+  // this page can listen for pay-at-service socket events directly (booking
+  // room is already joined by useCareAssistantTracking below).
+  const { role: viewerRole, on } = useSocket();
+  const dispatch = useDispatch();
+  const isPaid = useSelector(selectIsPaid(bookingId));
 
   const { loaded: mapsLoaded, error: mapsError } = useGoogleMapsLoader();
 
@@ -352,10 +500,14 @@ export default function CareAssistantLiveTracking({ rideId, bookingType: booking
   const mapLoadedRef      = useRef(false);
   const [mapReady, setMapReady] = useState(false);
   const [showSos, setShowSos]   = useState(false);
+  // FIX F: bottom sheet collapse/expand state.
+  const [sheetExpanded, setSheetExpanded] = useState(true);
   const announcedRef = useRef(false);
-  // FIX #2: guards caMarker.destroyMarker() so it only fires once on the
+  // guards caMarker.destroyMarker() so it only fires once on the
   // standalone/navigate_to_jp -> in_vehicle transition, not on every tick.
   const caMarkerDestroyedRef = useRef(false);
+  // FIX H: "my location" one-shot marker for the viewer's own device.
+  const myLocationMarkerRef = useRef(null);
 
   // ── 1. Create the map once the SDK + container are both ready ────────────
   useEffect(() => {
@@ -379,11 +531,41 @@ export default function CareAssistantLiveTracking({ rideId, bookingType: booking
   const routes     = useRouteRenderer(mapRef);
   const voice      = useVoiceNavigation();
 
+  // FIX E: wire up drag/heading listeners so user pan/rotate actually
+  // disengages follow-mode. Without this, `followModeRef` never flips to
+  // false on drag, and the very next GPS-tick `updateCamera()` call snaps
+  // the map straight back — every manual rotate/pan looked like it was
+  // being ignored. Listeners are torn down on unmount / map swap.
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return undefined;
+    return camera.initCameraListeners(mapRef.current);
+  }, [mapReady, camera.initCameraListeners]);
+
+  // Pay-at-service socket sync — booking room already joined by
+  // useCareAssistantTracking below, just listen for these two events here
+  // so the QR card / paid-state update live without a poll round-trip.
+  useEffect(() => {
+    if (!bookingId) return undefined;
+    const unsubLink = on('pay_at_service_link_generated', (data) => {
+      if (String(data?.bookingId) !== String(bookingId)) return;
+      dispatch(linkGeneratedFromSocket({
+        bookingId: String(bookingId), shortUrl: data.shortUrl, amount: data.amount, expiresAt: data.expiresAt,
+      }));
+    });
+    const unsubPaid = on('pay_at_service_paid', (data) => {
+      if (String(data?.bookingId) !== String(bookingId)) return;
+      dispatch(paidFromSocket({
+        bookingId: String(bookingId), amount: data.amount, paidAt: data.paidAt, canMarkComplete: data.canMarkComplete,
+      }));
+    });
+    return () => { unsubLink?.(); unsubPaid?.(); };
+  }, [on, dispatch, bookingId]);
+
   // ── 3. Data + sockets ──────────────────────────────────────────────────────
   const t = useCareAssistantTracking({ bookingId, viewerRole });
 
-  // FIX #4: a one-time announcement made in one phase shouldn't permanently
-  // block the equivalent announcement in a later phase.
+  // A one-time announcement made in one phase shouldn't permanently block
+  // the equivalent announcement in a later phase.
   useEffect(() => { announcedRef.current = false; }, [t.phase]);
 
   // ── Static markers: patient pickup, hospital dropoff, join point ─────────
@@ -406,8 +588,8 @@ export default function CareAssistantLiveTracking({ rideId, bookingType: booking
 
     const jpCoords = t.caJoinPoint?.coordinates;
     if (jpCoords?.length === 2 && t.phase === 'navigate_to_jp') {
-      // FIX #1: dedicated join-point marker, not createStaticMarker's
-      // pickup/dropoff branch (which would mislabel it "Drop-off").
+      // Dedicated join-point marker, not createStaticMarker's pickup/dropoff
+      // branch (which would mislabel it "Drop-off").
       if (staticRef.current.joinPoint) staticRef.current.joinPoint.map = null;
       staticRef.current.joinPoint = createJoinPointMarker(map, jpCoords[1], jpCoords[0]);
     }
@@ -500,7 +682,7 @@ export default function CareAssistantLiveTracking({ rideId, bookingType: booking
     }
 
     if (t.phase === 'in_vehicle') {
-      // FIX #2: only destroy once on the transition into this phase.
+      // Only destroy once on the transition into this phase.
       if (!caMarkerDestroyedRef.current) {
         caMarker.destroyMarker();
         caMarkerDestroyedRef.current = true;
@@ -517,10 +699,18 @@ export default function CareAssistantLiveTracking({ rideId, bookingType: booking
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapReady, t.phase, t.currentPosition, t.caLiveLocation, t.driverLiveLocation, t.caStatus]);
 
+  // Clean up the "my location" marker on unmount.
+  useEffect(() => () => {
+    if (myLocationMarkerRef.current) {
+      myLocationMarkerRef.current.map = null;
+      myLocationMarkerRef.current = null;
+    }
+  }, []);
+
   // ── Derived UI bits ───────────────────────────────────────────────────────
   const steps = STATUS_STEPS[t.phase] || [];
-  // FIX #3: once boarded, caStatus stops being meaningful (CA is now a
-  // passenger) — drive the timeline off rideStatus instead for in_vehicle.
+  // Once boarded, caStatus stops being meaningful (CA is now a passenger) —
+  // drive the timeline off rideStatus instead for in_vehicle.
   const activeStepKey = t.phase === 'in_vehicle'
     ? (t.rideStatus || t.caStatus)
     : (t.caStatus || t.rideStatus);
@@ -565,6 +755,48 @@ export default function CareAssistantLiveTracking({ rideId, bookingType: booking
     return null;
   }, [t.phase, t.caAtJoinPoint, t.caStatus, t.rideStatus]);
 
+  // FIX H: one-shot browser-geolocation pan to the viewer's own device
+  // position. Deliberately does NOT touch followModeRef/camera follow-mode —
+  // this is "where am I", not "resume navigation".
+  const handleLocateMe = useCallback(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation || !mapRef.current) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        const map = mapRef.current;
+        if (!map) return;
+        map.moveCamera({ center: { lat, lng }, zoom: Math.max(map.getZoom() || 14, 16) });
+        if (myLocationMarkerRef.current) myLocationMarkerRef.current.map = null;
+        myLocationMarkerRef.current = createMyLocationMarker(map, lat, lng);
+      },
+      () => { /* permission denied / unavailable — silently no-op, controls stay usable */ },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
+    );
+  }, []);
+
+  // FIX I (pay-at-service): before the FINAL completion step, an unpaid
+  // booking of a type that supports pay-at-service must be settled first.
+  //   care_assistant  — only the CA themself can collect/generate (single
+  //                     partner on the booking).
+  //   full_care_ride  — any non-customer partner viewing this page may
+  //                     collect; whichever partner gets there first closes
+  //                     it, no per-role lock (driver/CA/doctor/hospital all
+  //                     hit the same authorize() list server-side).
+  const payAtServiceApplies      = PAY_AT_SERVICE_BOOKING_TYPES.includes(t.bookingType);
+  const needsPaymentBeforeComplete = payAtServiceApplies && !isPaid;
+  const canManagePayment = t.bookingType === 'care_assistant'
+    ? t.isSelf
+    : t.bookingType === 'full_care_ride'
+      ? viewerRole !== 'customer'
+      : false;
+  // Only the LAST step of the standalone flow ("Mark task complete") is
+  // payment-gated — "I've arrived" / "Start task" proceed regardless.
+  const primaryGatedByPayment = needsPaymentBeforeComplete && primaryLabel === 'Mark task complete';
+
+  // FIX G: floating controls sit higher when the sheet is expanded (more
+  // sheet height to clear) and settle lower when it's collapsed to a bar.
+  const controlsBottomClass = sheetExpanded ? 'bottom-64' : 'bottom-28';
+
   // ── Render ──────────────────────────────────────────────────────────────
   if (!bookingId) {
     return <div className="flex h-screen items-center justify-center text-slate-500">Missing booking id.</div>;
@@ -596,10 +828,12 @@ export default function CareAssistantLiveTracking({ rideId, bookingType: booking
 
       {mapReady && (
         <FloatingControls
+          bottomClassName={controlsBottomClass}
           onRecenter={() => {
             const pos = t.phase === 'in_vehicle' ? t.driverLiveLocation : (t.isSelf ? t.currentPosition : t.caLiveLocation);
             if (pos?.lat) camera.recenter(pos.lat, pos.lng);
           }}
+          onLocateMe={handleLocateMe}
           onNorthUp={camera.resetToNorth}
           onZoomIn={camera.zoomIn}
           onZoomOut={camera.zoomOut}
@@ -609,11 +843,49 @@ export default function CareAssistantLiveTracking({ rideId, bookingType: booking
       )}
 
       {/* ── Bottom sheet ─────────────────────────────────────────────────── */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 rounded-t-3xl bg-white px-5 pb-6 pt-4 shadow-[0_-8px_30px_rgba(0,0,0,0.12)]">
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200" />
+      <div
+        className={`absolute bottom-0 left-0 right-0 z-20 rounded-t-3xl bg-white px-5 pb-6 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] transition-[padding] duration-200 ${
+          sheetExpanded ? 'pt-4' : 'pt-2'
+        }`}
+      >
+        {/* Handle / collapse-expand toggle — FIX F */}
+        <button
+          type="button"
+          onClick={() => setSheetExpanded((v) => !v)}
+          aria-label={sheetExpanded ? 'Collapse details' : 'Expand details'}
+          aria-expanded={sheetExpanded}
+          className="mx-auto mb-3 flex w-full flex-col items-center gap-1 py-1"
+        >
+          <span className="h-1 w-10 rounded-full bg-slate-200" />
+          <svg
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            className={`text-slate-400 transition-transform duration-200 ${sheetExpanded ? '' : 'rotate-180'}`}
+          >
+            <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
 
         {t.phase === 'awaiting_assignment' ? (
-          <p className="py-4 text-center text-sm text-slate-500">Waiting for a ride to be assigned to this booking…</p>
+          sheetExpanded && (
+            <p className="py-4 text-center text-sm text-slate-500">Waiting for a ride to be assigned to this booking…</p>
+          )
+        ) : !sheetExpanded ? (
+          // Collapsed: compact single-row summary, always-visible SOS.
+          <div className="flex items-center justify-between gap-3 pb-1">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-900">{PHASE_LABEL[t.phase] || 'Tracking'}</p>
+              <p className="text-xs text-slate-500">
+                {t.phase === 'in_vehicle' ? `ETA ${formatEta(t.etaMinutes)}` : `${formatDistance(distToDestKm)} away`}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSos(true)}
+              className="shrink-0 rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 active:scale-[0.99] transition"
+            >
+              SOS
+            </button>
+          </div>
         ) : (
           <>
             {steps.length > 0 && <StatusTimeline steps={steps} activeKey={activeStepKey} />}
@@ -649,14 +921,26 @@ export default function CareAssistantLiveTracking({ rideId, bookingType: booking
               </div>
             )}
 
+            {/* Pay-at-service — shown only while unpaid, hides itself the
+                moment `isPaid` flips true (booking re-fetch / socket). */}
+            {needsPaymentBeforeComplete && (
+              <PayAtServiceCard bookingId={bookingId} canManage={canManagePayment} />
+            )}
+
             <div className="mt-4 flex gap-2">
               {t.isSelf && primaryLabel && (
                 <button
                   type="button"
-                  onClick={handlePrimaryAction}
-                  className="flex-1 rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white active:scale-[0.99] transition"
+                  onClick={primaryGatedByPayment ? undefined : handlePrimaryAction}
+                  disabled={primaryGatedByPayment}
+                  title={primaryGatedByPayment ? 'Collect payment above before completing' : undefined}
+                  className={`flex-1 rounded-xl py-3 text-sm font-semibold text-white transition ${
+                    primaryGatedByPayment
+                      ? 'bg-slate-300 cursor-not-allowed'
+                      : 'bg-violet-600 active:scale-[0.99]'
+                  }`}
                 >
-                  {primaryLabel}
+                  {primaryGatedByPayment ? 'Collect payment first' : primaryLabel}
                 </button>
               )}
               <button
@@ -672,6 +956,7 @@ export default function CareAssistantLiveTracking({ rideId, bookingType: booking
           </>
         )}
       </div>
+
 
       {showSos && <SosSheet onConfirm={handleSosConfirm} onCancel={() => setShowSos(false)} />}
     </div>

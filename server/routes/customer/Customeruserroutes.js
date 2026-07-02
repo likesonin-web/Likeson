@@ -1,12 +1,13 @@
 import express from 'express';
-import EPrescription    from '../../models/EPrescription.js';
-import User             from '../../models/User.js';
-import CustomerProfile  from '../../models/CustomerProfile.js';
-import Notification     from '../../models/Notification.js';
-import sendEmail        from '../../utils/sendEmail.js';
+import EPrescription     from '../../models/EPrescription.js';
+import User              from '../../models/User.js';
+import CustomerProfile   from '../../models/CustomerProfile.js';
+import Notification      from '../../models/Notification.js';
+import PatientCareRecord from '../../models/PatientCareRecord.js';
+import sendEmail         from '../../utils/sendEmail.js';
 import { transactionalTemplate } from '../../utils/emailTemplates.js';
 import { protect, authorize }    from '../../middleware/authMiddleware.js';
-import upload           from '../../middleware/upload.js'; // multer-s3 — sets file.location
+import upload            from '../../middleware/upload.js'; // multer-s3 — sets file.location
 
 const router = express.Router();
 
@@ -18,8 +19,8 @@ router.use(authorize('customer'));
 // ═══════════════════════════════════════════════════════════════════════════════
 router.get('/me', async (req, res) => {
   try {
-    const user    = await User.findById(req.user._id).select('-password -otp -otpExpires -deviceTokens');
-    const profile = await CustomerProfile.findOne({ user: req.user._id });
+    const user    = await User.findById(req.user._id).select('-password -otp -otpExpires -deviceTokens').lean();
+    const profile = await CustomerProfile.findOne({ user: req.user._id }).lean();
     res.status(200).json({ success: true, data: { user, profile: profile || {} } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -33,7 +34,11 @@ router.put('/me', async (req, res) => {
   try {
     const ALLOWED = ['name', 'phone', 'workStatus', 'lastKnownAddress', 'termsAcceptedAt', 'privacyPolicyAcceptedAt', 'location'];
     const updates = {};
-    ALLOWED.forEach((f) => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
+    
+    ALLOWED.forEach((f) => { 
+      if (req.body[f] !== undefined) updates[f] = req.body[f]; 
+    });
+    
     delete updates.role;
     delete updates.isBlocked;
     delete updates.password;
@@ -48,20 +53,21 @@ router.put('/me', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 3. PUT /me/profile  — CustomerProfile core fields (new schema)
+// 3. PUT /me/profile  — CustomerProfile core fields
 // ═══════════════════════════════════════════════════════════════════════════════
 router.put('/me/profile', async (req, res) => {
   try {
-    // Allowed top-level + nested fields from updated schema
     const ALLOWED = [
       'gender', 'dob', 'bloodGroup', 'preferredLanguage',
       'address', 'emergencyContact',
-      'chronicConditions', 'allergies',   // promoted from snapshot
+      'chronicConditions', 'allergies',
       'notifPrefs',
     ];
 
     const updates = {};
-    ALLOWED.forEach((f) => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
+    ALLOWED.forEach((f) => { 
+      if (req.body[f] !== undefined) updates[f] = req.body[f]; 
+    });
 
     const profile = await CustomerProfile.findOneAndUpdate(
       { user: req.user._id },
@@ -75,7 +81,7 @@ router.put('/me/profile', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 4. POST /me/kyc  — Add/replace KYC (multer-s3)
+// 4. KYC
 // ═══════════════════════════════════════════════════════════════════════════════
 router.post(
   '/me/kyc',
@@ -85,18 +91,16 @@ router.post(
       const { type, documentNumber, holderName } = req.body;
       if (!type) return res.status(400).json({ success: false, message: 'Document type is required' });
 
-      // multer-s3 sets file.location = S3 URL
       const documentUrl = req.files?.documentFile?.[0]?.location || undefined;
-      const backSideUrl  = req.files?.backSideFile?.[0]?.location  || undefined;
+      const backSideUrl = req.files?.backSideFile?.[0]?.location || undefined;
 
       const kycEntry = {
         type, documentNumber, holderName,
         verificationStatus: 'Pending',
         ...(documentUrl && { documentUrl }),
-        ...(backSideUrl  && { backSideUrl }),
+        ...(backSideUrl && { backSideUrl }),
       };
 
-      // pull existing same-type, then push new
       await CustomerProfile.findOneAndUpdate({ user: req.user._id }, { $pull: { kyc: { type } } });
       const updated = await CustomerProfile.findOneAndUpdate(
         { user: req.user._id },
@@ -110,10 +114,9 @@ router.post(
   },
 );
 
-// GET /me/kyc
 router.get('/me/kyc', async (req, res) => {
   try {
-    const profile = await CustomerProfile.findOne({ user: req.user._id }).select('kyc');
+    const profile = await CustomerProfile.findOne({ user: req.user._id }).select('kyc').lean();
     if (!profile) return res.status(404).json({ success: false, message: 'Profile not found' });
     res.status(200).json({ success: true, data: profile.kyc });
   } catch (err) {
@@ -121,7 +124,6 @@ router.get('/me/kyc', async (req, res) => {
   }
 });
 
-// DELETE /me/kyc/:type
 router.delete('/me/kyc/:type', async (req, res) => {
   try {
     const profile = await CustomerProfile.findOneAndUpdate(
@@ -172,7 +174,7 @@ router.delete('/me/government-schemes/:schemeId', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 6. Private Insurance (NEW — matches updated schema)
+// 6. Private Insurance
 // ═══════════════════════════════════════════════════════════════════════════════
 router.post('/me/private-insurance', upload.single('cardFile'), async (req, res) => {
   try {
@@ -211,15 +213,20 @@ router.delete('/me/private-insurance/:insuranceId', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 router.post('/me/medical-timeline', upload.array('reportFiles', 5), async (req, res) => {
   try {
-    const { eventTitle, hospitalName, description, doctorName, date } = req.body;
+    const { eventTitle, hospitalName, description, doctorName, date, prescriptionId } = req.body;
     if (!eventTitle) return res.status(400).json({ success: false, message: 'eventTitle is required' });
 
-    // S3: each file has .location
     const reportUrls = (req.files || []).map((f) => f.location);
+
+    const timelineEntry = {
+      eventTitle, hospitalName, description, doctorName, reportUrls,
+      date: date || Date.now(),
+      ...(prescriptionId && { prescriptionId })
+    };
 
     const profile = await CustomerProfile.findOneAndUpdate(
       { user: req.user._id },
-      { $push: { medicalTimeline: { $each: [{ eventTitle, hospitalName, description, doctorName, reportUrls, date: date || Date.now() }], $sort: { date: -1 } } } },
+      { $push: { medicalTimeline: { $each: [timelineEntry], $sort: { date: -1 } } } },
       { new: true, upsert: true },
     );
     res.status(201).json({ success: true, data: profile.medicalTimeline });
@@ -230,13 +237,14 @@ router.post('/me/medical-timeline', upload.array('reportFiles', 5), async (req, 
 
 router.put('/me/medical-timeline/:eventId', async (req, res) => {
   try {
-    const { eventTitle, hospitalName, description, doctorName, date } = req.body;
+    const { eventTitle, hospitalName, description, doctorName, date, prescriptionId } = req.body;
     const setObj = {};
-    if (eventTitle)   setObj['medicalTimeline.$.eventTitle']   = eventTitle;
-    if (hospitalName) setObj['medicalTimeline.$.hospitalName'] = hospitalName;
-    if (description)  setObj['medicalTimeline.$.description']  = description;
-    if (doctorName)   setObj['medicalTimeline.$.doctorName']   = doctorName;
-    if (date)         setObj['medicalTimeline.$.date']         = date;
+    if (eventTitle)     setObj['medicalTimeline.$.eventTitle']     = eventTitle;
+    if (hospitalName)   setObj['medicalTimeline.$.hospitalName']   = hospitalName;
+    if (description)    setObj['medicalTimeline.$.description']    = description;
+    if (doctorName)     setObj['medicalTimeline.$.doctorName']     = doctorName;
+    if (date)           setObj['medicalTimeline.$.date']           = date;
+    if (prescriptionId) setObj['medicalTimeline.$.prescriptionId'] = prescriptionId;
 
     const profile = await CustomerProfile.findOneAndUpdate(
       { user: req.user._id, 'medicalTimeline._id': req.params.eventId },
@@ -269,12 +277,17 @@ router.delete('/me/medical-timeline/:eventId', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 router.post('/me/medicine-history', async (req, res) => {
   try {
-    const { medicineName, dosage, frequency, startDate, endDate, isOngoing, prescribingDoctor, instructions } = req.body;
+    const { medicineName, dosage, frequency, startDate, endDate, isOngoing, prescribingDoctor, instructions, prescriptionId } = req.body;
     if (!medicineName) return res.status(400).json({ success: false, message: 'medicineName is required' });
+
+    const medEntry = {
+      medicineName, dosage, frequency, startDate, endDate, isOngoing, prescribingDoctor, instructions,
+      ...(prescriptionId && { prescriptionId })
+    };
 
     const profile = await CustomerProfile.findOneAndUpdate(
       { user: req.user._id },
-      { $push: { medicineHistory: { medicineName, dosage, frequency, startDate, endDate, isOngoing, prescribingDoctor, instructions } } },
+      { $push: { medicineHistory: medEntry } },
       { new: true, upsert: true },
     );
     res.status(201).json({ success: true, data: profile.medicineHistory });
@@ -285,9 +298,11 @@ router.post('/me/medicine-history', async (req, res) => {
 
 router.put('/me/medicine-history/:medId', async (req, res) => {
   try {
-    const fields = ['medicineName', 'dosage', 'frequency', 'startDate', 'endDate', 'isOngoing', 'prescribingDoctor', 'instructions'];
+    const fields = ['medicineName', 'dosage', 'frequency', 'startDate', 'endDate', 'isOngoing', 'prescribingDoctor', 'instructions', 'prescriptionId'];
     const setObj = {};
-    fields.forEach((f) => { if (req.body[f] !== undefined) setObj[`medicineHistory.$.${f}`] = req.body[f]; });
+    fields.forEach((f) => { 
+      if (req.body[f] !== undefined) setObj[`medicineHistory.$.${f}`] = req.body[f]; 
+    });
 
     const profile = await CustomerProfile.findOneAndUpdate(
       { user: req.user._id, 'medicineHistory._id': req.params.medId },
@@ -316,12 +331,13 @@ router.delete('/me/medicine-history/:medId', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 9. Consent (NEW — matches updated schema)
+// 9. Consent
 // ═══════════════════════════════════════════════════════════════════════════════
 router.put('/me/consent', async (req, res) => {
   try {
     const { telemedicineConsent, dataSharingConsent, marketingConsent, recordingConsent, consentVersion } = req.body;
     const setObj = { 'consent.consentUpdatedAt': new Date() };
+    
     if (telemedicineConsent !== undefined) setObj['consent.telemedicineConsent'] = telemedicineConsent;
     if (dataSharingConsent  !== undefined) setObj['consent.dataSharingConsent']  = dataSharingConsent;
     if (marketingConsent    !== undefined) setObj['consent.marketingConsent']    = marketingConsent;
@@ -340,12 +356,12 @@ router.put('/me/consent', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 10. Vitals Baseline (replaces /me/snapshot vitals — new schema field)
+// 10. Vitals Baseline 
 // ═══════════════════════════════════════════════════════════════════════════════
 router.get('/me/snapshot', async (req, res) => {
   try {
     const profile = await CustomerProfile.findOne({ user: req.user._id })
-      .select('vitalsBaseline emergencyContact bloodGroup chronicConditions allergies preferredLanguage');
+      .select('vitalsBaseline emergencyContact bloodGroup chronicConditions allergies preferredLanguage').lean();
     if (!profile) return res.status(404).json({ success: false, message: 'Profile not found' });
     res.status(200).json({ success: true, data: profile });
   } catch (err) {
@@ -353,14 +369,14 @@ router.get('/me/snapshot', async (req, res) => {
   }
 });
 
-// PUT /me/snapshot  — patient manually updates baseline vitals
 router.put('/me/snapshot', async (req, res) => {
   try {
     const { chronicConditions, allergies, preferredLanguage, vitals } = req.body;
     const setObj = {};
     if (chronicConditions !== undefined) setObj.chronicConditions = chronicConditions;
-    if (allergies          !== undefined) setObj.allergies          = allergies;
-    if (preferredLanguage  !== undefined) setObj.preferredLanguage  = preferredLanguage;
+    if (allergies         !== undefined) setObj.allergies         = allergies;
+    if (preferredLanguage !== undefined) setObj.preferredLanguage = preferredLanguage;
+    
     if (vitals) {
       const VITAL_FIELDS = ['bloodPressure', 'pulseRate', 'temperature', 'spO2', 'bloodSugar', 'weightKg', 'heightCm'];
       VITAL_FIELDS.forEach((v) => {
@@ -385,8 +401,12 @@ router.put('/me/snapshot', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 router.get('/me/audit-sessions', async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('auditSessions');
-    res.status(200).json({ success: true, count: user.auditSessions.length, data: user.auditSessions.sort((a, b) => b.lastActiveAt - a.lastActiveAt) });
+    const user = await User.findById(req.user._id).select('auditSessions').lean();
+    res.status(200).json({ 
+      success: true, 
+      count: user.auditSessions.length, 
+      data: user.auditSessions.sort((a, b) => new Date(b.lastActiveAt) - new Date(a.lastActiveAt)) 
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -399,6 +419,7 @@ router.delete('/me/audit-sessions/:sessionId', async (req, res) => {
       { $pull: { auditSessions: { _id: req.params.sessionId } } },
       { new: true },
     ).select('auditSessions');
+    
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     await Notification.create({
@@ -496,7 +517,7 @@ router.get('/me/notifications', async (req, res) => {
     const filter = { recipient: req.user._id, ...(req.query.unread === 'true' && { isRead: false }) };
 
     const [notifications, total] = await Promise.all([
-      Notification.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Notification.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       Notification.countDocuments(filter),
     ]);
     res.status(200).json({ success: true, page, totalPages: Math.ceil(total / limit), total, data: notifications });
@@ -543,7 +564,7 @@ router.get('/me/prescriptions', async (req, res) => {
 
     const [prescriptions, total] = await Promise.all([
       EPrescription.find(filter).sort({ issuedAt: -1 }).skip(skip).limit(limit)
-        .select('-medicines.instructions -doctor.signatureUrl'),
+        .select('-medicines.instructions -doctor.signatureUrl').lean(),
       EPrescription.countDocuments(filter),
     ]);
     res.status(200).json({ success: true, page, totalPages: Math.ceil(total / limit), total, data: prescriptions });
@@ -554,7 +575,7 @@ router.get('/me/prescriptions', async (req, res) => {
 
 router.get('/me/prescriptions/:rxNumber', async (req, res) => {
   try {
-    const rx = await EPrescription.findOne({ rxNumber: req.params.rxNumber, 'patient.userId': req.user._id });
+    const rx = await EPrescription.findOne({ rxNumber: req.params.rxNumber, 'patient.userId': req.user._id }).lean();
     if (!rx) return res.status(404).json({ success: false, message: 'Prescription not found' });
     res.status(200).json({ success: true, data: rx });
   } catch (err) {
@@ -567,12 +588,20 @@ router.get('/me/prescriptions/:rxNumber', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 router.get('/me/reports', async (req, res) => {
   try {
-    const profile = await CustomerProfile.findOne({ user: req.user._id }).select('medicalTimeline');
+    const profile = await CustomerProfile.findOne({ user: req.user._id }).select('medicalTimeline').lean();
     if (!profile) return res.status(404).json({ success: false, message: 'Profile not found' });
 
     const reports = profile.medicalTimeline
       .filter((e) => e.reportUrls?.length)
-      .map((e) => ({ eventId: e._id, eventTitle: e.eventTitle, hospitalName: e.hospitalName, doctorName: e.doctorName, date: e.date, reportUrls: e.reportUrls }))
+      .map((e) => ({ 
+        eventId: e._id, 
+        eventTitle: e.eventTitle, 
+        hospitalName: e.hospitalName, 
+        doctorName: e.doctorName, 
+        date: e.date, 
+        reportUrls: e.reportUrls,
+        prescriptionId: e.prescriptionId
+      }))
       .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     res.status(200).json({ success: true, total: reports.length, data: reports });
@@ -581,12 +610,10 @@ router.get('/me/reports', async (req, res) => {
   }
 });
 
-// POST /me/reports/:eventId/upload  — append files to existing event
 router.post('/me/reports/:eventId/upload', upload.array('reportFiles', 5), async (req, res) => {
   try {
     if (!req.files?.length) return res.status(400).json({ success: false, message: 'No files uploaded' });
 
-    // S3: file.location is the public URL
     const newUrls = req.files.map((f) => f.location);
 
     const profile = await CustomerProfile.findOneAndUpdate(
@@ -603,7 +630,6 @@ router.post('/me/reports/:eventId/upload', upload.array('reportFiles', 5), async
   }
 });
 
-// DELETE /me/reports/:eventId/file  — remove single URL
 router.delete('/me/reports/:eventId/file', async (req, res) => {
   try {
     const { url } = req.body;
@@ -618,6 +644,76 @@ router.delete('/me/reports/:eventId/file', async (req, res) => {
 
     const event = profile.medicalTimeline.id(req.params.eventId);
     res.status(200).json({ success: true, data: event });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 17. Patient Care Records
+// ═══════════════════════════════════════════════════════════════════════════════
+router.get('/me/care-records', async (req, res) => {
+  try {
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(50, parseInt(req.query.limit) || 10);
+    const skip  = (page - 1) * limit;
+    const filter = { patient: req.user._id, ...(req.query.status && { status: req.query.status }) };
+
+    const [records, total] = await Promise.all([
+      PatientCareRecord.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('careAssistant', 'fullName photoUrl phone')
+        .populate('booking', 'bookingCode bookingType scheduledAt status documents')
+        .lean(),
+      PatientCareRecord.countDocuments(filter),
+    ]);
+
+    res.status(200).json({ success: true, page, totalPages: Math.ceil(total / limit), total, data: records });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/me/care-records/:id', async (req, res) => {
+  try {
+    const record = await PatientCareRecord.findOne({ _id: req.params.id, patient: req.user._id })
+      .select('+hospitalInstructions')
+      .populate('careAssistant', 'fullName photoUrl phone')
+      .populate('booking', 'bookingCode bookingType scheduledAt status documents patientInfo')
+      .lean();
+
+    if (!record) return res.status(404).json({ success: false, message: 'Care record not found' });
+    res.status(200).json({ success: true, data: record });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/me/care-records/booking/:bookingId', async (req, res) => {
+  try {
+    const record = await PatientCareRecord.findOne({ booking: req.params.bookingId, patient: req.user._id })
+      .select('+hospitalInstructions')
+      .populate('careAssistant', 'fullName photoUrl phone')
+      .populate('booking', 'bookingCode bookingType scheduledAt status documents patientInfo')
+      .lean();
+
+    if (!record) return res.status(404).json({ success: false, message: 'Care record not found for this booking' });
+    res.status(200).json({ success: true, data: record });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/me/care-records/:id/booking-documents', async (req, res) => {
+  try {
+    const record = await PatientCareRecord.findOne({ _id: req.params.id, patient: req.user._id })
+      .populate({ path: 'booking', select: 'documents', match: { customer: req.user._id } })
+      .lean();
+
+    if (!record || !record.booking) return res.status(404).json({ success: false, message: 'Booking not found for this record' });
+    res.status(200).json({ success: true, data: record.booking.documents });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

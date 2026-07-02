@@ -327,27 +327,52 @@ router.get('/appointments', wrap(async (req, res) => {
   const { from, to } = parseDateRange(req.query);
   const { page, limit, skip } = paginate(req.query);
 
-  // Filter helpers
-  const statusFilter  = req.query.status       ? { status: req.query.status }          : {};
-  const typeFilter    = req.query.bookingType  ? { bookingType: req.query.bookingType } : {};
-  const doctorFilter  = req.query.doctorId     ? { doctor: mongoose.Types.ObjectId.isValid(req.query.doctorId) ? new mongoose.Types.ObjectId(req.query.doctorId) : null } : {};
-  const hospitalFilter= req.query.hospitalId   ? { hospital: mongoose.Types.ObjectId.isValid(req.query.hospitalId) ? new mongoose.Types.ObjectId(req.query.hospitalId) : null } : {};
+  // 1. Define the doctor-related booking types based on your schema's 'requiresDoctor' virtual
+  const DOCTOR_BOOKING_TYPES = [
+    "full_care_ride",
+    "doctor_consultation",
+    "doctor_online",
+    "physiotherapist",
+    "follow_up"
+  ];
 
+  // 2. Strict Type Filter: Ensure we ONLY query doctor-related appointments.
+  // If a specific bookingType is requested, verify it's a doctor type. 
+  // Otherwise, fallback to ALL doctor types.
+  const typeFilter = req.query.bookingType && DOCTOR_BOOKING_TYPES.includes(req.query.bookingType) 
+    ? { bookingType: req.query.bookingType } 
+    : { bookingType: { $in: DOCTOR_BOOKING_TYPES } };
+
+  // Filter helpers
+  const statusFilter  = req.query.status     ? { status: req.query.status } : {};
+  const doctorFilter  = req.query.doctorId   ? { doctor: mongoose.Types.ObjectId.isValid(req.query.doctorId) ? new mongoose.Types.ObjectId(req.query.doctorId) : null } : {};
+  const hospitalFilter= req.query.hospitalId ? { hospital: mongoose.Types.ObjectId.isValid(req.query.hospitalId) ? new mongoose.Types.ObjectId(req.query.hospitalId) : null } : {};
+
+  // Combine filters for the main match object
   const match = {
     scheduledAt: { $gte: from, $lte: to },
-    ...statusFilter, ...typeFilter, ...doctorFilter, ...hospitalFilter,
+    ...statusFilter, 
+    ...typeFilter, 
+    ...doctorFilter, 
+    ...hospitalFilter,
   };
 
   const [total, upcoming, noShow, cancellationRate, appts, opStats] = await Promise.all([
-
+    
+    // Total matched appointments
     Booking.countDocuments(match),
 
     // Upcoming (next 7 days)
+    // NOTE: Applied the type, doctor, and hospital filters here so stats reflect the current view
     Booking.countDocuments({
       scheduledAt: { $gte: new Date(), $lte: new Date(Date.now() + 7 * 86400_000) },
       status: { $in: ['pending', 'confirmed'] },
+      ...typeFilter,
+      ...doctorFilter,
+      ...hospitalFilter
     }),
 
+    // No Shows
     Booking.countDocuments({ ...match, status: 'no_show' }),
 
     // Cancellation rate

@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 // THUNKS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ── 1. Profile & User ────────────────────────────────────────────────────────
 export const fetchMyProfile = createAsyncThunk(
   'customerProfile/fetchMyProfile',
   async (_, { rejectWithValue }) => {
@@ -42,6 +43,7 @@ export const updateMyCustomerProfile = createAsyncThunk(
   },
 );
 
+// ── 2. KYC ───────────────────────────────────────────────────────────────────
 export const uploadKyc = createAsyncThunk(
   'customerProfile/uploadKyc',
   async (formData, { rejectWithValue }) => {
@@ -80,6 +82,7 @@ export const deleteKycByType = createAsyncThunk(
   },
 );
 
+// ── 3. Government Schemes ────────────────────────────────────────────────────
 export const addGovernmentScheme = createAsyncThunk(
   'customerProfile/addGovernmentScheme',
   async (formData, { rejectWithValue }) => {
@@ -106,11 +109,10 @@ export const deleteGovernmentScheme = createAsyncThunk(
   },
 );
 
-// ── Private Insurance (NEW) ───────────────────────────────────────────────────
+// ── 4. Private Insurance ─────────────────────────────────────────────────────
 export const addPrivateInsurance = createAsyncThunk(
   'customerProfile/addPrivateInsurance',
   async (formData, { rejectWithValue }) => {
-    // formData: FormData — insurerName, policyNumber, tpaName, holderName, sumInsured, validFrom, validTo, cardFile?
     try {
       const { data } = await API.post('/customer/me/private-insurance', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -134,6 +136,7 @@ export const deletePrivateInsurance = createAsyncThunk(
   },
 );
 
+// ── 5. Medical Timeline ──────────────────────────────────────────────────────
 export const addMedicalEvent = createAsyncThunk(
   'customerProfile/addMedicalEvent',
   async (formData, { rejectWithValue }) => {
@@ -172,6 +175,7 @@ export const deleteMedicalEvent = createAsyncThunk(
   },
 );
 
+// ── 6. Medicine History ──────────────────────────────────────────────────────
 export const addMedicine = createAsyncThunk(
   'customerProfile/addMedicine',
   async (payload, { rejectWithValue }) => {
@@ -208,11 +212,10 @@ export const deleteMedicine = createAsyncThunk(
   },
 );
 
-// ── Consent (NEW) ─────────────────────────────────────────────────────────────
+// ── 7. Consent ───────────────────────────────────────────────────────────────
 export const updateConsent = createAsyncThunk(
   'customerProfile/updateConsent',
   async (payload, { rejectWithValue }) => {
-    // payload: { telemedicineConsent, dataSharingConsent, marketingConsent, recordingConsent, consentVersion }
     try {
       const { data } = await API.put('/customer/me/consent', payload);
       return data.data;
@@ -222,6 +225,32 @@ export const updateConsent = createAsyncThunk(
   },
 );
 
+// ── 8. Health Snapshot / Vitals Baseline ─────────────────────────────────────
+export const fetchSnapshot = createAsyncThunk(
+  'customerProfile/fetchSnapshot',
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await API.get('/customer/me/snapshot');
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to fetch snapshot');
+    }
+  },
+);
+
+export const updateSnapshot = createAsyncThunk(
+  'customerProfile/updateSnapshot',
+  async (payload, { rejectWithValue }) => {
+    try {
+      const { data } = await API.put('/customer/me/snapshot', payload);
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to update snapshot');
+    }
+  },
+);
+
+// ── 9. Audit Sessions & Devices ──────────────────────────────────────────────
 export const fetchAuditSessions = createAsyncThunk(
   'customerProfile/fetchAuditSessions',
   async (_, { rejectWithValue }) => {
@@ -270,6 +299,7 @@ export const deleteDeviceToken = createAsyncThunk(
   },
 );
 
+// ── 10. Unblock Requests ─────────────────────────────────────────────────────
 export const requestUnblock = createAsyncThunk(
   'customerProfile/requestUnblock',
   async (reason, { rejectWithValue }) => {
@@ -282,6 +312,7 @@ export const requestUnblock = createAsyncThunk(
   },
 );
 
+// ── 11. Notifications ────────────────────────────────────────────────────────
 export const fetchNotifications = createAsyncThunk(
   'customerProfile/fetchNotifications',
   async ({ page = 1, limit = 20, unread } = {}, { rejectWithValue }) => {
@@ -320,32 +351,7 @@ export const markAllNotificationsRead = createAsyncThunk(
   },
 );
 
-// ── Snapshot / vitalsBaseline ─────────────────────────────────────────────────
-export const fetchSnapshot = createAsyncThunk(
-  'customerProfile/fetchSnapshot',
-  async (_, { rejectWithValue }) => {
-    try {
-      const { data } = await API.get('/customer/me/snapshot');
-      return data.data; // { vitalsBaseline, chronicConditions, allergies, preferredLanguage, emergencyContact, bloodGroup }
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || 'Failed to fetch snapshot');
-    }
-  },
-);
-
-export const updateSnapshot = createAsyncThunk(
-  'customerProfile/updateSnapshot',
-  async (payload, { rejectWithValue }) => {
-    // payload: { chronicConditions?, allergies?, preferredLanguage?, vitals?: { bloodPressure, pulseRate, ... } }
-    try {
-      const { data } = await API.put('/customer/me/snapshot', payload);
-      return data.data; // { vitalsBaseline, chronicConditions, allergies, preferredLanguage }
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || 'Failed to update snapshot');
-    }
-  },
-);
-
+// ── 12. Prescriptions ────────────────────────────────────────────────────────
 export const fetchPrescriptions = createAsyncThunk(
   'customerProfile/fetchPrescriptions',
   async ({ page = 1, limit = 10, status } = {}, { rejectWithValue }) => {
@@ -372,6 +378,7 @@ export const fetchPrescriptionByRx = createAsyncThunk(
   },
 );
 
+// ── 13. Reports (Timeline Attachments) ───────────────────────────────────────
 export const fetchReports = createAsyncThunk(
   'customerProfile/fetchReports',
   async (_, { rejectWithValue }) => {
@@ -410,6 +417,59 @@ export const deleteReportFile = createAsyncThunk(
   },
 );
 
+// ── 14. Patient Care Records ─────────────────────────────────────────────────
+export const fetchCareRecords = createAsyncThunk(
+  'customerProfile/fetchCareRecords',
+  async ({ page = 1, limit = 10, status } = {}, { rejectWithValue }) => {
+    try {
+      const params = new URLSearchParams({ page, limit });
+      if (status) params.set('status', status);
+      const { data } = await API.get(`/customer/me/care-records?${params}`);
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to fetch care records');
+    }
+  },
+);
+
+export const fetchCareRecordById = createAsyncThunk(
+  'customerProfile/fetchCareRecordById',
+  async (recordId, { rejectWithValue }) => {
+    try {
+      const { data } = await API.get(`/customer/me/care-records/${recordId}`);
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Care record not found');
+    }
+  },
+);
+
+export const fetchCareRecordByBooking = createAsyncThunk(
+  'customerProfile/fetchCareRecordByBooking',
+  async (bookingId, { rejectWithValue }) => {
+    try {
+      const { data } = await API.get(`/customer/me/care-records/booking/${bookingId}`);
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Care record not found for this booking');
+    }
+  },
+);
+
+// NEW THUNK for /customer/me/care-records/:id/booking-documents
+export const fetchCareRecordBookingDocs = createAsyncThunk(
+  'customerProfile/fetchCareRecordBookingDocs',
+  async (recordId, { rejectWithValue }) => {
+    try {
+      const { data } = await API.get(`/customer/me/care-records/${recordId}/booking-documents`);
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to fetch booking documents');
+    }
+  },
+);
+
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // INITIAL STATE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -419,15 +479,15 @@ const initialState = {
   user:    null,
   profile: null,
 
-  // Sub-sections — match new CustomerProfile schema
+  // Sub-sections 
   kyc:               [],
   governmentSchemes: [],
-  privateInsurances: [],    // NEW
+  privateInsurances: [],
   medicalTimeline:   [],
   medicineHistory:   [],
-  consent:           null,  // NEW
+  consent:           null,
 
-  // Vitals baseline + top-level health fields (replaces flat `snapshot`)
+  // Vitals baseline & Snapshot
   vitalsBaseline:    null,
   chronicConditions: [],
   allergies:         [],
@@ -453,22 +513,29 @@ const initialState = {
   reports:      [],
   reportsTotal: 0,
 
-  // Loading
+  // Care Records 
+  careRecords:          [],
+  careRecordsMeta:      { page: 1, totalPages: 1, total: 0 },
+  activeCareRecord:     null,
+  activeCareRecordDocs: [], // For the isolated documents fetch endpoint
+
+  // UI State Loading & Errors
   loading: false,
   sectionLoading: {
     profile:           false,
     kyc:               false,
     schemes:           false,
-    privateInsurances: false,  // NEW
+    privateInsurances: false,
     medicalTimeline:   false,
     medicineHistory:   false,
-    consent:           false,  // NEW
+    consent:           false,
     snapshot:          false,
     auditSessions:     false,
     deviceTokens:      false,
     notifications:     false,
     prescriptions:     false,
     reports:           false,
+    careRecords:       false,
     unblock:           false,
   },
   error: null,
@@ -498,11 +565,15 @@ const customerProfileSlice = createSlice({
     clearCustomerProfile: () => initialState,
     decrementUnread: (state) => { if (state.unreadCount > 0) state.unreadCount -= 1; },
     clearError: (state) => { state.error = null; },
+    clearActiveCareRecord: (state) => { 
+      state.activeCareRecord = null; 
+      state.activeCareRecordDocs = []; 
+    },
   },
 
   extraReducers: (builder) => {
 
-    // ── 1. fetchMyProfile ────────────────────────────────────────────────────
+    // ── 1. Profile & User ────────────────────────────────────────────────────
     builder
       .addCase(fetchMyProfile.pending, (state) => { state.loading = true; state.error = null; })
       .addCase(fetchMyProfile.fulfilled, (state, { payload }) => {
@@ -511,23 +582,19 @@ const customerProfileSlice = createSlice({
         state.user             = payload.user;
         state.profile          = p;
 
-        // Arrays
-        state.kyc               = p.kyc               || [];
+        state.kyc               = p.kyc                || [];
         state.governmentSchemes = p.governmentSchemes  || [];
-        state.privateInsurances = p.privateInsurances  || [];  // NEW
+        state.privateInsurances = p.privateInsurances  || [];
         state.medicalTimeline   = p.medicalTimeline    || [];
         state.medicineHistory   = p.medicineHistory    || [];
 
-        // Consent
-        state.consent           = p.consent            || null;  // NEW
+        state.consent           = p.consent            || null;
 
-        // Health fields — new schema (no longer nested under snapshot)
-        state.vitalsBaseline    = p.vitalsBaseline      || null;
-        state.chronicConditions = p.chronicConditions   || [];
-        state.allergies         = p.allergies           || [];
-        state.preferredLanguage = p.preferredLanguage   || 'English';
+        state.vitalsBaseline    = p.vitalsBaseline     || null;
+        state.chronicConditions = p.chronicConditions  || [];
+        state.allergies         = p.allergies          || [];
+        state.preferredLanguage = p.preferredLanguage  || 'English';
 
-        // Sessions / devices live on user doc
         state.auditSessions     = payload.user?.auditSessions || [];
         state.deviceTokens      = payload.user?.deviceTokens  || [];
       })
@@ -537,7 +604,6 @@ const customerProfileSlice = createSlice({
         toast.error(payload || 'Failed to load profile');
       });
 
-    // ── 2. updateMyUser ──────────────────────────────────────────────────────
     builder
       .addCase(updateMyUser.pending,    sectionPending('profile'))
       .addCase(updateMyUser.fulfilled, (state, { payload }) => {
@@ -547,13 +613,11 @@ const customerProfileSlice = createSlice({
       })
       .addCase(updateMyUser.rejected, sectionRejected('profile', 'Failed to update user'));
 
-    // ── 3. updateMyCustomerProfile ───────────────────────────────────────────
     builder
       .addCase(updateMyCustomerProfile.pending,    sectionPending('profile'))
       .addCase(updateMyCustomerProfile.fulfilled, (state, { payload }) => {
         state.sectionLoading.profile = false;
-        state.profile          = payload;
-        // Sync promoted fields back to state
+        state.profile           = payload;
         state.chronicConditions = payload.chronicConditions  || state.chronicConditions;
         state.allergies         = payload.allergies          || state.allergies;
         state.preferredLanguage = payload.preferredLanguage  || state.preferredLanguage;
@@ -561,7 +625,7 @@ const customerProfileSlice = createSlice({
       })
       .addCase(updateMyCustomerProfile.rejected, sectionRejected('profile', 'Failed to update profile'));
 
-    // ── 4. KYC ───────────────────────────────────────────────────────────────
+    // ── 2. KYC ───────────────────────────────────────────────────────────────
     builder
       .addCase(uploadKyc.pending,    sectionPending('kyc'))
       .addCase(uploadKyc.fulfilled, (state, { payload }) => {
@@ -588,7 +652,7 @@ const customerProfileSlice = createSlice({
       })
       .addCase(deleteKycByType.rejected, sectionRejected('kyc', 'Failed to delete KYC'));
 
-    // ── 5. Government Schemes ────────────────────────────────────────────────
+    // ── 3. Government Schemes ────────────────────────────────────────────────
     builder
       .addCase(addGovernmentScheme.pending,    sectionPending('schemes'))
       .addCase(addGovernmentScheme.fulfilled, (state, { payload }) => {
@@ -607,7 +671,7 @@ const customerProfileSlice = createSlice({
       })
       .addCase(deleteGovernmentScheme.rejected, sectionRejected('schemes', 'Failed to delete scheme'));
 
-    // ── 6. Private Insurance (NEW) ───────────────────────────────────────────
+    // ── 4. Private Insurance ─────────────────────────────────────────────────
     builder
       .addCase(addPrivateInsurance.pending,    sectionPending('privateInsurances'))
       .addCase(addPrivateInsurance.fulfilled, (state, { payload }) => {
@@ -626,7 +690,7 @@ const customerProfileSlice = createSlice({
       })
       .addCase(deletePrivateInsurance.rejected, sectionRejected('privateInsurances', 'Failed to delete insurance'));
 
-    // ── 7. Medical Timeline ──────────────────────────────────────────────────
+    // ── 5. Medical Timeline ──────────────────────────────────────────────────
     builder
       .addCase(addMedicalEvent.pending,    sectionPending('medicalTimeline'))
       .addCase(addMedicalEvent.fulfilled, (state, { payload }) => {
@@ -654,7 +718,7 @@ const customerProfileSlice = createSlice({
       })
       .addCase(deleteMedicalEvent.rejected, sectionRejected('medicalTimeline', 'Failed to delete medical event'));
 
-    // ── 8. Medicine History ──────────────────────────────────────────────────
+    // ── 6. Medicine History ──────────────────────────────────────────────────
     builder
       .addCase(addMedicine.pending,    sectionPending('medicineHistory'))
       .addCase(addMedicine.fulfilled, (state, { payload }) => {
@@ -682,7 +746,7 @@ const customerProfileSlice = createSlice({
       })
       .addCase(deleteMedicine.rejected, sectionRejected('medicineHistory', 'Failed to delete medicine'));
 
-    // ── 9. Consent (NEW) ─────────────────────────────────────────────────────
+    // ── 7. Consent ───────────────────────────────────────────────────────────
     builder
       .addCase(updateConsent.pending,    sectionPending('consent'))
       .addCase(updateConsent.fulfilled, (state, { payload }) => {
@@ -692,7 +756,31 @@ const customerProfileSlice = createSlice({
       })
       .addCase(updateConsent.rejected, sectionRejected('consent', 'Failed to update consent'));
 
-    // ── 10. Audit Sessions ───────────────────────────────────────────────────
+    // ── 8. Health Snapshot / Vitals Baseline ─────────────────────────────────
+    builder
+      .addCase(fetchSnapshot.pending,    sectionPending('snapshot'))
+      .addCase(fetchSnapshot.fulfilled, (state, { payload }) => {
+        state.sectionLoading.snapshot = false;
+        state.vitalsBaseline    = payload.vitalsBaseline    || null;
+        state.chronicConditions = payload.chronicConditions || [];
+        state.allergies         = payload.allergies         || [];
+        state.preferredLanguage = payload.preferredLanguage || 'English';
+      })
+      .addCase(fetchSnapshot.rejected, sectionRejected('snapshot', 'Failed to fetch snapshot'));
+
+    builder
+      .addCase(updateSnapshot.pending,    sectionPending('snapshot'))
+      .addCase(updateSnapshot.fulfilled, (state, { payload }) => {
+        state.sectionLoading.snapshot = false;
+        if (payload.vitalsBaseline    !== undefined) state.vitalsBaseline    = payload.vitalsBaseline;
+        if (payload.chronicConditions !== undefined) state.chronicConditions = payload.chronicConditions;
+        if (payload.allergies         !== undefined) state.allergies         = payload.allergies;
+        if (payload.preferredLanguage !== undefined) state.preferredLanguage = payload.preferredLanguage;
+        toast.success('Health snapshot updated');
+      })
+      .addCase(updateSnapshot.rejected, sectionRejected('snapshot', 'Failed to update snapshot'));
+
+    // ── 9. Audit Sessions ────────────────────────────────────────────────────
     builder
       .addCase(fetchAuditSessions.pending,    sectionPending('auditSessions'))
       .addCase(fetchAuditSessions.fulfilled, (state, { payload }) => {
@@ -719,7 +807,7 @@ const customerProfileSlice = createSlice({
       })
       .addCase(deleteAllAuditSessions.rejected, sectionRejected('auditSessions', 'Failed to clear sessions'));
 
-    // ── 11. Device Tokens ────────────────────────────────────────────────────
+    // ── 10. Device Tokens ────────────────────────────────────────────────────
     builder
       .addCase(deleteDeviceToken.pending,    sectionPending('deviceTokens'))
       .addCase(deleteDeviceToken.fulfilled, (state, { payload }) => {
@@ -729,7 +817,7 @@ const customerProfileSlice = createSlice({
       })
       .addCase(deleteDeviceToken.rejected, sectionRejected('deviceTokens', 'Failed to remove token'));
 
-    // ── 12. Request Unblock ──────────────────────────────────────────────────
+    // ── 11. Request Unblock ──────────────────────────────────────────────────
     builder
       .addCase(requestUnblock.pending,    sectionPending('unblock'))
       .addCase(requestUnblock.fulfilled, (state, { payload }) => {
@@ -738,7 +826,7 @@ const customerProfileSlice = createSlice({
       })
       .addCase(requestUnblock.rejected, sectionRejected('unblock', 'Failed to submit unblock request'));
 
-    // ── 13. Notifications ────────────────────────────────────────────────────
+    // ── 12. Notifications ────────────────────────────────────────────────────
     builder
       .addCase(fetchNotifications.pending,    sectionPending('notifications'))
       .addCase(fetchNotifications.fulfilled, (state, { payload }) => {
@@ -773,33 +861,7 @@ const customerProfileSlice = createSlice({
         toast.error(payload || 'Could not mark all as read');
       });
 
-    // ── 14. Snapshot / vitalsBaseline ────────────────────────────────────────
-    builder
-      .addCase(fetchSnapshot.pending,    sectionPending('snapshot'))
-      .addCase(fetchSnapshot.fulfilled, (state, { payload }) => {
-        // payload: { vitalsBaseline, chronicConditions, allergies, preferredLanguage, emergencyContact, bloodGroup }
-        state.sectionLoading.snapshot = false;
-        state.vitalsBaseline    = payload.vitalsBaseline    || null;
-        state.chronicConditions = payload.chronicConditions || [];
-        state.allergies         = payload.allergies         || [];
-        state.preferredLanguage = payload.preferredLanguage || 'English';
-      })
-      .addCase(fetchSnapshot.rejected, sectionRejected('snapshot', 'Failed to fetch snapshot'));
-
-    builder
-      .addCase(updateSnapshot.pending,    sectionPending('snapshot'))
-      .addCase(updateSnapshot.fulfilled, (state, { payload }) => {
-        // payload: { vitalsBaseline, chronicConditions, allergies, preferredLanguage }
-        state.sectionLoading.snapshot = false;
-        if (payload.vitalsBaseline    !== undefined) state.vitalsBaseline    = payload.vitalsBaseline;
-        if (payload.chronicConditions !== undefined) state.chronicConditions = payload.chronicConditions;
-        if (payload.allergies         !== undefined) state.allergies         = payload.allergies;
-        if (payload.preferredLanguage !== undefined) state.preferredLanguage = payload.preferredLanguage;
-        toast.success('Health snapshot updated');
-      })
-      .addCase(updateSnapshot.rejected, sectionRejected('snapshot', 'Failed to update snapshot'));
-
-    // ── 15. Prescriptions ────────────────────────────────────────────────────
+    // ── 13. Prescriptions ────────────────────────────────────────────────────
     builder
       .addCase(fetchPrescriptions.pending,    sectionPending('prescriptions'))
       .addCase(fetchPrescriptions.fulfilled, (state, { payload }) => {
@@ -817,7 +879,7 @@ const customerProfileSlice = createSlice({
       })
       .addCase(fetchPrescriptionByRx.rejected, sectionRejected('prescriptions', 'Prescription not found'));
 
-    // ── 16. Reports ──────────────────────────────────────────────────────────
+    // ── 14. Reports ──────────────────────────────────────────────────────────
     builder
       .addCase(fetchReports.pending,    sectionPending('reports'))
       .addCase(fetchReports.fulfilled, (state, { payload }) => {
@@ -850,6 +912,40 @@ const customerProfileSlice = createSlice({
         toast.success('File removed');
       })
       .addCase(deleteReportFile.rejected, sectionRejected('reports', 'Failed to delete file'));
+
+    // ── 15. Care Records ─────────────────────────────────────────────────────
+    builder
+      .addCase(fetchCareRecords.pending,    sectionPending('careRecords'))
+      .addCase(fetchCareRecords.fulfilled, (state, { payload }) => {
+        state.sectionLoading.careRecords = false;
+        state.careRecords     = payload.data;
+        state.careRecordsMeta = { page: payload.page, totalPages: payload.totalPages, total: payload.total };
+      })
+      .addCase(fetchCareRecords.rejected, sectionRejected('careRecords', 'Failed to fetch care records'));
+
+    builder
+      .addCase(fetchCareRecordById.pending,    sectionPending('careRecords'))
+      .addCase(fetchCareRecordById.fulfilled, (state, { payload }) => {
+        state.sectionLoading.careRecords = false;
+        state.activeCareRecord = payload;
+      })
+      .addCase(fetchCareRecordById.rejected, sectionRejected('careRecords', 'Care record not found'));
+
+    builder
+      .addCase(fetchCareRecordByBooking.pending,    sectionPending('careRecords'))
+      .addCase(fetchCareRecordByBooking.fulfilled, (state, { payload }) => {
+        state.sectionLoading.careRecords = false;
+        state.activeCareRecord = payload;
+      })
+      .addCase(fetchCareRecordByBooking.rejected, sectionRejected('careRecords', 'Care record not found for this booking'));
+
+    builder
+      .addCase(fetchCareRecordBookingDocs.pending,    sectionPending('careRecords'))
+      .addCase(fetchCareRecordBookingDocs.fulfilled, (state, { payload }) => {
+        state.sectionLoading.careRecords = false;
+        state.activeCareRecordDocs = payload;
+      })
+      .addCase(fetchCareRecordBookingDocs.rejected, sectionRejected('careRecords', 'Failed to fetch booking documents'));
   },
 });
 
@@ -857,36 +953,40 @@ const customerProfileSlice = createSlice({
 // ACTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const { clearCustomerProfile, decrementUnread, clearError } = customerProfileSlice.actions;
+export const { clearCustomerProfile, decrementUnread, clearError, clearActiveCareRecord } = customerProfileSlice.actions;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SELECTORS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const selectCustomerUser        = (s) => s.customerProfile.user;
-export const selectCustomerProfile     = (s) => s.customerProfile.profile;
-export const selectKyc                 = (s) => s.customerProfile.kyc;
-export const selectGovernmentSchemes   = (s) => s.customerProfile.governmentSchemes;
-export const selectPrivateInsurances   = (s) => s.customerProfile.privateInsurances;   // NEW
-export const selectConsent             = (s) => s.customerProfile.consent;              // NEW
-export const selectMedicalTimeline     = (s) => s.customerProfile.medicalTimeline;
-export const selectMedicineHistory     = (s) => s.customerProfile.medicineHistory;
-export const selectVitalsBaseline      = (s) => s.customerProfile.vitalsBaseline;       // replaces selectSnapshot.vitals
-export const selectChronicConditions   = (s) => s.customerProfile.chronicConditions;    // promoted
-export const selectAllergies           = (s) => s.customerProfile.allergies;            // promoted
-export const selectPreferredLanguage   = (s) => s.customerProfile.preferredLanguage;    // promoted
-export const selectAuditSessions       = (s) => s.customerProfile.auditSessions;
-export const selectDeviceTokens        = (s) => s.customerProfile.deviceTokens;
-export const selectNotifications       = (s) => s.customerProfile.notifications;
-export const selectUnreadCount         = (s) => s.customerProfile.unreadCount;
-export const selectNotifMeta           = (s) => ({ page: s.customerProfile.notifPage, totalPages: s.customerProfile.notifTotalPages, total: s.customerProfile.notifTotal });
-export const selectPrescriptions       = (s) => s.customerProfile.prescriptions;
-export const selectPrescriptionsMeta   = (s) => s.customerProfile.prescriptionsMeta;
-export const selectActivePrescription  = (s) => s.customerProfile.activePrescription;
-export const selectReports             = (s) => s.customerProfile.reports;
-export const selectReportsTotal        = (s) => s.customerProfile.reportsTotal;
-export const selectProfileLoading      = (s) => s.customerProfile.loading;
-export const selectSectionLoading      = (key) => (s) => s.customerProfile.sectionLoading[key];
-export const selectProfileError        = (s) => s.customerProfile.error;
+export const selectCustomerUser         = (s) => s.customerProfile.user;
+export const selectCustomerProfile      = (s) => s.customerProfile.profile;
+export const selectKyc                  = (s) => s.customerProfile.kyc;
+export const selectGovernmentSchemes    = (s) => s.customerProfile.governmentSchemes;
+export const selectPrivateInsurances    = (s) => s.customerProfile.privateInsurances;
+export const selectConsent              = (s) => s.customerProfile.consent;
+export const selectMedicalTimeline      = (s) => s.customerProfile.medicalTimeline;
+export const selectMedicineHistory      = (s) => s.customerProfile.medicineHistory;
+export const selectVitalsBaseline       = (s) => s.customerProfile.vitalsBaseline;
+export const selectChronicConditions    = (s) => s.customerProfile.chronicConditions;
+export const selectAllergies            = (s) => s.customerProfile.allergies;
+export const selectPreferredLanguage    = (s) => s.customerProfile.preferredLanguage;
+export const selectAuditSessions        = (s) => s.customerProfile.auditSessions;
+export const selectDeviceTokens         = (s) => s.customerProfile.deviceTokens;
+export const selectNotifications        = (s) => s.customerProfile.notifications;
+export const selectUnreadCount          = (s) => s.customerProfile.unreadCount;
+export const selectNotifMeta            = (s) => ({ page: s.customerProfile.notifPage, totalPages: s.customerProfile.notifTotalPages, total: s.customerProfile.notifTotal });
+export const selectPrescriptions        = (s) => s.customerProfile.prescriptions;
+export const selectPrescriptionsMeta    = (s) => s.customerProfile.prescriptionsMeta;
+export const selectActivePrescription   = (s) => s.customerProfile.activePrescription;
+export const selectReports              = (s) => s.customerProfile.reports;
+export const selectReportsTotal         = (s) => s.customerProfile.reportsTotal;
+export const selectCareRecords          = (s) => s.customerProfile.careRecords;
+export const selectCareRecordsMeta      = (s) => s.customerProfile.careRecordsMeta;
+export const selectActiveCareRecord     = (s) => s.customerProfile.activeCareRecord;
+export const selectActiveCareRecordDocs = (s) => s.customerProfile.activeCareRecordDocs; // NEW Selector
+export const selectProfileLoading       = (s) => s.customerProfile.loading;
+export const selectSectionLoading       = (key) => (s) => s.customerProfile.sectionLoading[key];
+export const selectProfileError         = (s) => s.customerProfile.error;
 
 export default customerProfileSlice.reducer;

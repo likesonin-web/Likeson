@@ -3,37 +3,6 @@
 /**
  * RideLiveTracking.jsx — Likeson.in
  * Admin/Superadmin real-time ride tracking panel.
- *
- * FIXES this pass:
- * 1. Driver marker icon used `fillColor: 'var(--color-primary, #2563eb)'`.
- * Google Maps renders Symbol icons via its own SVG/canvas pipeline, NOT
- * through the page's CSS engine — `var()` is never resolved there, so
- * the marker rendered with an invalid/default color (effectively
- * black, or in some browsers no icon at all). Replaced with a literal
- * hex constant.
- * 2. Stop markers were created once (`if (!markersRef.current[key])`) and
- * never touched again — if a stop's status changed PENDING -> ARRIVED
- * -> COMPLETED after the marker already existed, the pin color never
- * updated; you'd see a stale amber pin on a stop that's actually been
- * completed an hour ago. Added an update branch that re-syncs the icon
- * fillColor + label on every stops change, not just on first creation.
- * 3. Driver marker rotation was set only at creation time inside the
- * `else` branch — once the marker existed, `setPosition()` updated
- * location but heading never changed again, so the arrow froze facing
- * whatever direction it was first drawn in. Added `setIcon()` with
- * fresh rotation in the position-update branch too.
- * 4. `MapPanel`'s `ride` prop was passed as
- * `tracking?.tracking ? tracking.ride ?? ride : ride` — a redundant,
- * confusing ternary that reduces to the same thing as the simpler
- * `tracking?.ride ?? ride` pattern used everywhere else in this file
- * (TabOverview / TabRoute). Normalized into one `resolvedRide` value
- * reused by all three.
- * 5. Moved `wireRideSocketEvents` import from socketService to rideRequestSlice
- * where it actually resides, resolving the "Export doesn't exist" build error.
- *
- * Props:
- * bookingId: string  — Booking._id
- * rideId:    string  — Ride._id
  */
 
 import React, {
@@ -41,7 +10,6 @@ import React, {
   useRef,
   useState,
   useCallback,
-  useMemo,
 } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -54,67 +22,62 @@ import {
   Users,
   Route,
   Activity,
-  ChevronRight,
   ChevronDown,
   RefreshCw,
   Radio,
   TrendingUp,
   Flag,
-  Zap,
-  Eye,
-  Car,
   UserCheck,
   History,
-  XCircle,
   CheckCircle,
-  Info,
-  ArrowRight,
   Wifi,
   WifiOff,
   LocateFixed,
+  Car,
 } from 'lucide-react';
 
 import API from '@/store/api';
 import socketService, {
   SOCKET_EVENTS,
 } from '@/services/socketService';
+
+// Imports from rideRequestSlice
 import {
   fetchRideTracking,
   fetchRideLive,
-  fetchRideStops,
-  fetchRideParticipants,
-  fetchRideSosEvents,
   socketLocationUpdate,
   socketEtaUpdate,
   socketRideStatusChanged,
   socketCaAtJoinPoint,
   socketCaJoinedRide,
   socketJpWaypointCompleted,
-  socketStopArrived,
-  socketStopDeparted,
   socketOtpResult,
   socketRideAssigned,
   selectCurrentRide,
   selectTrackingData,
-  selectStops,
-  selectParticipants,
-  selectSosEvents,
   selectSocketLive,
   selectRideLoading,
   wireRideSocketEvents,
 } from '@/store/slices/rideRequestSlice';
+
+// Imports from operationsSlice (where stops, participants, and SOS actually live)
 import {
   fetchBookingAssignmentHistory,
   selectBookingAssignmentHistory,
+  fetchRideStops,
+  fetchRideParticipants,
+  fetchBookingSosEvents,
+  selectRideStops,
+  selectRideParticipants,
+  selectBookingSosEvents,
 } from '@/store/slices/operationsSlice';
+
 import { useGoogleMaps } from '@/hooks/useGoogleMaps';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// FIX #1: literal hex — Google Maps Symbol icons render outside the page's
-// CSS cascade, so a CSS custom property here would never resolve.
 const DRIVER_MARKER_COLOR = '#2563eb';
 
 const STATUS_LABELS = {
@@ -163,9 +126,6 @@ const STOP_STATUS_COLORS = {
   MISSED:    'badge-error',
 };
 
-// Hex equivalents of STOP_STATUS_COLORS for the actual map pin fillColor —
-// Google Maps doesn't understand Tailwind/daisyUI class names, only
-// literal color values.
 const STOP_STATUS_PIN_COLOR = {
   PENDING:   '#f59e0b',
   ARRIVED:   '#2563eb',
@@ -343,7 +303,6 @@ function MapPanel({ liveLocation, stops, caLocation, ride }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef({});
-  const polylineRef = useRef(null);
   const { isLoaded, loadError } = useGoogleMaps();
 
   const initMap = useCallback(() => {
@@ -381,9 +340,6 @@ function MapPanel({ liveLocation, stops, caLocation, ride }) {
     const pos = { lat: liveLocation.lat, lng: liveLocation.lng };
     if (markersRef.current.driver) {
       markersRef.current.driver.setPosition(pos);
-      // FIX #3: heading was previously only set at creation — re-apply it
-      // on every position update too, or the arrow freezes facing whatever
-      // direction it first spawned in.
       const icon = markersRef.current.driver.getIcon();
       markersRef.current.driver.setIcon({ ...icon, rotation: liveLocation.heading ?? 0 });
     } else {
@@ -394,7 +350,6 @@ function MapPanel({ liveLocation, stops, caLocation, ride }) {
         icon: {
           path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
           scale: 6,
-          // FIX #1: was 'var(--color-primary, #2563eb)' — invalid outside CSS.
           fillColor: DRIVER_MARKER_COLOR,
           fillOpacity: 1,
           strokeColor: '#fff',
@@ -430,10 +385,7 @@ function MapPanel({ liveLocation, stops, caLocation, ride }) {
     }
   }, [caLocation]);
 
-  // Stop markers — create once, but FIX #2: also re-sync color/label on
-  // every subsequent stops update, since stop.status changes over the
-  // life of the ride (PENDING -> ARRIVED -> COMPLETED/MISSED) and the old
-  // code never touched an already-created marker again.
+  // Stop markers
   useEffect(() => {
     if (!mapInstanceRef.current || !window.google || !stops?.length) return;
     stops.forEach((stop, i) => {
@@ -516,8 +468,7 @@ function TabOverview({ ride, tracking, socketLive, liveLocation }) {
   return (
     <motion.div variants={stagger} initial="hidden" animate="visible" className="flex flex-col gap-4">
 
-      {/* Status bar */}
-      <motion.div variants={fadeInUp} className="card p-4 flex flex-wrap items-center gap-3">
+      <motion.div variants={fadeInUp} className="card p-4 flex max-h-[300px] overflow-y-auto flex-wrap items-center gap-3">
         <StatusBadge status={status} />
         <EtaChip etaMinutes={eta} />
         {tracking?.hasActiveSos && (
@@ -536,7 +487,6 @@ function TabOverview({ ride, tracking, socketLive, liveLocation }) {
         )}
       </motion.div>
 
-      {/* Ride meta */}
       <SectionCard title="Ride Details" icon={Car}>
         <InfoRow label="Ride Code" value={ride?.rideCode} mono />
         <InfoRow label="Type" value={ride?.rideType} />
@@ -548,7 +498,6 @@ function TabOverview({ ride, tracking, socketLive, liveLocation }) {
         <InfoRow label="Dropoff" value={ride?.dropoff?.address ?? fmtCoords(ride?.dropoff?.coordinates)} />
       </SectionCard>
 
-      {/* Timing */}
       <SectionCard title="Timing" icon={Clock} collapsible>
         <InfoRow label="Scheduled" value={fmtDateTime(ride?.scheduledPickupAt)} />
         <InfoRow label="Driver Assigned" value={fmtDateTime(ride?.driverAssignedAt)} />
@@ -558,7 +507,6 @@ function TabOverview({ ride, tracking, socketLive, liveLocation }) {
         <InfoRow label="Completed" value={fmtDateTime(ride?.rideCompletedAt)} />
       </SectionCard>
 
-      {/* Driver snapshot */}
       {ride?.driverSnapshot && (
         <SectionCard title="Driver" icon={UserCheck} collapsible>
           <InfoRow label="Name" value={ride.driverSnapshot.legalName} />
@@ -570,7 +518,6 @@ function TabOverview({ ride, tracking, socketLive, liveLocation }) {
         </SectionCard>
       )}
 
-      {/* Live position */}
       {liveLocation && (
         <SectionCard title="Live Position" icon={Navigation}>
           <InfoRow label="Lat, Lng" value={`${liveLocation.lat?.toFixed(6)}, ${liveLocation.lng?.toFixed(6)}`} mono />
@@ -580,7 +527,6 @@ function TabOverview({ ride, tracking, socketLive, liveLocation }) {
         </SectionCard>
       )}
 
-      {/* Tracking summary */}
       {tracking?.summary?.isCompleted && (
         <SectionCard title="Summary" icon={TrendingUp}>
           <InfoRow label="Total Distance" value={`${tracking.summary.totalDistanceKm ?? '—'} km`} />
@@ -614,7 +560,6 @@ function TabStops({ stops }) {
       {stops.map((stop, i) => (
         <motion.div key={stop._id ?? i} variants={fadeInUp} className="card p-4">
           <div className="flex items-start gap-3">
-            {/* Sequence dot */}
             <div className="flex flex-col items-center gap-1 pt-0.5">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
                 ${stop.status === 'COMPLETED' ? 'bg-success text-success-content'
@@ -927,9 +872,9 @@ export default function RideLiveTracking({ bookingId, rideId }) {
   // Redux state
   const ride         = useSelector(selectCurrentRide);
   const tracking     = useSelector(selectTrackingData);
-  const stops        = useSelector(selectStops);
-  const participants = useSelector(selectParticipants);
-  const sosEvents    = useSelector(selectSosEvents);
+  const stops        = useSelector(selectRideStops);
+  const participants = useSelector(selectRideParticipants);
+  const sosEvents    = useSelector(selectBookingSosEvents);
   const socketLive   = useSelector(selectSocketLive);
   const loading      = useSelector(selectRideLoading);
   const assignmentHistory = useSelector(selectBookingAssignmentHistory);
@@ -954,9 +899,9 @@ export default function RideLiveTracking({ bookingId, rideId }) {
     if (!rideId) return;
     await Promise.all([
       dispatch(fetchRideTracking({ rideId, breadcrumbs: 100 })),
-      dispatch(fetchRideStops(rideId)),
-      dispatch(fetchRideParticipants(rideId)),
-      dispatch(fetchRideSosEvents(rideId)),
+      dispatch(fetchRideStops({ rideId })),
+      dispatch(fetchRideParticipants({ rideId })),
+      dispatch(fetchBookingSosEvents({ bookingId })),
       dispatch(fetchBookingAssignmentHistory({ bookingId })),
     ]);
     // Fetch active route version separately
@@ -1009,15 +954,13 @@ export default function RideLiveTracking({ bookingId, rideId }) {
       pushEvent(`status→${d?.status}`);
     });
 
-    on(SOCKET_EVENTS.STOP_ARRIVED, (d) => {
-      dispatch(socketStopArrived(d));
-      dispatch(fetchRideStops(rideId));
+    on(SOCKET_EVENTS.STOP_ARRIVED, () => {
+      dispatch(fetchRideStops({ rideId }));
       pushEvent('stop_arrived');
     });
 
-    on(SOCKET_EVENTS.STOP_DEPARTED, (d) => {
-      dispatch(socketStopDeparted(d));
-      dispatch(fetchRideStops(rideId));
+    on(SOCKET_EVENTS.STOP_DEPARTED, () => {
+      dispatch(fetchRideStops({ rideId }));
       pushEvent('stop_departed');
     });
 
@@ -1028,28 +971,28 @@ export default function RideLiveTracking({ bookingId, rideId }) {
 
     on(SOCKET_EVENTS.CARE_ASSISTANT_JOINED_RIDE, (d) => {
       dispatch(socketCaJoinedRide(d));
-      dispatch(fetchRideParticipants(rideId));
+      dispatch(fetchRideParticipants({ rideId }));
       pushEvent('ca_joined_ride');
     });
 
     on(SOCKET_EVENTS.CA_JOIN_WAYPOINT_COMPLETED, (d) => {
       dispatch(socketJpWaypointCompleted(d));
-      dispatch(fetchRideStops(rideId));
+      dispatch(fetchRideStops({ rideId }));
       pushEvent('jp_completed');
     });
 
     on(SOCKET_EVENTS.SOS_TRIGGERED, () => {
-      dispatch(fetchRideSosEvents(rideId));
+      dispatch(fetchBookingSosEvents({ bookingId }));
       pushEvent('sos_triggered');
     });
 
     on(SOCKET_EVENTS.SOS_RESOLVED, () => {
-      dispatch(fetchRideSosEvents(rideId));
+      dispatch(fetchBookingSosEvents({ bookingId }));
       pushEvent('sos_resolved');
     });
 
     on(SOCKET_EVENTS.PARTICIPANT_ASSIGNED, () => {
-      dispatch(fetchRideParticipants(rideId));
+      dispatch(fetchRideParticipants({ rideId }));
       dispatch(fetchBookingAssignmentHistory({ bookingId }));
       pushEvent('participant_assigned');
     });
@@ -1063,7 +1006,7 @@ export default function RideLiveTracking({ bookingId, rideId }) {
     });
 
     on(SOCKET_EVENTS.JOIN_POINT_RECALCULATED, () => {
-      dispatch(fetchRideStops(rideId));
+      dispatch(fetchRideStops({ rideId }));
       pushEvent('jp_recalculated');
     });
 
@@ -1090,13 +1033,8 @@ export default function RideLiveTracking({ bookingId, rideId }) {
 
   // Derived
   const liveLocation = socketLive?.liveLocation;
-  const activeSosCount = sosEvents.filter(e => !e.isResolved).length;
+  const activeSosCount = (sosEvents || []).filter(e => !e.isResolved).length;
   const milestones = tracking?.tracking?.milestones ?? tracking?.milestones ?? [];
-  // FIX #4: normalized to a single `resolvedRide` value used by MapPanel,
-  // TabOverview, and anywhere else — old code had a redundant
-  // `tracking?.tracking ? tracking.ride ?? ride : ride` ternary in the
-  // MapPanel call that reduced to the same thing as `tracking?.ride ?? ride`
-  // used elsewhere, just written differently and confusingly.
   const resolvedRide = tracking?.ride ?? ride;
 
   const isLoading = loading?.tracking || loading?.fetchRide;
@@ -1113,7 +1051,7 @@ export default function RideLiveTracking({ bookingId, rideId }) {
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full">
+    <div className="flex flex-col gap-4 w-full max-h-[85vh] overflow-y-auto overflow-x-hidden scrollbar-thin pr-2 pb-2">
 
       {/* ── Header ── */}
       <motion.div
@@ -1162,7 +1100,7 @@ export default function RideLiveTracking({ bookingId, rideId }) {
       {/* ── Map ── */}
       <MapPanel
         liveLocation={liveLocation}
-        stops={stops}
+        stops={stops || []}
         caLocation={caLocation}
         ride={resolvedRide}
       />
@@ -1171,17 +1109,16 @@ export default function RideLiveTracking({ bookingId, rideId }) {
       <LiveEventFeed events={liveEvents} />
 
       {/* ── Tab nav ── */}
-      <div className="flex gap-1 overflow-x-auto scrollbar-thin pb-1">
+      <div className="flex gap-2 overflow-x-auto overflow-y-hidden pb-10 scrollbar-thin py-2 px-1">
         {PANEL_TABS.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
-          const hasBadge =
-            (tab.id === 'sos' && activeSosCount > 0);
+          const hasBadge = (tab.id === 'sos' && activeSosCount > 0);
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all
+              className={`flex items-center gap-1.5 px-3 py-1.5 h-8 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shrink-0
                 ${isActive
                   ? 'bg-primary text-primary-content shadow-primary'
                   : 'bg-base-200 text-base-content/60 hover:text-primary hover:bg-primary/10'}`}
@@ -1215,10 +1152,10 @@ export default function RideLiveTracking({ bookingId, rideId }) {
               liveLocation={liveLocation}
             />
           )}
-          {activeTab === 'stops' && <TabStops stops={stops} />}
-          {activeTab === 'participants' && <TabParticipants participants={participants} />}
-          {activeTab === 'sos' && <TabSos sosEvents={sosEvents} />}
-          {activeTab === 'history' && <TabHistory assignmentHistory={assignmentHistory} />}
+          {activeTab === 'stops' && <TabStops stops={stops || []} />}
+          {activeTab === 'participants' && <TabParticipants participants={participants || []} />}
+          {activeTab === 'sos' && <TabSos sosEvents={sosEvents || []} />}
+          {activeTab === 'history' && <TabHistory assignmentHistory={assignmentHistory || []} />}
           {activeTab === 'route' && (
             <TabRoute
               tracking={tracking?.tracking ?? tracking}

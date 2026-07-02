@@ -1,14 +1,11 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * LAB PARTNER COMPLETE ROUTER — Likeson.in
+ * LAB PARTNER ROUTER — Likeson.in (CORRECTED)
  *
- * Four role groups:
- *  1. PUBLIC          — no auth required (browse labs, tests, packages)
- *  2. CUSTOMER        — authenticated customers (book, review, track)
- *  3. LAB PARTNER     — the lab itself (view own profile, manage tests/packages,
- *                       view own bookings, update bank details, settings, security)
- *  4. ADMIN / SUPERADMIN — full control (create, approve, suspend, fee overrides,
- *                           verify docs, manage reviews)
+ * Role groups (customer group removed per request):
+ *  1. PUBLIC          — no auth required (browse labs, tests, packages, search)
+ *  2. LAB PARTNER     — manage own profile/tests/packages/settings/security
+ *  3. ADMIN / SUPERADMIN — full control
  *
  * Mount at:  app.use('/api/labs', labRouter);
  * ═══════════════════════════════════════════════════════════════════════════════
@@ -352,6 +349,94 @@ router.get(
 );
 
 /**
+ * GET /api/labs/public/search
+ * Unified public lab + test search. No auth required.
+ * Uses the text index defined on LabPartnerProfile
+ * (labTests.testName, labName, tags, labPackages.packageName)
+ * with a regex fallback for partial / short queries, plus
+ * optional testName / city / geo filters — same capability the
+ * old authenticated "customer/search" route had, now public.
+ *
+ * Query: q, testName, city, lat, lng, radiusKm, page, limit
+ */
+router.get(
+  '/public/search',
+  asyncHandler(async (req, res) => {
+    const {
+      q, testName, city,
+      lat, lng, radiusKm = 10,
+      page = 1, limit = 20,
+    } = req.query;
+
+    const filter = { status: 'approved', isActive: true };
+
+    if (q) {
+      filter.$or = [
+        { $text: { $search: q } },
+        { labName: { $regex: q, $options: 'i' } },
+        { tags:    { $regex: q, $options: 'i' } },
+        { 'labTests.testName':      { $regex: q, $options: 'i' } },
+        { 'labPackages.packageName': { $regex: q, $options: 'i' } },
+      ];
+    }
+
+    if (testName) {
+      filter.labTests = {
+        $elemMatch: { testName: { $regex: testName, $options: 'i' }, isActive: true },
+      };
+    }
+
+    if (city) filter['registeredAddress.city'] = { $regex: city, $options: 'i' };
+
+    if (lat && lng) {
+      filter['registeredAddress.location'] = {
+        $near: {
+          $geometry:    { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
+          $maxDistance: parseFloat(radiusKm) * 1000,
+        },
+      };
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [labs, total] = await Promise.all([
+      LabPartnerProfile.find(filter)
+        .select(
+          'labName labCode labType logoUrl registeredAddress averageRating totalReviews ' +
+          'sampleCollectionMode homeCollectionRadius homeCollectionFee labTests labPackages ' +
+          'isVerified tags'
+        )
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      LabPartnerProfile.countDocuments(filter),
+    ]);
+
+    // strip partnerPrice from nested arrays before sending to public
+    const sanitized = labs.map((lab) => ({
+      ...lab,
+      labTests: (lab.labTests ?? [])
+        .filter((t) => t.isActive)
+        .map(({ partnerPrice: _p, ...t }) => t),
+      labPackages: (lab.labPackages ?? [])
+        .filter((p) => p.isActive)
+        .map(({ partnerPrice: _p, ...p }) => p),
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: sanitized,
+      pagination: {
+        total,
+        page:       Number(page),
+        limit:      Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    });
+  })
+);
+
+/**
  * GET /api/labs/public/featured
  * Featured labs only. Cached 300 s.
  */
@@ -382,12 +467,20 @@ router.get(
   '/public/:id',
   cache(60, (req) => `lab:${req.params.id}:public`),
   asyncHandler(async (req, res) => {
+    // 1. Validate ObjectId to prevent CastError before querying
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+       return res.status(404).json({ success: false, message: 'Invalid Lab ID format.' });
+    }
+
     const lab = await LabPartnerProfile.findOne({
       _id:      req.params.id,
       status:   'approved',
       isActive: true,
     })
-      .select('-user -bankDetails -complianceDocs -statusLog -createdBy -updatedBy -platformFee')
+      // 2. Explicitly exclude the sensitive sub-fields. 
+      // Do not just select -bankDetails; target the fields individually if needed, 
+      // or ensure the exclusion is clear.
+      .select('-user -bankDetails.accountNumber -complianceDocs -statusLog -createdBy -updatedBy -platformFee')
       .lean({ virtuals: true });
 
     if (!lab) {
@@ -419,13 +512,12 @@ router.get(
     if (category) tests = tests.filter((t) => t.category?.toLowerCase() === category.toLowerCase());
     if (search)   tests = tests.filter((t) => t.testName?.toLowerCase().includes(search.toLowerCase()));
 
-   // replace return line:
-return res.status(200).json({
-  success: true,
-  labName: lab.labName,
-  total:   tests.length,
-  data:    tests.map(({ partnerPrice: _, ...t }) => t),  // strip partner price
-});
+    return res.status(200).json({
+      success: true,
+      labName: lab.labName,
+      total:   tests.length,
+      data:    tests.map(({ partnerPrice: _, ...t }) => t),  // strip partner price
+    });
   })
 );
 
@@ -443,7 +535,10 @@ router.get(
 
     if (!lab) return res.status(404).json({ success: false, message: 'Lab not found.' });
 
-    const activePackages = lab.labPackages.filter((p) => p.isActive);
+    const activePackages = lab.labPackages
+      .filter((p) => p.isActive)
+      .map(({ partnerPrice: _p, ...p }) => p); // strip partner price for public
+
     return res.status(200).json({
       success: true,
       labName: lab.labName,
@@ -487,128 +582,6 @@ router.get(
         totalPages: Math.ceil(visible.length / Number(limit)),
       },
     });
-  })
-);
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  CUSTOMER ROUTES
-// ═════════════════════════════════════════════════════════════════════════════
-
-/**
- * POST /api/labs/customer/:id/reviews
- * Submit a review for a lab after a completed booking.
- */
-router.post(
-  '/customer/:id/reviews',
-  protect,
-  authorize('customer'),
-  asyncHandler(async (req, res) => {
-    const { rating, comment } = req.body;
-
-    if (!rating || Number(rating) < 1 || Number(rating) > 5) {
-      return res.status(400).json({ success: false, message: 'rating must be between 1 and 5.' });
-    }
-
-    const lab = await LabPartnerProfile.findOne({
-      _id: req.params.id, status: 'approved', isActive: true,
-    });
-    if (!lab) return res.status(404).json({ success: false, message: 'Lab not found.' });
-
-    const alreadyReviewed = lab.reviews.some(
-      (r) => r.user.toString() === req.user._id.toString()
-    );
-    if (alreadyReviewed) {
-      return res.status(409).json({ success: false, message: 'You have already reviewed this lab.' });
-    }
-
-    lab.reviews.push({
-      user:      req.user._id,
-      rating:    Number(rating),
-      comment:   comment?.trim(),
-      isVisible: true,
-    });
-
-    await lab.save();
-
-    await invalidateKeys([
-      `lab:${lab._id}:public`,
-      `GET:/api/labs/public/${lab._id}`,
-    ]);
-
-    return res.status(201).json({
-      success:       true,
-      message:       'Review submitted. Thank you!',
-      averageRating: lab.averageRating,
-      totalReviews:  lab.totalReviews,
-    });
-  })
-);
-
-/**
- * GET /api/labs/customer/search
- * Customer-facing lab + test search.
- */
-router.get(
-  '/customer/search',
-  protect,
-  authorize('customer'),
-  asyncHandler(async (req, res) => {
-    const { testName, city, lat, lng, radiusKm = 10 } = req.query;
-
-    const filter = { status: 'approved', isActive: true };
-
-    if (testName) {
-      filter['labTests'] = {
-        $elemMatch: {
-          testName: { $regex: testName, $options: 'i' },
-          isActive: true,
-        },
-      };
-    }
-    if (city) filter['registeredAddress.city'] = { $regex: city, $options: 'i' };
-    if (lat && lng) {
-      filter['registeredAddress.location'] = {
-        $near: {
-          $geometry:    { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
-          $maxDistance: parseFloat(radiusKm) * 1000,
-        },
-      };
-    }
-
-    const labs = await LabPartnerProfile.find(filter)
-      .select(
-        'labName labCode labType logoUrl registeredAddress averageRating totalReviews ' +
-        'sampleCollectionMode homeCollectionRadius homeCollectionFee labTests isVerified tags'
-      )
-      .limit(30)
-      .lean();
-
-    return res.status(200).json({ success: true, total: labs.length, data: labs });
-  })
-);
-
-/**
- * GET /api/labs/customer/:id
- * Authenticated customer detail view.
- */
-router.get(
-  '/customer/:id',
-  protect,
-  authorize('customer'),
-  asyncHandler(async (req, res) => {
-    const lab = await LabPartnerProfile.findOne({
-      _id: req.params.id, status: 'approved', isActive: true,
-    })
-      .select('-user -complianceDocs -statusLog -createdBy -updatedBy -platformFee')
-      .lean({ virtuals: true });
-
-    if (!lab) return res.status(404).json({ success: false, message: 'Lab not found.' });
-
-    // Strip bankDetails in JS after query — avoids Mongoose path collision
-    // caused by bankDetails.accountNumber having select:false in the schema
-    delete lab.bankDetails;
-
-    return res.status(200).json({ success: true, data: lab });
   })
 );
 
@@ -781,11 +754,14 @@ router.post(
   asyncHandler(async (req, res) => {
     const lab = req.lab;
 
- const { testCode, testName, category, sampleType,
-  turnaroundHours, mrpPrice, partnerPrice, discountedPrice, homeCollectionAvailable } = req.body;
+    const { testCode, testName, category, sampleType,
+      turnaroundHours, mrpPrice, partnerPrice, discountedPrice, homeCollectionAvailable } = req.body;
 
-    if (!testName || mrpPrice == null) {
-      return res.status(400).json({ success: false, message: 'testName and mrpPrice are required.' });
+    if (!testName || mrpPrice == null || partnerPrice == null) {
+      return res.status(400).json({
+        success: false,
+        message: 'testName, mrpPrice and partnerPrice are required.',
+      });
     }
 
     let reportTemplateUrl;
@@ -799,7 +775,7 @@ router.post(
       testCode, testName, category, sampleType,
       turnaroundHours:        turnaroundHours ? Number(turnaroundHours) : undefined,
       mrpPrice:               Number(mrpPrice),
-      partnerPrice:           partnerPrice    ? Number(partnerPrice)    : undefined,
+      partnerPrice:           Number(partnerPrice),
       homeCollectionAvailable: homeCollectionAvailable === 'true',
       discountedPrice: discountedPrice ? Number(discountedPrice) : undefined,
       reportTemplateUrl,
@@ -835,8 +811,8 @@ router.patch(
 
     // Partners can update description-level fields; price changes flagged for admin review
     [
-     'testCode', 'testName', 'category', 'sampleType',
-'turnaroundHours', 'mrpPrice', 'discountedPrice', 'partnerPrice', 'homeCollectionAvailable',
+      'testCode', 'testName', 'category', 'sampleType',
+      'turnaroundHours', 'mrpPrice', 'discountedPrice', 'partnerPrice', 'homeCollectionAvailable',
     ].forEach((f) => { if (req.body[f] !== undefined) test[f] = req.body[f]; });
 
     // Partners can toggle their own tests active/inactive
@@ -910,15 +886,19 @@ router.post(
   attachLabProfile,
   asyncHandler(async (req, res) => {
     const lab = req.lab;
-    const { packageCode, packageName, description, tests, mrpPrice, partnerPrice, validUntil } = req.body;
+    const { packageCode, packageName, panelType, description, tests, mrpPrice, partnerPrice, validUntil } = req.body;
 
-    if (!packageName || mrpPrice == null) {
-      return res.status(400).json({ success: false, message: 'packageName and mrpPrice are required.' });
+    if (!packageName || !panelType || mrpPrice == null) {
+      return res.status(400).json({
+        success: false,
+        message: 'packageName, panelType and mrpPrice are required.',
+      });
     }
 
     lab.labPackages.push({
       packageCode,
       packageName,
+      panelType,
       description,
       tests:        parseJSON(tests) ?? [],
       mrpPrice:     Number(mrpPrice),
@@ -954,7 +934,7 @@ router.patch(
     if (!pkg) return res.status(404).json({ success: false, message: 'Package not found.' });
 
     [
-      'packageCode', 'packageName', 'description',
+      'packageCode', 'packageName', 'panelType', 'description',
       'mrpPrice', 'partnerPrice', 'validUntil', 'isActive',
     ].forEach((f) => { if (req.body[f] !== undefined) pkg[f] = req.body[f]; });
 
@@ -1150,11 +1130,6 @@ router.get(
 //  LAB PARTNER — SETTINGS
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * GET /api/labs/partner/me/settings
- * Retrieve all configurable settings for the lab partner.
- * Returns operational preferences, notification prefs, display settings.
- */
 router.get(
   '/partner/me/settings',
   protect,
@@ -1170,7 +1145,6 @@ router.get(
       )
       .lean();
 
-    // Build a structured settings payload
     const settings = {
       operational: {
         sampleCollectionMode: lab.sampleCollectionMode,
@@ -1192,7 +1166,6 @@ router.get(
         isFeatured: lab.isFeatured,
         isVerified: lab.isVerified,
       },
-      // Stored on the lab doc as lab.settings (extend schema if not present)
       notifications: lab.notificationPreferences ?? {
         emailOnNewBooking:     true,
         emailOnCancellation:   true,
@@ -1206,10 +1179,6 @@ router.get(
   })
 );
 
-/**
- * PATCH /api/labs/partner/me/settings/operational
- * Update operational settings: collection mode, radius, fee, TAT, report modes, timing.
- */
 router.patch(
   '/partner/me/settings/operational',
   protect,
@@ -1253,10 +1222,6 @@ router.patch(
   })
 );
 
-/**
- * PATCH /api/labs/partner/me/settings/display
- * Update display settings: description, website URL, tags.
- */
 router.patch(
   '/partner/me/settings/display',
   protect,
@@ -1285,12 +1250,6 @@ router.patch(
   })
 );
 
-/**
- * PATCH /api/labs/partner/me/settings/notifications
- * Update notification preferences.
- * Body: { emailOnNewBooking, emailOnCancellation, emailOnReview, emailOnStatusChange, smsOnNewBooking }
- * NOTE: Add notificationPreferences field to LabPartnerProfile schema if not present.
- */
 router.patch(
   '/partner/me/settings/notifications',
   protect,
@@ -1304,7 +1263,6 @@ router.patch(
       'emailOnReview', 'emailOnStatusChange', 'smsOnNewBooking',
     ];
 
-    // Initialise if not set
     if (!lab.notificationPreferences) {
       lab.notificationPreferences = {};
     }
@@ -1327,11 +1285,6 @@ router.patch(
   })
 );
 
-/**
- * PATCH /api/labs/partner/me/settings/contact-persons
- * Update the list of contact persons (Lab Director, Ops Head, etc.).
- * Body: { contactPersons: [...] }
- */
 router.patch(
   '/partner/me/settings/contact-persons',
   protect,
@@ -1357,11 +1310,6 @@ router.patch(
   })
 );
 
-/**
- * PATCH /api/labs/partner/me/settings/timing
- * Update lab operating hours.
- * Body: { timing: [{ day, openTime, closeTime, isClosed }] }
- */
 router.patch(
   '/partner/me/settings/timing',
   protect,
@@ -1388,10 +1336,6 @@ router.patch(
   })
 );
 
-/**
- * PATCH /api/labs/partner/me/settings/images
- * Update lab logo and cover image.
- */
 router.patch(
   '/partner/me/settings/images',
   protect,
@@ -1438,10 +1382,6 @@ router.patch(
 //  LAB PARTNER — SECURITY
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * PATCH /api/labs/partner/me/change-password
- * Lab partner changes their own account password.
- */
 router.patch(
   '/partner/me/change-password',
   protect,
@@ -1472,7 +1412,6 @@ router.patch(
     user.passwordChangedAt = new Date();
     await user.save();
 
-    // Send security alert email
     try {
       await sendEmail({
         email:   user.email,
@@ -1501,11 +1440,6 @@ router.patch(
   })
 );
 
-/**
- * POST /api/labs/partner/me/security/request-email-change
- * Lab partner requests email change — sends OTP to current email for verification.
- * Body: { newEmail }
- */
 router.post(
   '/partner/me/security/request-email-change',
   protect,
@@ -1525,7 +1459,7 @@ router.post(
     const user = await User.findById(req.user._id);
     const otp  = generateOTP();
     user.otp        = await bcrypt.hash(otp, 10);
-    user.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+    user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
     try {
@@ -1552,11 +1486,6 @@ router.post(
   })
 );
 
-/**
- * PATCH /api/labs/partner/me/security/confirm-email-change
- * Confirm the email change with OTP.
- * Body: { newEmail, otp }
- */
 router.patch(
   '/partner/me/security/confirm-email-change',
   protect,
@@ -1587,7 +1516,7 @@ router.patch(
     user.email      = newEmail.toLowerCase().trim();
     user.otp        = undefined;
     user.otpExpires = undefined;
-    user.isEmailVerified = false; // require re-verification
+    user.isEmailVerified = false;
     await user.save();
 
     try {
@@ -1622,10 +1551,6 @@ router.patch(
   })
 );
 
-/**
- * GET /api/labs/partner/me/security/sessions
- * View all active sessions for the lab partner account.
- */
 router.get(
   '/partner/me/security/sessions',
   protect,
@@ -1641,10 +1566,6 @@ router.get(
   })
 );
 
-/**
- * DELETE /api/labs/partner/me/security/sessions/:sessionId
- * Revoke a specific session (force logout on that device).
- */
 router.delete(
   '/partner/me/security/sessions/:sessionId',
   protect,
@@ -1661,7 +1582,6 @@ router.delete(
       return res.status(404).json({ success: false, message: 'Session not found.' });
     }
 
-    // Remove associated device token if any
     if (session.deviceTokenId) {
       user.deviceTokens = user.deviceTokens.filter(
         (t) => t._id.toString() !== session.deviceTokenId.toString()
@@ -1686,10 +1606,6 @@ router.delete(
   })
 );
 
-/**
- * DELETE /api/labs/partner/me/security/sessions
- * Revoke ALL sessions except the current one (global logout from other devices).
- */
 router.delete(
   '/partner/me/security/sessions',
   protect,
@@ -1699,7 +1615,6 @@ router.delete(
 
     const currentSessionId = req.user.sessionId;
 
-    // Keep only current session; remove device tokens of revoked sessions
     const revokedSessions = (user.auditSessions ?? []).filter(
       (s) => s._id.toString() !== currentSessionId
     );
@@ -1731,10 +1646,6 @@ router.delete(
   })
 );
 
-/**
- * GET /api/labs/partner/me/security/login-history
- * View recent login history (last 20 audit sessions).
- */
 router.get(
   '/partner/me/security/login-history',
   protect,
@@ -1760,10 +1671,6 @@ router.get(
   })
 );
 
-/**
- * POST /api/labs/partner/me/security/send-verification-otp
- * Send email verification OTP to the lab partner's current email.
- */
 router.post(
   '/partner/me/security/send-verification-otp',
   protect,
@@ -1801,11 +1708,6 @@ router.post(
   })
 );
 
-/**
- * POST /api/labs/partner/me/security/verify-email
- * Verify email with OTP.
- * Body: { otp }
- */
 router.post(
   '/partner/me/security/verify-email',
   protect,
@@ -1836,11 +1738,6 @@ router.post(
 //  LAB PARTNER — NOTIFICATIONS
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * GET /api/labs/partner/me/notifications
- * Fetch paginated notifications for the lab partner.
- * Query: page, limit, isRead, type
- */
 router.get(
   '/partner/me/notifications',
   protect,
@@ -1883,10 +1780,6 @@ router.get(
   })
 );
 
-/**
- * PATCH /api/labs/partner/me/notifications/:notificationId/read
- * Mark a single notification as read.
- */
 router.patch(
   '/partner/me/notifications/:notificationId/read',
   protect,
@@ -1906,10 +1799,6 @@ router.patch(
   })
 );
 
-/**
- * PATCH /api/labs/partner/me/notifications/read-all
- * Mark all notifications as read.
- */
 router.patch(
   '/partner/me/notifications/read-all',
   protect,
@@ -1927,10 +1816,6 @@ router.patch(
   })
 );
 
-/**
- * DELETE /api/labs/partner/me/notifications/:notificationId
- * Delete a single notification.
- */
 router.delete(
   '/partner/me/notifications/:notificationId',
   protect,
@@ -1949,11 +1834,6 @@ router.delete(
   })
 );
 
-/**
- * DELETE /api/labs/partner/me/notifications
- * Clear all notifications (or all read ones).
- * Query: ?readOnly=true — only deletes read notifications.
- */
 router.delete(
   '/partner/me/notifications',
   protect,
@@ -1975,11 +1855,6 @@ router.delete(
 //  LAB PARTNER — DASHBOARD & ANALYTICS
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * GET /api/labs/partner/me/dashboard
- * High-level dashboard stats for the lab partner.
- * Returns counts of active tests, packages, recent reviews, account status.
- */
 router.get(
   '/partner/me/dashboard',
   protect,
@@ -2041,10 +1916,6 @@ router.get(
   })
 );
 
-/**
- * GET /api/labs/partner/me/analytics/reviews
- * Review analytics — rating breakdown, trend over last 6 months.
- */
 router.get(
   '/partner/me/analytics/reviews',
   protect,
@@ -2057,11 +1928,9 @@ router.get(
 
     const visible = lab.reviews.filter((r) => r.isVisible);
 
-    // Rating distribution 1–5
     const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     visible.forEach((r) => { distribution[Math.round(r.rating)]++; });
 
-    // Monthly trend (last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
@@ -2098,10 +1967,6 @@ router.get(
 //  Role: admin | superadmin
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * POST /api/labs/admin
- * Create a new lab partner: User account + LabPartnerProfile in one shot.
- */
 router.post(
   '/admin',
   protect,
@@ -2237,10 +2102,6 @@ router.post(
   })
 );
 
-/**
- * GET /api/labs/admin
- * List all labs with pagination, search, filters.
- */
 router.get(
   '/admin',
   protect,
@@ -2295,10 +2156,6 @@ router.get(
   })
 );
 
-/**
- * GET /api/labs/admin/:id
- * Full lab detail for admin.
- */
 router.get(
   '/admin/:id',
   protect,
@@ -2316,10 +2173,6 @@ router.get(
   })
 );
 
-/**
- * PATCH /api/labs/admin/:id
- * Admin updates any lab field.
- */
 router.patch(
   '/admin/:id',
   protect,
@@ -2368,10 +2221,6 @@ router.patch(
   })
 );
 
-/**
- * PATCH /api/labs/admin/:id/status
- * Change lab status (approve/suspend/reject/reactivate/deactivate/under_review).
- */
 router.patch(
   '/admin/:id/status',
   protect,
@@ -2502,7 +2351,6 @@ router.patch(
       console.error('[Lab Status Email] Failed:', err.message);
     }
 
-    // Create in-app notification for the lab partner
     try {
       await Notification.create({
         recipient:   lab.user._id,
@@ -2537,10 +2385,6 @@ router.patch(
   })
 );
 
-/**
- * PATCH /api/labs/admin/:id/platform-fee
- * Set a lab-level platform fee override.
- */
 router.patch(
   '/admin/:id/platform-fee',
   protect,
@@ -2572,10 +2416,6 @@ router.patch(
   })
 );
 
-/**
- * DELETE /api/labs/admin/:id/platform-fee
- * Remove lab-level fee override → falls back to global config.
- */
 router.delete(
   '/admin/:id/platform-fee',
   protect,
@@ -2599,9 +2439,6 @@ router.delete(
 
 // ── Tests (Admin) ─────────────────────────────────────────────────────────────
 
-/**
- * POST /api/labs/admin/:id/tests
- */
 router.post(
   '/admin/:id/tests',
   protect,
@@ -2616,8 +2453,11 @@ router.post(
       turnaroundHours, mrpPrice, partnerPrice, homeCollectionAvailable,
     } = req.body;
 
-    if (!testName || mrpPrice == null) {
-      return res.status(400).json({ success: false, message: 'testName and mrpPrice are required.' });
+    if (!testName || mrpPrice == null || partnerPrice == null) {
+      return res.status(400).json({
+        success: false,
+        message: 'testName, mrpPrice and partnerPrice are required.',
+      });
     }
 
     let reportTemplateUrl;
@@ -2631,7 +2471,7 @@ router.post(
       testCode, testName, category, sampleType,
       turnaroundHours:        turnaroundHours ? Number(turnaroundHours) : undefined,
       mrpPrice:               Number(mrpPrice),
-      partnerPrice:           partnerPrice    ? Number(partnerPrice)    : undefined,
+      partnerPrice:           Number(partnerPrice),
       homeCollectionAvailable: homeCollectionAvailable === 'true',
       reportTemplateUrl,
       isActive: true,
@@ -2649,9 +2489,6 @@ router.post(
   })
 );
 
-/**
- * PATCH /api/labs/admin/:id/tests/:testId
- */
 router.patch(
   '/admin/:id/tests/:testId',
   protect,
@@ -2684,9 +2521,6 @@ router.patch(
   })
 );
 
-/**
- * DELETE /api/labs/admin/:id/tests/:testId  (soft delete)
- */
 router.delete(
   '/admin/:id/tests/:testId',
   protect,
@@ -2709,9 +2543,6 @@ router.delete(
 
 // ── Packages (Admin) ──────────────────────────────────────────────────────────
 
-/**
- * POST /api/labs/admin/:id/packages
- */
 router.post(
   '/admin/:id/packages',
   protect,
@@ -2720,15 +2551,19 @@ router.post(
     const lab = await LabPartnerProfile.findById(req.params.id);
     if (!lab) return res.status(404).json({ success: false, message: 'Lab not found.' });
 
-    const { packageCode, packageName, description, tests, mrpPrice, partnerPrice, validUntil } = req.body;
+    const { packageCode, packageName, panelType, description, tests, mrpPrice, partnerPrice, validUntil } = req.body;
 
-    if (!packageName || mrpPrice == null) {
-      return res.status(400).json({ success: false, message: 'packageName and mrpPrice are required.' });
+    if (!packageName || !panelType || mrpPrice == null) {
+      return res.status(400).json({
+        success: false,
+        message: 'packageName, panelType and mrpPrice are required.',
+      });
     }
 
     lab.labPackages.push({
       packageCode,
       packageName,
+      panelType,
       description,
       tests:        parseJSON(tests) ?? [],
       mrpPrice:     Number(mrpPrice),
@@ -2749,9 +2584,6 @@ router.post(
   })
 );
 
-/**
- * PATCH /api/labs/admin/:id/packages/:pkgId
- */
 router.patch(
   '/admin/:id/packages/:pkgId',
   protect,
@@ -2764,7 +2596,7 @@ router.patch(
     if (!pkg) return res.status(404).json({ success: false, message: 'Package not found.' });
 
     [
-      'packageCode', 'packageName', 'description',
+      'packageCode', 'packageName', 'panelType', 'description',
       'mrpPrice', 'partnerPrice', 'validUntil', 'isActive',
     ].forEach((f) => { if (req.body[f] !== undefined) pkg[f] = req.body[f]; });
 
@@ -2778,9 +2610,6 @@ router.patch(
   })
 );
 
-/**
- * DELETE /api/labs/admin/:id/packages/:pkgId  (soft delete)
- */
 router.delete(
   '/admin/:id/packages/:pkgId',
   protect,
@@ -2803,9 +2632,6 @@ router.delete(
 
 // ── Accreditations (Admin) ────────────────────────────────────────────────────
 
-/**
- * POST /api/labs/admin/:id/accreditations
- */
 router.post(
   '/admin/:id/accreditations',
   protect,
@@ -2848,9 +2674,6 @@ router.post(
 
 // ── Compliance Docs (Admin) ───────────────────────────────────────────────────
 
-/**
- * POST /api/labs/admin/:id/compliance-docs
- */
 router.post(
   '/admin/:id/compliance-docs',
   protect,
@@ -2890,10 +2713,6 @@ router.post(
   })
 );
 
-/**
- * POST /api/labs/admin/:id/verify-doc/:docId
- * Mark a compliance doc or accreditation as verified.
- */
 router.post(
   '/admin/:id/verify-doc/:docId',
   protect,
@@ -2926,10 +2745,6 @@ router.post(
   })
 );
 
-/**
- * PATCH /api/labs/admin/:id/verify-bank
- * Admin verifies the lab's bank details.
- */
 router.patch(
   '/admin/:id/verify-bank',
   protect,
@@ -2956,10 +2771,6 @@ router.patch(
 
 // ── Reviews (Admin) ───────────────────────────────────────────────────────────
 
-/**
- * GET /api/labs/admin/:id/reviews
- * All reviews including hidden ones.
- */
 router.get(
   '/admin/:id/reviews',
   protect,
@@ -2976,10 +2787,6 @@ router.get(
   })
 );
 
-/**
- * PATCH /api/labs/admin/:id/reviews/:reviewId
- * Toggle review visibility.
- */
 router.patch(
   '/admin/:id/reviews/:reviewId',
   protect,
@@ -3004,10 +2811,6 @@ router.patch(
   })
 );
 
-/**
- * DELETE /api/labs/admin/:id/reviews/:reviewId
- * Hard delete a review.
- */
 router.delete(
   '/admin/:id/reviews/:reviewId',
   protect,
@@ -3028,10 +2831,6 @@ router.delete(
   })
 );
 
-/**
- * PATCH /api/labs/admin/:id/resend-credentials
- * Re-generate and re-send login credentials. Superadmin only.
- */
 router.patch(
   '/admin/:id/resend-credentials',
   protect,
@@ -3082,11 +2881,6 @@ router.patch(
   })
 );
 
-/**
- * POST /api/labs/admin/:id/send-notification
- * Admin pushes an in-app + email notification to a lab partner.
- * Body: { title, body, type?, priority?, sendEmail? }
- */
 router.post(
   '/admin/:id/send-notification',
   protect,
@@ -3130,10 +2924,6 @@ router.post(
   })
 );
 
-/**
- * GET /api/labs/admin/stats/overview
- * Admin dashboard stats for labs.
- */
 router.get(
   '/admin/stats/overview',
   protect,

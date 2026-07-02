@@ -74,6 +74,16 @@ const SERVICES_DATA = [
   },
 ];
 
+// Added variants for clean SSR & SEO rendering
+const cardVariants = {
+  hidden: { opacity: 0, y: 40 },
+  visible: (index) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.55, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }
+  })
+};
+
 const SpotlightCard = memo(({ service, index }) => {
   const Icon = service.icon;
   const cardRef = useRef(null);
@@ -100,10 +110,12 @@ const SpotlightCard = memo(({ service, index }) => {
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      initial={{ opacity: 0, y: 40 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      // FIX 3: SEO Fallback - initial={false} ensures bots see the HTML instantly
+      initial={false}
+      custom={index}
+      variants={cardVariants}
+      whileInView="visible"
       viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.55, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
       animate={{ scale: hovered ? 1.015 : 1 }}
       style={{ listStyle: "none", "--spot-x": "50%", "--spot-y": "50%" }}
       className="relative rounded-2xl will-change-transform"
@@ -151,7 +163,8 @@ const SpotlightCard = memo(({ service, index }) => {
             <div className="flex items-center gap-2 flex-shrink-0">
               {service.badge && (
                 <span
-                  className="font-poppins text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full"
+                  // FIX 1: Increased from text-[10px] to text-xs for better legibility
+                  className="font-poppins text-xs font-black uppercase tracking-widest px-2.5 py-1 rounded-full"
                   style={{ backgroundColor: palette.light, color: palette.text, border: `1px solid ${palette.border}` }}
                 >
                   {service.badge}
@@ -159,7 +172,7 @@ const SpotlightCard = memo(({ service, index }) => {
               )}
               <Link
                 href={service.storyHref}
-                className="w-9 h-9 rounded-full border border-base-300 text-base-content/40 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="w-9 h-9 rounded-full border border-base-300 text-base-content/50 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 aria-label={`See how ${service.title} works`}
               >
                 <ChevronRight size={16} />
@@ -170,7 +183,8 @@ const SpotlightCard = memo(({ service, index }) => {
           {/* Text Content */}
           <div className="mb-6">
             <p 
-              className="font-poppins text-[10px] font-black uppercase tracking-[0.16em] mb-1.5"
+              // FIX 1: Increased from text-[10px] to text-xs
+              className="font-poppins text-xs font-black uppercase tracking-[0.16em] mb-1.5"
               style={{ color: palette.text }}
             >
               {service.tagline}
@@ -181,7 +195,10 @@ const SpotlightCard = memo(({ service, index }) => {
             >
               {service.title}
             </h2>
-            <p className="font-poppins text-xs leading-relaxed text-base-content/50">
+            <p 
+              // FIX 2: Increased contrast from text-base-content/50 to /70
+              className="font-poppins text-xs md:text-sm leading-relaxed text-base-content/70"
+            >
               {service.description}
             </p>
           </div>
@@ -191,7 +208,8 @@ const SpotlightCard = memo(({ service, index }) => {
             {service.features.map((f) => (
               <span
                 key={f}
-                className="font-poppins inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1 rounded-full transition-all duration-300"
+                // FIX 1: Increased from text-[11px] to text-xs
+                className="font-poppins inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all duration-300"
                 style={{
                   backgroundColor: hovered ? palette.light : "var(--base-200)",
                   color: hovered ? palette.text : "var(--base-content)",
@@ -200,7 +218,7 @@ const SpotlightCard = memo(({ service, index }) => {
                   borderStyle: "solid"
                 }}
               >
-                <CheckCircle2 size={10} className="shrink-0" aria-hidden="true" />
+                <CheckCircle2 size={12} className="shrink-0" aria-hidden="true" />
                 {f}
               </span>
             ))}
@@ -209,7 +227,7 @@ const SpotlightCard = memo(({ service, index }) => {
           {/* CTA Button */}
           <Link href={service.href} aria-label={`Book ${service.title}`}>
             <motion.div
-              className="font-poppins relative w-full flex items-center justify-between px-5 py-3.5 rounded-xl overflow-hidden font-black text-xs cursor-pointer"
+              className="font-poppins relative w-full flex items-center justify-between px-5 py-3.5 rounded-xl overflow-hidden font-black text-sm cursor-pointer"
               animate={{ 
                 backgroundColor: hovered ? palette.text : "var(--base-200)", 
                 color: hovered ? "#ffffff" : palette.text 
@@ -243,14 +261,14 @@ AmbientBG.displayName = "AmbientBG";
 const SectionHeader = memo(() => (
   <motion.header
     className="max-w-3xl mb-20"
-    initial={{ opacity: 0, y: 30 }}
+    initial={false}
     whileInView={{ opacity: 1, y: 0 }}
     viewport={{ once: true }}
     transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
   >
     <div className="flex items-center gap-3 mb-6">
-      <div className="font-poppins flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-[0.15em] bg-[#0ea5e9]/10 border border-[#0ea5e9]/25 text-[#0ea5e9]">
-        <Sparkles size={11} aria-hidden="true" />
+      <div className="font-poppins flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-[0.15em] bg-[#0ea5e9]/10 border border-[#0ea5e9]/25 text-[#0ea5e9]">
+        <Sparkles size={12} aria-hidden="true" />
         Our Services
       </div>
     </div>
@@ -261,7 +279,7 @@ const SectionHeader = memo(() => (
       <span className="text-gradient-primary">Right at Your Door.</span>
     </h2>
     
-    <p className="font-poppins text-base-content/60 text-base md:text-md leading-relaxed mb-8 max-w-xl">
+    <p className="font-poppins text-base-content/70 text-base md:text-md leading-relaxed mb-8 max-w-xl">
       <strong className="text-base-content font-bold">Likeson.in</strong> brings{" "}
       <span className="text-primary font-bold">expert doctors</span> and{" "}
       <span className="text-primary font-bold">essential medical services</span>{" "}
@@ -270,10 +288,10 @@ const SectionHeader = memo(() => (
     
     <Link 
       href={HOW_IT_WORKS}
-      className="font-poppins text-primary inline-flex items-center gap-2 text-xs font-bold transition-all duration-300 hover:gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-lg"
+      className="font-poppins text-primary inline-flex items-center gap-2 text-sm font-bold transition-all duration-300 hover:gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-lg"
     >
       See how each service works
-      <ArrowUpRight size={15} aria-hidden="true" />
+      <ArrowUpRight size={16} aria-hidden="true" />
     </Link>
   </motion.header>
 ));
@@ -282,7 +300,7 @@ SectionHeader.displayName = "SectionHeader";
 const BottomCTA = memo(() => (
   <motion.div
     className="mt-20 relative rounded-3xl overflow-hidden"
-    initial={{ opacity: 0, y: 30 }}
+    initial={false}
     whileInView={{ opacity: 1, y: 0 }}
     viewport={{ once: true }}
     transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
@@ -290,7 +308,7 @@ const BottomCTA = memo(() => (
   >
     <div className="relative flex flex-col sm:flex-row items-center justify-between gap-6 px-8 py-10">
       <div>
-        <p className="font-poppins text-white/70 text-xs font-semibold mb-1">
+        <p className="font-poppins text-white/90 text-sm font-semibold mb-1">
           Not sure which service you need?
         </p>
         <p className="font-montserrat text-white text-xl md:text-2xl font-black tracking-tight">
@@ -301,10 +319,10 @@ const BottomCTA = memo(() => (
         <motion.div
           whileHover={{ scale: 1.04, backgroundColor: "rgba(255,255,255,0.25)" }}
           whileTap={{ scale: 0.97 }}
-          className="font-poppins flex items-center gap-2.5 px-7 py-3.5 rounded-2xl font-black text-xs whitespace-nowrap cursor-pointer bg-white/20 text-white border-[1.5px] border-white/30 backdrop-blur-md transition-colors"
+          className="font-poppins flex items-center gap-2.5 px-7 py-3.5 rounded-2xl font-black text-sm whitespace-nowrap cursor-pointer bg-white/20 text-white border-[1.5px] border-white/30 backdrop-blur-md transition-colors"
         >
           Talk to Our Team
-          <ChevronRight size={16} aria-hidden="true" />
+          <ChevronRight size={18} aria-hidden="true" />
         </motion.div>
       </Link>
     </div>

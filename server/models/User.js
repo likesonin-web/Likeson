@@ -84,11 +84,35 @@ const deviceTokenSchema = new Schema(
   { _id: true }
 );
 
+// Legacy log of completed referrals. Kept for backward compatibility with any
+// existing reads/exports; NOT used by referralRoutes.js anymore (see `referrals` below).
 const referralHistorySchema = new Schema(
   {
     referredUser: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     coinsAwarded: { type: Number, required: true },
     createdAt:    { type: Date, default: Date.now },
+  },
+  { _id: true }
+);
+
+/**
+ * FIX — THE ACTUAL BUG:
+ * referralRoutes.js (attachPendingReferral / processReferralReward / the
+ * my-referrals, admin/overview, admin/leaderboard, admin/user/:id routes)
+ * reads and writes `referrals` (array of these entries) on the referrer doc.
+ * This sub-schema previously did not exist anywhere in the User model, so
+ * Mongoose (strict mode, the default) silently dropped every write to it —
+ * no error, nothing persisted. That is why referrals appeared to "not work".
+ */
+const referralEntrySchema = new Schema(
+  {
+    referredUser:      { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    referredUserName:  { type: String },
+    referredUserEmail: { type: String },
+    pointsAwarded:     { type: Number, default: 0, min: 0 },
+    status:            { type: String, enum: ['pending', 'completed'], default: 'pending' },
+    completedAt:       { type: Date },
+    createdAt:         { type: Date, default: Date.now },
   },
   { _id: true }
 );
@@ -164,8 +188,38 @@ const userSchema = new Schema(
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
 
     // ── Referral ──────────────────────────────────────────────────────────────
-    referralCode:    { type: String, unique: true, sparse: true, index: true },
-    referredBy:      { type: Schema.Types.ObjectId, ref: 'User', default: null },
+
+    // This user's own shareable code (unchanged, already worked fine).
+    referralCode: { type: String, unique: true, sparse: true, index: true },
+
+    // Populated ObjectId link once the reward is actually credited.
+    referredBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+
+    // FIX: was missing — set by attachPendingReferral() at signup, read by
+    // processReferralReward() at login. Without this field the reward path
+    // could never find the referrer, so no referral ever converted.
+    referredByCode: { type: String, uppercase: true, trim: true, index: true },
+
+    // FIX: was missing — idempotency guard so the reward is only ever
+    // credited once per invitee. Without it, either nothing persisted
+    // (silently dropped) or, if it *had* been written unguarded, a user
+    // could be rewarded on every login.
+    referralRewardCredited: { type: Boolean, default: false },
+
+    // FIX: was missing — the coin balance both attachPendingReferral() and
+    // processReferralReward() increment. `coins` (below) is a different,
+    // unrelated legacy counter — routes never touched it, so it was never
+    // the actual balance being used for referral coins.
+    redeemPoints: { type: Number, default: 0, min: 0 },
+
+    // FIX: was missing — per-referrer list of invitees with pending/completed
+    // status, used by my-referrals, admin/overview, admin/leaderboard,
+    // admin/user/:userId. This is the field the routes actually push/read;
+    // `referralHistory` below is a different, legacy shape.
+    referrals: { type: [referralEntrySchema], default: [] },
+
+    // Legacy — retained only for backward compatibility with any old data /
+    // external readers. Not written to by the current referral flow.
     referralHistory: { type: [referralHistorySchema], default: [] },
 
     coins:         { type: Number, default: 0, min: 0 },
@@ -213,6 +267,13 @@ userSchema.virtual('isCurrentlyBlocked').get(function () {
 
 userSchema.virtual('coinsInRupees').get(function () {
   return +(this.coins / COINS_PER_RUPEE).toFixed(2);
+});
+
+// FIX: added — referralRoutes.js reports `redeemPoints` in rupees repeatedly
+// via inline `.toFixed()` math; expose it once here too so any other
+// consumer (e.g. a future profile endpoint) doesn't have to re-derive it.
+userSchema.virtual('redeemPointsInRupees').get(function () {
+  return +((this.redeemPoints ?? 0) / COINS_PER_RUPEE).toFixed(2);
 });
 
 // ── Pre-save ──────────────────────────────────────────────────────────────────
@@ -270,6 +331,13 @@ userSchema.pre('save', async function () {
   if (this.isModified('deviceTokens') && this.deviceTokens.length > MAX_DEVICE_TOKENS) {
     this.deviceTokens = this.deviceTokens.slice(-MAX_DEVICE_TOKENS);
   }
+
+  // 7. Cap referrals (FIX: added — mirrors the auditSessions/deviceTokens
+  // caps above; without this a high-volume referrer's document could grow
+  // unbounded, same class of problem those two caps were added to prevent).
+  if (this.isModified('referrals') && this.referrals.length > 2000) {
+    this.referrals = this.referrals.slice(-2000);
+  }
 });
 
 // ── Indexes ───────────────────────────────────────────────────────────────────
@@ -278,6 +346,14 @@ userSchema.index({ email: 1, role: 1 });
 userSchema.index({ unblockAt: 1 });
 userSchema.index({ location: '2dsphere' });
 userSchema.index({ email: 1, otpExpires: 1 });
+
+// FIX: added — processReferralReward's pre-check runs on every single login
+// (`User.findById(userId).select('referralRewardCredited referredByCode')`),
+// and attachPendingReferral looks up `referrer` by referralCode already
+// indexed above. This composite index makes the "does this user still need
+// processing" class of query and admin filtering on reward status cheap.
+userSchema.index({ referredByCode: 1, referralRewardCredited: 1 });
+userSchema.index({ 'referrals.status': 1 });
 
 const User = mongoose.model('User', userSchema);
 export default User;

@@ -11,7 +11,7 @@ import bannersReducer from "./slices/bannerSlice";
 import bloodbankReducer from "./slices/bloodbankSlice";
 import bookingReducer from "./slices/bookingSlice";
 import careAssistantReducer from "./slices/careAssistantSlice";
-
+import partnerWalletReducer from "./slices/partnerWalletSlice";
 import clinicalReducer from "./slices/clinicalSlice";
 import consulationReducer from "./slices/consultationSlice";
  
@@ -99,6 +99,7 @@ export const store = configureStore({
     user: userReducer,
     userManagement: userManagementReducer,
     wallet: walletReducer,
+    partnerWallet:partnerWalletReducer,
   },
  
 });
