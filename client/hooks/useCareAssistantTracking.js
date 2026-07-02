@@ -11,8 +11,8 @@ import {
   markCareArrived,
   markCareStart,
   markCareComplete,
-  careReachedJoinPoint,
-  caJoinRideAndTrackDriver,
+careReachedJoinPoint,
+  careJoinRide,
   careUpdateRideStatus,
   triggerBookingSos,
   setCareAssistantLocation,
@@ -317,9 +317,8 @@ export function useCareAssistantTracking({ bookingId, viewerRole = 'care_assista
   // ── Actions ─────────────────────────────────────────────────────────────
   const reachedJoinPoint = useCallback((lat, lng) =>
     dispatch(careReachedJoinPoint({ bookingId, lat, lng })), [dispatch, bookingId]);
-
-  const boardVehicle = useCallback((lat, lng) =>
-    dispatch(caJoinRideAndTrackDriver({ bookingId, currentLat: lat, currentLng: lng })), [dispatch, bookingId]);
+const boardVehicle = useCallback((lat, lng) =>
+    dispatch(careJoinRide({ bookingId, currentLat: lat, currentLng: lng })), [dispatch, bookingId]);
 
   const setOwnRideStatus = useCallback((status, lat, lng) =>
     dispatch(careUpdateRideStatus({ bookingId, status, lat, lng })), [dispatch, bookingId]);

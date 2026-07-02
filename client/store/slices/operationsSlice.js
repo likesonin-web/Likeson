@@ -2364,6 +2364,15 @@ export const selectAdminBookingMapRoute   = (s) => s.operations.selectedBooking?
 // Ride Operations
 export const selectRideParticipants       = (s) => s.operations.rideParticipants;
 export const selectRideStops              = (s) => s.operations.rideStops;
+export const selectCurrentStopId          = (s) => {
+  const stops = s.operations.rideStops || [];
+  if (!stops.length) return null;
+  const sorted = [...stops].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+  const arrived = sorted.find((st) => st.status === 'ARRIVED');
+  if (arrived) return arrived._id ?? arrived.stopId;
+  const pending = sorted.find((st) => !['COMPLETED', 'SKIPPED'].includes(st.status));
+  return pending ? (pending._id ?? pending.stopId) : null;
+};
 export const selectRideJoinPoints         = (s) => s.operations.rideJoinPoints;
 export const selectRideRouteVersions      = (s) => s.operations.rideRouteVersions;
 export const selectActiveRouteVersion     = (s) => s.operations.activeRouteVersion;

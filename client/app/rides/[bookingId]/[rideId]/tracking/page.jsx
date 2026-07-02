@@ -31,8 +31,6 @@ import {
   socketRideCancelled, socketNavigationTargetChanged, socketRideAssigned,
   socketCaAtJoinPoint, socketCaJoinedRide, socketJpWaypointCompleted,
   socketCareAssistantTracking, socketHospitalEtaUpdate,
-  selectStops, selectCurrentStopId, selectParticipants,
-  fetchRideStops, fetchRideParticipants,
 } from '@/store/slices/rideRequestSlice';
 
 import { fetchMyBookingById, selectSelectedBooking } from '@/store/slices/bookingSlice';
@@ -40,6 +38,10 @@ import {
   fetchCareTrackingSnapshot,
   selectCareTrackingSnapshot,
   triggerBookingSos, fetchBookingSosEvents, selectBookingSosEvents,
+  fetchRideStops, fetchRideParticipants,
+  selectRideStops as selectStops,
+  selectRideParticipants as selectParticipants,
+  selectCurrentStopId,
 } from '@/store/slices/operationsSlice';
 
 import { useSocket } from '@/context/SocketProvider';
@@ -1162,7 +1164,7 @@ const careSnapshot   = useSelector(selectCareTrackingSnapshot);
     const load = async () => {
       setInitLoading(true);
       const tasks = [];
-      if (rideId)    { tasks.push(dispatch(fetchRideTracking({ rideId }))); tasks.push(dispatch(fetchRideLive(rideId))); tasks.push(dispatch(fetchRideStops(rideId))); }
+if (rideId)    { tasks.push(dispatch(fetchRideTracking({ rideId }))); tasks.push(dispatch(fetchRideLive(rideId))); tasks.push(dispatch(fetchRideStops({ rideId }))); }
       if (bookingId) { tasks.push(dispatch(fetchMyBookingById({ bookingId }))); tasks.push(dispatch(fetchCareTrackingSnapshot({ bookingId }))); tasks.push(dispatch(fetchBookingSosEvents({ bookingId }))); }
       if (rideId)    { tasks.push(dispatch(fetchRideParticipants({ rideId }))); }
       await Promise.all(tasks).catch(console.error);
@@ -1566,8 +1568,8 @@ const careSnapshot   = useSelector(selectCareTrackingSnapshot);
     if (pts > 0) mapRef.current.fitBounds(bounds, { top: 90, bottom: 200, left: 40, right: 40 });
   }, [pickupCoords, dropoffCoords, driverPos, caPos, jpCoords]);
 
-  const handleRefresh = useCallback(() => {
-    if (activeRideId) { dispatch(fetchRideLive(activeRideId)); dispatch(fetchRideStops(activeRideId)); }
+const handleRefresh = useCallback(() => {
+    if (activeRideId) { dispatch(fetchRideLive(activeRideId)); dispatch(fetchRideStops({ rideId: activeRideId })); }
     if (bookingId)    dispatch(fetchCareTrackingSnapshot({ bookingId }));
     notify('Refreshing…', 'info', '🔄');
   }, [activeRideId, bookingId, dispatch, notify]);

@@ -5,29 +5,24 @@ import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FlaskConical, Star, MapPin, Clock, Home, Shield, Phone,
-  Mail, Globe, ArrowLeft, Microscope, Package, Award,
-  CheckCircle, X, Search, Building2, FileText, AlertCircle,
-  Loader2, TestTube, Calendar, Navigation, Sparkles, ExternalLink,
-  Share2, MessageSquare, Users, Activity, HeartPulse
+  Mail, ExternalLink, Share2, MessageSquare, Users, Activity,
+  TestTube, Calendar, Navigation, Sparkles, Package, Award,
+  CheckCircle, Search, FileText, AlertCircle, Loader2, Microscope
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
-// Note: Ensure your Redux slice is correctly mapped
 import {
   fetchPublicLabById,
   fetchPublicLabTests,
   fetchPublicLabPackages,
   fetchPublicLabReviews,
-  fetchCustomerLabById,
-  submitLabReview,
   selectSelectedLab,
   selectPublicTests,
   selectPublicPackages,
   selectPublicReviews,
   selectReviewsPagination,
   selectLabLoading,
-  selectLabActionLoading,
 } from "@/store/slices/labSlice";
 import Container from "@/components/ui/Container";
 
@@ -147,7 +142,7 @@ const SectionTitle = memo(({ icon: Icon, title, count }) => (
     <div className="w-9 h-9 rounded-[var(--r-field)] bg-[var(--primary)]/10 flex items-center justify-center border border-[var(--primary)]/20">
       <Icon size={16} className="text-[var(--primary)]" aria-hidden="true" />
     </div>
-    <h2 className="font-montserrat   text-sm md:text-lg text-[var(--base-content)] ">{title}</h2>
+    <h2 className="font-montserrat text-sm md:text-lg text-[var(--base-content)]">{title}</h2>
     {count != null && (
       <span className="ml-auto bg-[var(--primary)]/10 text-[var(--primary)] text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
         {count}
@@ -280,53 +275,6 @@ const ReviewCard = memo(({ review, index }) => (
 ));
 ReviewCard.displayName = "ReviewCard";
 
-// ─── Review Form ──────────────────────────────────────────────────────────────
-
-const ReviewForm = ({ labId, onSubmit }) => {
-  const dispatch = useDispatch();
-  const actionLoading = useSelector(selectLabActionLoading);
-  const [rating, setRating] = useState(0);
-  const [hovered, setHovered] = useState(0);
-  const [comment, setComment] = useState("");
-  const labels = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"];
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!rating) return;
-    const res = await dispatch(submitLabReview({ id: labId, rating, comment }));
-    if (!res.error) { setRating(0); setComment(""); onSubmit?.(); }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="p-3 rounded-[var(--r-box)] border-2 border-[var(--primary)]/20 bg-gradient-to-b from-[var(--primary)]/5 to-[var(--base-100)]">
-      <p className="font-montserrat font-black text-lg text-[var(--base-content)] mb-1">Rate your experience</p>
-      <p className="font-poppins text-[10px] text-[var(--base-content)]/60 mb-5">Your feedback helps others make informed health decisions.</p>
-      
-      <div className="flex gap-1.5 mb-5 items-center">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <button key={i} type="button" aria-label={`Rate ${i} stars`} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(0)} onClick={() => setRating(i)}>
-            <Star size={32} className={`transition-all duration-200 ${i <= (hovered || rating) ? "fill-[var(--warning)] text-[var(--warning)] scale-110 drop-shadow-md" : "fill-[var(--base-300)] text-[var(--base-300)] hover:scale-105"}`} />
-          </button>
-        ))}
-        {rating > 0 && <motion.span initial={{opacity:0,x:-10}} animate={{opacity:1,x:0}} className="ml-3 font-poppins text-xs font-black text-[var(--warning)] uppercase tracking-widest">{labels[rating]}</motion.span>}
-      </div>
-
-      <label htmlFor="review-comment" className="sr-only">Your review comment</label>
-      <textarea id="review-comment" value={comment} onChange={(e) => setComment(e.target.value)} rows={3}
-        placeholder="Share details of your experience (optional)…"
-        className="input-field w-full text-xs font-poppins resize-none mb-4 p-4" />
-      
-      <div className="flex justify-end">
-        <button type="submit" disabled={!rating || actionLoading}
-          className="btn-primary-cta text-[10px] px-8 py-3.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-          {actionLoading ? <Loader2 size={14} className="animate-spin" aria-hidden="true"/> : <MessageSquare size={14} aria-hidden="true"/>}
-          Submit Review
-        </button>
-      </div>
-    </form>
-  );
-};
-
 // ─── Tab config ───────────────────────────────────────────────────────────────
 
 const TABS = ["overview", "tests", "packages", "reviews"];
@@ -352,17 +300,14 @@ export default function LabDetailPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [testSearch, setTestSearch] = useState("");
   const [reviewPage, setReviewPage] = useState(1);
-  const [showReviewForm, setShowReviewForm] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    if (isCustomer) dispatch(fetchCustomerLabById(id));
-    else dispatch(fetchPublicLabById(id));
-    
+    dispatch(fetchPublicLabById(id));
     dispatch(fetchPublicLabTests({ id, params: {} }));
     dispatch(fetchPublicLabPackages({ id, params: {} }));
     dispatch(fetchPublicLabReviews({ id, params: { page: 1, limit: 10 } }));
-  }, [dispatch, id, isCustomer]);
+  }, [dispatch, id]);
 
   useEffect(() => {
     if (id && activeTab === "reviews") {
@@ -716,9 +661,9 @@ export default function LabDetailPage() {
                   {/* Summary Card */}
                   <div className="bg-[var(--base-100)] border border-[var(--base-300)] rounded-[var(--r-box)] p-3 shadow-sm flex flex-col items-center text-center">
                     <p className="font-poppins text-[10px] font-black uppercase tracking-widest text-[var(--base-content)]/50 mb-2">Overall Rating</p>
-                    <div className="font-montserrat font-black text-6xl text-[var(--primary)] mb-3">{lab.averageRating?.toFixed(1)}</div>
+                    <div className="font-montserrat font-black text-6xl text-[var(--primary)] mb-3">{lab.averageRating?.toFixed(1) || "0.0"}</div>
                     <StarRow rating={lab.averageRating} size={20}/>
-                    <p className="font-poppins text-[10px] font-medium text-[var(--base-content)]/50 mt-3 bg-[var(--base-200)] px-4 py-1.5 rounded-full">Based on {lab.totalReviews} reviews</p>
+                    <p className="font-poppins text-[10px] font-medium text-[var(--base-content)]/50 mt-3 bg-[var(--base-200)] px-4 py-1.5 rounded-full">Based on {lab.totalReviews || 0} reviews</p>
 
                     {/* Distribution Bars */}
                     <div className="w-full mt-6 space-y-2.5">
@@ -739,21 +684,6 @@ export default function LabDetailPage() {
                       })}
                     </div>
                   </div>
-
-                  {isCustomer && (
-                    <div>
-                      {!showReviewForm ? (
-                        <button onClick={() => setShowReviewForm(true)} className="btn-secondary w-full py-4 font-poppins text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm hover:-translate-y-0.5">
-                          <MessageSquare size={16} aria-hidden="true"/> Share Your Experience
-                        </button>
-                      ) : (
-                        <ReviewForm labId={id} onSubmit={() => {
-                          setShowReviewForm(false);
-                          dispatch(fetchPublicLabReviews({ id, params: { page: 1, limit: 10 } }));
-                        }}/>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {/* Right Col: Review List */}
@@ -778,14 +708,14 @@ export default function LabDetailPage() {
                     <div className="flex items-center justify-center gap-3 mt-8">
                       <button disabled={reviewPage <= 1} onClick={() => setReviewPage((p) => p - 1)}
                         className="px-4 py-2 rounded-[var(--r-field)] border-2 border-[var(--base-300)] text-[10px] font-black font-poppins uppercase tracking-wider disabled:opacity-30 hover:border-[var(--primary)] hover:text-[var(--primary)] transition-all outline-none focus-visible:border-[var(--primary)]">
-                        &larr; Prev
+                        ← Prev
                       </button>
                       <span className="font-poppins text-[11px] font-black text-[var(--base-content)]/50 bg-[var(--base-200)] px-4 py-2 rounded-[var(--r-field)]">
                         {reviewPage} / {reviewPag.totalPages}
                       </span>
                       <button disabled={reviewPage >= reviewPag.totalPages} onClick={() => setReviewPage((p) => p + 1)}
                         className="px-4 py-2 rounded-[var(--r-field)] border-2 border-[var(--base-300)] text-[10px] font-black font-poppins uppercase tracking-wider disabled:opacity-30 hover:border-[var(--primary)] hover:text-[var(--primary)] transition-all outline-none focus-visible:border-[var(--primary)]">
-                        Next &rarr;
+                        Next →
                       </button>
                     </div>
                   )}
@@ -798,7 +728,5 @@ export default function LabDetailPage() {
         </AnimatePresence>
       </div>
    </Container>
-   
-    
   );
 }
