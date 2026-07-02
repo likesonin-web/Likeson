@@ -345,7 +345,7 @@ export default function AvailabilityPage() {
   );
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--base-200)' }}>
+    <div data-theme='admin' className="min-h-screen" style={{ background: 'var(--base-200)' }}>
       <AnimatePresence>
         {drawerDoc && <DoctorDrawer doc={drawerDoc} onClose={() => setDrawerDoc(null)} />}
       </AnimatePresence>

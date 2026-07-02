@@ -1,640 +1,1138 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { motion, AnimatePresence } from "framer-motion";
+/**
+ * PermissionsPage.jsx — Single-file admin permissions dashboard
+ *
+ * Integrates with:
+ *   - Redux slice: store/slices/userSlice.js  (adminGetAllUsers, adminUpdateRole,
+ *                                              adminSuspendUser, adminUnblockUser, adminResetOtp)
+ *   - global.css design tokens (--primary, --error, --success, etc.)
+ *
+ * Stack: Next.js · Redux Toolkit · Tailwind CSS · Framer Motion · Recharts · Lucide
+ *
+ * FIXES APPLIED:
+ *  1. ROLE_META: added 'lab_partner' (was 'lab partner' with space) + 'blood_bank'
+ *  2. loaders keys: adminSuspend → adminSuspendUser, adminUnblock → adminUnblockUser
+ *  3. ALL_ROLES_LIST auto-corrected via ROLE_META fix
+ *  4. BADGE_CLASS: added 'accent' variant (used by lab_partner)
+ *  5. ROLE_META color for blood_bank mapped to 'error' (crimson theme)
+ */
+
+import {
+  useState, useEffect, useCallback, useRef, useMemo, memo,
+} from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   RadialBarChart, RadialBar, ResponsiveContainer,
-  PieChart, Pie, Cell, Tooltip,
-} from "recharts";
+  AreaChart, Area,
+} from 'recharts';
 import {
-  Shield, ShieldCheck, ShieldX, Search, SlidersHorizontal,
-  Coins, Bell, Settings, ChevronRight, CheckCircle, XCircle,
-  Clock, Eye, RotateCcw, AlertTriangle, Loader2,
-  Send, Minus, Plus, Filter, Users, Star, Lock,
-  BadgeCheck, FileCheck, Fingerprint, CreditCard,
-} from "lucide-react";
-import Link from "next/link";
-import {
-  fetchAllUsers, updateUserKyc, adjustUserCoins,
-  sendUserNotification, updateUserSettings, fetchUserSettings,
-  selectAllUsers, selectUsersPagination, selectUsersFilters,
-  selectListLoading, selectUpdateKycLoading,
-  selectAdjustCoinsLoading, selectSendNotificationLoading,
-  setFilters,
-} from "@/store/slices/adminUserSlice";
+  Users, ShieldAlert, ShieldCheck, Activity,
+  Search, SlidersHorizontal, RefreshCw, X,
+  Shield, ShieldOff, RotateCcw, ChevronDown,
+  AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight,
+  Wifi, WifiOff, BadgeCheck, Clock,
+} from 'lucide-react';
 
-// ── KYC status config ─────────────────────────────────────────────────────────
-const KYC_STATUS = {
-  verified:      { label: "Verified",      color: "var(--success)", icon: ShieldCheck },
-  pending:       { label: "Pending",       color: "var(--warning)", icon: Clock       },
-  "under-review":{ label: "Under Review",  color: "var(--info)",    icon: Eye         },
-  rejected:      { label: "Rejected",      color: "var(--error)",   icon: ShieldX     },
-  "not-submitted":{ label: "Not Submitted",color: "var(--neutral)", icon: Shield      },
+import {
+  adminGetAllUsers,
+  adminUpdateRole,
+  adminSuspendUser,
+  adminUnblockUser,
+  adminResetOtp,
+} from '@/store/slices/userSlice';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Only these 4 roles may be assigned through this UI panel */
+const ALLOWED_ROLES = ['superadmin', 'admin', 'finance', 'customer'];
+
+// FIX 1: 'lab partner' (space) → 'lab_partner' (underscore, matches schema)
+// FIX 1: Added 'blood_bank' role (present in schema, missing here)
+const ROLE_META = {
+  superadmin:        { label: 'Superadmin',    color: 'error',   icon: '👑' },
+  admin:             { label: 'Admin',          color: 'warning', icon: '🛡️' },
+  customer:          { label: 'Customer',       color: 'info',    icon: '👤' },
+  hospital:          { label: 'Hospital',       color: 'primary', icon: '🏥' },
+  solodriverpartner: { label: 'Solo Driver',    color: 'primary', icon: '🚘' },
+  care_assistant:    { label: 'Care Assistant', color: 'success', icon: '🩺' },
+  doctor:            { label: 'Doctor',         color: 'primary', icon: '⚕️' },
+  driver:            { label: 'Driver',         color: 'error',   icon: '🚗' },
+  pharmacy:          { label: 'Pharmacy',       color: 'accent',  icon: '💊' },
+  transportpartner:  { label: 'Transport',      color: 'error',   icon: '🚛' },
+  lab_partner:       { label: 'Lab Partner',    color: 'info',    icon: '🔬' }, // FIX: was 'lab partner'
+  finance:           { label: 'Finance',        color: 'warning', icon: '💰' },
+  blood_bank:        { label: 'Blood Bank',     color: 'error',   icon: '🩸' }, // FIX: added
 };
 
-// Roles that have KYC in the system
-const KYC_ROLES = ["transportpartner", "care assistant", "driver"];
+const ALL_ROLES_LIST = Object.entries(ROLE_META).map(([value, m]) => ({
+  value, label: m.label, icon: m.icon,
+}));
 
-// ── Small stat pill ───────────────────────────────────────────────────────────
-function Pill({ icon: Icon, label, value, color }) {
+const DONUT_COLORS = [
+  'var(--color-primary,#3b82f6)',
+  'var(--color-secondary,#14b8a6)',
+  'var(--color-accent,#f59e0b)',
+  'var(--color-success,#22c55e)',
+  'var(--color-warning,#f97316)',
+];
+
+// FIX 4: Added 'accent' variant (used by pharmacy → ROLE_META.pharmacy.color = 'accent')
+const BADGE_CLASS = {
+  error:   'bg-error/10 text-error border border-error/30',
+  warning: 'bg-warning/10 text-warning border border-warning/30',
+  info:    'bg-info/10 text-info border border-info/30',
+  success: 'bg-success/10 text-success border border-success/30',
+  primary: 'bg-primary/10 text-primary border border-primary/30',
+  accent:  'bg-accent/10 text-accent border border-accent/30',   // FIX: was missing
+  neutral: 'bg-neutral/10 text-neutral-content border border-neutral/30',
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TINY HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+const makeSparkData = (base, noise = 8) =>
+  Array.from({ length: 8 }, (_, i) => ({
+    v: Math.max(0, base + Math.round(Math.sin(i * 1.2) * noise + Math.random() * noise)),
+  }));
+
+const fmtDate = (d) =>
+  d
+    ? new Date(d).toLocaleDateString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+      })
+    : '—';
+
+const avatarSrc = (user) =>
+  user.avatar ||
+  `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(user.name)}`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOOK — all data / action logic lives here
+// ─────────────────────────────────────────────────────────────────────────────
+
+function usePermissions() {
+  const dispatch = useDispatch();
+  const { allUsers, loaders, error } = useSelector((s) => s.user);
+
+  const [filters, setFilters] = useState({
+    page: 1, limit: 20, role: '', isBlocked: '', search: '',
+  });
+  const [modal, setModal] = useState({ type: null, user: null });
+
+  const searchTimer = useRef(null);
+
+  const fetchUsers = useCallback(
+    (overrides = {}) => {
+      const merged = { ...filters, ...overrides };
+      const clean  = Object.fromEntries(
+        Object.entries(merged).filter(([, v]) => v !== '')
+      );
+      dispatch(adminGetAllUsers(clean));
+    },
+    [dispatch, filters]
+  );
+
+  // Re-fetch whenever page / role / blocked filter changes
+  useEffect(() => {
+    fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.page, filters.role, filters.isBlocked]);
+
+  const handleSearch = useCallback(
+    (value) => {
+      clearTimeout(searchTimer.current);
+      searchTimer.current = setTimeout(() => {
+        setFilters((prev) => ({ ...prev, search: value, page: 1 }));
+        dispatch(adminGetAllUsers({ ...filters, search: value, page: 1 }));
+      }, 380);
+    },
+    [dispatch, filters]
+  );
+
+  const applyFilter = useCallback(
+    (key, value) => setFilters((prev) => ({ ...prev, [key]: value, page: 1 })),
+    []
+  );
+
+  const goToPage = useCallback(
+    (page) => setFilters((prev) => ({ ...prev, page })),
+    []
+  );
+
+  const openModal  = useCallback((type, user) => setModal({ type, user }), []);
+  const closeModal = useCallback(() => setModal({ type: null, user: null }), []);
+
+  const handleUpdateRole = useCallback(
+    async (userId, newRole) => {
+      if (!ALLOWED_ROLES.includes(newRole)) return;
+      await dispatch(adminUpdateRole({ id: userId, role: newRole }));
+      closeModal();
+      fetchUsers();
+    },
+    [dispatch, closeModal, fetchUsers]
+  );
+
+  const handleSuspend = useCallback(
+    async ({ id, reason, durationDays }) => {
+      await dispatch(adminSuspendUser({ id, reason, durationDays }));
+      closeModal();
+      fetchUsers();
+    },
+    [dispatch, closeModal, fetchUsers]
+  );
+
+  const handleUnblock = useCallback(
+    async (userId) => {
+      await dispatch(adminUnblockUser(userId));
+      closeModal();
+      fetchUsers();
+    },
+    [dispatch, closeModal, fetchUsers]
+  );
+
+  const handleResetOtp = useCallback(
+    async (email) => {
+      await dispatch(adminResetOtp(email));
+      closeModal();
+    },
+    [dispatch, closeModal]
+  );
+
+  return {
+    users: allUsers.data,
+    total: allUsers.total,
+    pages: allUsers.pages,
+    currentPage: allUsers.currentPage,
+    filters,
+    loaders,
+    error,
+    modal,
+    openModal,
+    closeModal,
+    handleSearch,
+    applyFilter,
+    goToPage,
+    handleUpdateRole,
+    handleSuspend,
+    handleUnblock,
+    handleResetOtp,
+    refetch: fetchUsers,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAT CARD
+// ─────────────────────────────────────────────────────────────────────────────
+
+const StatCard = memo(function StatCard({ icon: Icon, label, value, colorKey, sparkData, delay }) {
+  const style = {
+    primary: { ring: 'bg-primary/10',  text: 'text-primary',  stroke: 'var(--color-primary,#3b82f6)' },
+    error:   { ring: 'bg-error/10',    text: 'text-error',    stroke: 'var(--color-error,#ef4444)'   },
+    success: { ring: 'bg-success/10',  text: 'text-success',  stroke: 'var(--color-success,#22c55e)' },
+    warning: { ring: 'bg-warning/10',  text: 'text-warning',  stroke: 'var(--color-warning,#f97316)' },
+  }[colorKey] ?? {};
+
   return (
-    <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
-      style={{ background: `color-mix(in srgb, ${color}, transparent 88%)` }}>
-      <Icon size={16} style={{ color }} />
-      <div>
-        <p className="text-xs opacity-55 font-semibold uppercase tracking-wider">{label}</p>
-        <p className="font-display font-black text-lg leading-tight" style={{ color }}>{value}</p>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+      className="rounded-2xl border border-base-300/50 bg-base-100 p-5 flex flex-col gap-3 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+    >
+      <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full blur-3xl opacity-15 ${style.ring}`} />
+      <div className="flex items-start justify-between relative">
+        <div className={`p-2.5 rounded-xl ${style.ring}`}>
+          <Icon className={`w-5 h-5 ${style.text}`} strokeWidth={2} />
+        </div>
+        <div className="w-24 h-10 opacity-70">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={sparkData} margin={{ top: 2, bottom: 2 }}>
+              <defs>
+                <linearGradient id={`sg-${colorKey}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor={style.stroke} stopOpacity={0.35} />
+                  <stop offset="95%" stopColor={style.stroke} stopOpacity={0}    />
+                </linearGradient>
+              </defs>
+              <Area
+                type="monotone" dataKey="v"
+                stroke={style.stroke} strokeWidth={2}
+                fill={`url(#sg-${colorKey})`} dot={false}
+                isAnimationActive animationDuration={1400}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+      <div className="relative">
+        <p className="text-2xl font-black text-base-content tabular-nums" style={{ fontFamily: 'var(--font-family-montserrat,sans-serif)' }}>
+          {value?.toLocaleString() ?? '—'}
+        </p>
+        <p className="text-[11px] text-base-content/50 mt-0.5 uppercase tracking-widest font-medium">
+          {label}
+        </p>
+      </div>
+    </motion.div>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROLE DONUT
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RoleDonut = memo(function RoleDonut({ users }) {
+  const data = useMemo(() => {
+    const counts = {};
+    users.forEach((u) => { counts[u.role] = (counts[u.role] ?? 0) + 1; });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([role, count], i) => ({
+        name:  ROLE_META[role]?.label ?? role,
+        value: count,
+        fill:  DONUT_COLORS[i % DONUT_COLORS.length],
+      }));
+  }, [users]);
+
+  if (!data.length) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.3, duration: 0.45 }}
+      className="rounded-2xl border border-base-300/50 bg-base-100 p-5 flex flex-col gap-3 shadow-sm"
+    >
+      <p className="text-[11px] uppercase tracking-widest text-base-content/40 font-medium">
+        Role Distribution
+      </p>
+      <div className="flex items-center gap-4">
+        <div className="w-28 h-28 flex-shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <RadialBarChart
+              innerRadius="52%" outerRadius="100%"
+              data={data} startAngle={90} endAngle={-270} barSize={9}
+            >
+              <RadialBar dataKey="value" cornerRadius={5} isAnimationActive animationDuration={1300} />
+            </RadialBarChart>
+          </ResponsiveContainer>
+        </div>
+        <ul className="flex flex-col gap-1.5 flex-1 min-w-0">
+          {data.map((d) => (
+            <li key={d.name} className="flex items-center gap-2 text-[10px] text-base-content/65">
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: d.fill }} />
+              <span className="truncate">{d.name}</span>
+              <span className="ml-auto font-bold text-base-content tabular-nums">{d.value}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </motion.div>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATS BAR
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StatsBar({ users, total }) {
+  const blocked  = useMemo(() => users.filter((u) => u.isBlocked).length, [users]);
+  const online   = useMemo(() => users.filter((u) => u.isOnline).length,  [users]);
+  const verified = useMemo(() => users.filter((u) => u.isEmailVerified).length, [users]);
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <StatCard icon={Users}       label="Total Users"  value={total}    colorKey="primary" sparkData={makeSparkData(total,   5)} delay={0.05} />
+      <StatCard icon={Activity}    label="Online Now"   value={online}   colorKey="success" sparkData={makeSparkData(online,  3)} delay={0.1}  />
+      <StatCard icon={ShieldAlert} label="Suspended"    value={blocked}  colorKey="error"   sparkData={makeSparkData(blocked, 1)} delay={0.15} />
+      <StatCard icon={ShieldCheck} label="Verified"     value={verified} colorKey="warning" sparkData={makeSparkData(verified,3)} delay={0.2}  />
+      <RoleDonut users={users} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FILTERS BAR
+// ─────────────────────────────────────────────────────────────────────────────
+
+function FiltersBar({ filters, onSearch, onFilter, onRefetch, loading }) {
+  const inputRef = useRef(null);
+
+  const handleChange = useCallback(
+    (e) => onSearch(e.target.value),
+    [onSearch]
+  );
+
+  const clearSearch = useCallback(() => {
+    if (inputRef.current) inputRef.current.value = '';
+    onSearch('');
+  }, [onSearch]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col sm:flex-row gap-3 mb-5"
+    >
+      {/* Search */}
+      <div className="relative flex-1 min-w-0">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/35 pointer-events-none" />
+        <input
+          ref={inputRef}
+          type="search"
+          placeholder="Search by name, email or phone…"
+          onChange={handleChange}
+          defaultValue={filters.search}
+          aria-label="Search users"
+          className="w-full h-10 pl-10 pr-9 rounded-xl border border-base-300 bg-base-200/60 text-xs text-base-content placeholder:text-base-content/35 outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
+        />
+        {filters.search && (
+          <button
+            onClick={clearSearch}
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/35 hover:text-base-content transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Role */}
+      <div className="relative">
+        <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/35 pointer-events-none" />
+        <select
+          value={filters.role}
+          onChange={(e) => onFilter('role', e.target.value)}
+          aria-label="Filter by role"
+          className="h-10 pl-9 pr-8 rounded-xl border border-base-300 bg-base-200/60 text-xs text-base-content outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary cursor-pointer appearance-none min-w-[160px] transition-all"
+        >
+          <option value="">All Roles</option>
+          {ALL_ROLES_LIST.map((r) => (
+            <option key={r.value} value={r.value}>{r.icon} {r.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Status */}
+      <select
+        value={filters.isBlocked}
+        onChange={(e) => onFilter('isBlocked', e.target.value)}
+        aria-label="Filter by status"
+        className="h-10 px-4 rounded-xl border border-base-300 bg-base-200/60 text-xs text-base-content outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary cursor-pointer appearance-none min-w-[140px] transition-all"
+      >
+        <option value="">All Status</option>
+        <option value="false">Active</option>
+        <option value="true">Suspended</option>
+      </select>
+
+      {/* Refresh */}
+      <button
+        onClick={onRefetch}
+        disabled={loading}
+        aria-label="Refresh"
+        className="h-10 px-4 flex items-center gap-2 rounded-xl border-2 border-primary text-primary text-xs font-bold hover:bg-primary hover:text-primary-content transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={2} />
+        <span className="hidden sm:inline">Refresh</span>
+      </button>
+    </motion.div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROLE BADGE
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RoleBadge = memo(function RoleBadge({ role }) {
+  const m = ROLE_META[role] ?? { label: role, color: 'neutral', icon: '?' };
+  const cls = BADGE_CLASS[m.color] ?? BADGE_CLASS.neutral;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${cls}`}>
+      <span aria-hidden>{m.icon}</span>
+      {m.label}
+    </span>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTION BUTTON
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ActionBtn = memo(function ActionBtn({ onClick, icon: Icon, tooltip, colorKey = 'base', disabled }) {
+  const cls = {
+    base:    'text-base-content/45 hover:text-base-content hover:bg-base-200',
+    error:   'text-error/60 hover:text-error hover:bg-error/10',
+    success: 'text-success/60 hover:text-success hover:bg-success/10',
+    warning: 'text-warning/60 hover:text-warning hover:bg-warning/10',
+    info:    'text-info/60 hover:text-info hover:bg-info/10',
+  }[colorKey] ?? 'text-base-content/45 hover:text-base-content hover:bg-base-200';
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={tooltip}
+      aria-label={tooltip}
+      className={`p-1.5 rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed ${cls}`}
+    >
+      <Icon className="w-4 h-4" strokeWidth={2} />
+    </button>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USER ROW
+// ─────────────────────────────────────────────────────────────────────────────
+
+const UserRow = memo(function UserRow({ user, onOpenModal, index }) {
+  const canChangeRole = ALLOWED_ROLES.includes(user.role);
+
+  return (
+    <motion.tr
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.018, duration: 0.22 }}
+      className="border-b border-base-300/30 hover:bg-base-200/40 transition-colors group"
+    >
+      {/* Avatar */}
+      <td className="px-4 py-3">
+        <div className="relative w-9 h-9">
+          <img
+            src={avatarSrc(user)} alt={user.name}
+            width={36} height={36} loading="lazy"
+            className="w-9 h-9 rounded-full object-cover border-2 border-base-300"
+          />
+          {user.isOnline && (
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-success rounded-full border-2 border-base-100" />
+          )}
+        </div>
+      </td>
+
+      {/* Name + email */}
+      <td className="px-4 py-3 max-w-[200px]">
+        <p className="text-xs font-semibold text-base-content truncate flex items-center gap-1.5">
+          {user.name}
+          {user.isEmailVerified && <BadgeCheck className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
+        </p>
+        <p className="text-[10px] text-base-content/40 truncate">{user.email}</p>
+      </td>
+
+      {/* Phone */}
+      <td className="px-4 py-3 text-[10px] text-base-content/55 whitespace-nowrap hidden md:table-cell">
+        {user.phone ?? <span className="text-base-content/25">—</span>}
+      </td>
+
+      {/* Role */}
+      <td className="px-4 py-3"><RoleBadge role={user.role} /></td>
+
+      {/* Status */}
+      <td className="px-4 py-3">
+        {user.isBlocked ? (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-error/10 text-error border border-error/30">
+            <ShieldOff className="w-3 h-3" /> Suspended
+          </span>
+        ) : user.isOnline ? (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-success/10 text-success border border-success/30">
+            <Wifi className="w-3 h-3" /> Online
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-info/10 text-info border border-info/30">
+            <WifiOff className="w-3 h-3" /> Offline
+          </span>
+        )}
+      </td>
+
+      {/* Last active */}
+      <td className="px-4 py-3 hidden lg:table-cell">
+        <div className="flex items-center gap-1.5 text-[10px] text-base-content/40">
+          <Clock className="w-3 h-3 flex-shrink-0" />
+          {fmtDate(user.lastActiveAt)}
+        </div>
+      </td>
+
+      {/* Actions */}
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+          {canChangeRole && (
+            <ActionBtn icon={ChevronDown} tooltip="Change Role" colorKey="info"
+              onClick={() => onOpenModal('role', user)} />
+          )}
+          {user.isBlocked ? (
+            <ActionBtn icon={Shield} tooltip="Unblock User" colorKey="success"
+              onClick={() => onOpenModal('unblock', user)} />
+          ) : (
+            <ActionBtn icon={ShieldOff} tooltip="Suspend User" colorKey="error"
+              onClick={() => onOpenModal('suspend', user)} />
+          )}
+          <ActionBtn icon={RotateCcw} tooltip="Reset OTP" colorKey="warning"
+            onClick={() => onOpenModal('resetOtp', user)} />
+        </div>
+      </td>
+    </motion.tr>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SKELETON ROW
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SkeletonRow() {
+  return (
+    <tr className="border-b border-base-300/30">
+      {[36, 140, 100, 80, 80, 90, 80].map((w, i) => (
+        <td key={i} className={`px-4 py-3.5 ${i === 2 ? 'hidden md:table-cell' : ''} ${i === 5 ? 'hidden lg:table-cell' : ''}`}>
+          <div className="animate-pulse bg-base-300 rounded-lg h-4" style={{ width: w }} />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USERS TABLE
+// ─────────────────────────────────────────────────────────────────────────────
+
+function UsersTable({ users, loading, onOpenModal }) {
+  const cols = ['', 'User', 'Phone', 'Role', 'Status', 'Last Active', 'Actions'];
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-base-300/50 shadow-sm">
+      <table className="w-full text-left text-xs" aria-label="Users permission table">
+        <thead>
+          <tr className="border-b border-base-300/50 bg-base-200/50">
+            {cols.map((col, i) => (
+              <th
+                key={i}
+                scope="col"
+                className={`px-4 py-3 text-[11px] font-bold uppercase tracking-widest text-base-content/35 whitespace-nowrap
+                  ${i === 2 ? 'hidden md:table-cell' : ''}
+                  ${i === 5 ? 'hidden lg:table-cell' : ''}
+                `}
+              >
+                {col}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <AnimatePresence mode="wait">
+            {loading ? (
+              Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
+            ) : users.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="py-20 text-center">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col items-center gap-3"
+                  >
+                    <div className="w-16 h-16 rounded-2xl bg-base-200 flex items-center justify-center">
+                      <Shield className="w-8 h-8 text-base-content/20" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-base-content/35 text-xs">No users found matching your filters</p>
+                  </motion.div>
+                </td>
+              </tr>
+            ) : (
+              users.map((u, i) => (
+                <UserRow key={u._id} user={u} index={i} onOpenModal={onOpenModal} />
+              ))
+            )}
+          </AnimatePresence>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAGINATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+const Pagination = memo(function Pagination({ currentPage, pages, total, limit, onPage }) {
+  if (pages <= 1) return null;
+
+  const from = (currentPage - 1) * limit + 1;
+  const to   = Math.min(currentPage * limit, total);
+
+  const range = useMemo(() => {
+    if (pages <= 5) return Array.from({ length: pages }, (_, i) => i + 1);
+    let s = Math.max(1, currentPage - 2);
+    let e = Math.min(pages, currentPage + 2);
+    if (e - s < 4) {
+      if (s === 1) e = Math.min(5, pages);
+      else s = Math.max(1, e - 4);
+    }
+    return Array.from({ length: e - s + 1 }, (_, i) => s + i);
+  }, [currentPage, pages]);
+
+  const PageBtn = ({ n }) => (
+    <button
+      onClick={() => onPage(n)}
+      aria-current={n === currentPage ? 'page' : undefined}
+      className={`min-w-[32px] h-8 px-2 rounded-lg text-xs font-semibold transition-all
+        ${n === currentPage
+          ? 'bg-primary text-primary-content shadow-sm'
+          : 'border border-base-300 text-base-content/55 hover:bg-base-200 hover:text-base-content'
+        }`}
+    >
+      {n}
+    </button>
+  );
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-4 border-t border-base-300/40">
+      <p className="text-[10px] text-base-content/40">
+        Showing <strong className="text-base-content">{from}–{to}</strong> of{' '}
+        <strong className="text-base-content">{total}</strong> users
+      </p>
+      <nav aria-label="Pagination" className="flex items-center gap-1">
+        <button
+          onClick={() => onPage(currentPage - 1)} disabled={currentPage === 1}
+          aria-label="Previous" className="p-2 rounded-lg border border-base-300 text-base-content/50 hover:text-base-content hover:bg-base-200 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        {range[0] > 1 && (
+          <>
+            <PageBtn n={1} />
+            {range[0] > 2 && <span className="px-1 text-base-content/25 text-xs">…</span>}
+          </>
+        )}
+        {range.map((n) => <PageBtn key={n} n={n} />)}
+        {range[range.length - 1] < pages && (
+          <>
+            {range[range.length - 1] < pages - 1 && (
+              <span className="px-1 text-base-content/25 text-xs">…</span>
+            )}
+            <PageBtn n={pages} />
+          </>
+        )}
+        <button
+          onClick={() => onPage(currentPage + 1)} disabled={currentPage === pages}
+          aria-label="Next" className="p-2 rounded-lg border border-base-300 text-base-content/50 hover:text-base-content hover:bg-base-200 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </nav>
+    </div>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODAL SHELL
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ModalShell({ children, onClose, title, icon: Icon, accentKey = 'primary' }) {
+  const accentMap = {
+    primary: 'bg-primary/10 text-primary border-primary/20',
+    error:   'bg-error/10   text-error   border-error/20',
+    success: 'bg-success/10 text-success border-success/20',
+    warning: 'bg-warning/10 text-warning border-warning/20',
+  };
+
+  useEffect(() => {
+    const esc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onClose]);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <motion.div
+        key="bd"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden
+      />
+      {/* Panel */}
+      <motion.div
+        key="panel"
+        role="dialog" aria-modal="true" aria-labelledby="modal-title"
+        initial={{ opacity: 0, scale: 0.93, y: 14 }}
+        animate={{ opacity: 1, scale: 1,    y: 0  }}
+        exit={{   opacity: 0, scale: 0.93, y: 14  }}
+        transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-base-300/60 bg-base-100 shadow-2xl p-6 relative">
+          {/* Close */}
+          <button
+            onClick={onClose} aria-label="Close"
+            className="absolute top-4 right-4 p-1.5 rounded-lg text-base-content/35 hover:text-base-content hover:bg-base-200 transition-all"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-5">
+            <div className={`p-2.5 rounded-xl border ${accentMap[accentKey]}`}>
+              <Icon className="w-5 h-5" strokeWidth={2} />
+            </div>
+            <h2 id="modal-title" className="text-lg font-black text-base-content" style={{ fontFamily: 'var(--font-family-montserrat,sans-serif)' }}>
+              {title}
+            </h2>
+          </div>
+
+          {children}
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
+// ── User summary inside modals ────────────────────────────────────────────────
+function UserSummary({ user, accentKey = 'neutral' }) {
+  const bgMap = {
+    neutral: 'bg-base-200/70',
+    error:   'bg-error/5 border border-error/20',
+    success: 'bg-success/5 border border-success/20',
+    warning: 'bg-warning/5 border border-warning/20',
+  };
+  return (
+    <div className={`flex items-center gap-3 p-3 rounded-xl mb-4 ${bgMap[accentKey] ?? bgMap.neutral}`}>
+      <img src={avatarSrc(user)} alt={user.name} width={36} height={36}
+        className="w-9 h-9 rounded-full object-cover border border-base-300" />
+      <div className="min-w-0">
+        <p className="text-xs font-bold text-base-content truncate">{user.name}</p>
+        <p className="text-[10px] text-base-content/40 truncate">{user.email}</p>
       </div>
     </div>
   );
 }
 
-// ── KYC status badge ──────────────────────────────────────────────────────────
-function KycBadge({ status }) {
-  const cfg = KYC_STATUS[status] || KYC_STATUS["not-submitted"];
-  const Icon = cfg.icon;
+// ─────────────────────────────────────────────────────────────────────────────
+// MODAL: Change Role
+// ─────────────────────────────────────────────────────────────────────────────
+
+function RoleModal({ user, onConfirm, onClose, loading }) {
+  const [selected, setSelected] = useState(user.role);
+  const changed = selected !== user.role;
+
   return (
-    <span className="badge flex items-center gap-1" style={{
-      background: `color-mix(in srgb, ${cfg.color}, transparent 85%)`,
-      color: cfg.color,
-      border: `1px solid color-mix(in srgb, ${cfg.color}, transparent 65%)`,
-    }}>
-      <Icon size={10} />{cfg.label}
-    </span>
+    <ModalShell title="Change Role" icon={ChevronDown} accentKey="primary" onClose={onClose}>
+      <UserSummary user={user} />
+      <p className="text-[10px] text-base-content/45 mb-3">
+        Only these roles can be assigned via this panel:
+      </p>
+
+      {/* Role grid */}
+      <div className="grid grid-cols-2 gap-2 mb-5" role="radiogroup">
+        {ALLOWED_ROLES.map((role) => {
+          const m      = ROLE_META[role];
+          const active = selected === role;
+          return (
+            <button
+              key={role}
+              role="radio"
+              aria-checked={active}
+              onClick={() => setSelected(role)}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all
+                ${active
+                  ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                  : 'border-base-300 text-base-content/65 hover:border-primary/40 hover:bg-base-200'
+                }`}
+            >
+              <span aria-hidden>{m.icon}</span>
+              <span className="truncate">{m.label}</span>
+              {active && <CheckCircle2 className="w-3.5 h-3.5 ml-auto flex-shrink-0" />}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Warning if current role is restricted */}
+      {!ALLOWED_ROLES.includes(user.role) && (
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-warning/8 border border-warning/25 text-[10px] text-warning mb-4">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>
+            Current role <strong>{ROLE_META[user.role]?.label ?? user.role}</strong> is restricted —
+            assigning a new role will delete the old profile data.
+          </span>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button onClick={onClose}
+          className="flex-1 h-10 rounded-xl border-2 border-primary text-primary text-xs font-bold hover:bg-primary hover:text-primary-content transition-all">
+          Cancel
+        </button>
+        <button
+          onClick={() => onConfirm(user._id, selected)}
+          disabled={!changed || loading}
+          className="flex-1 h-10 rounded-xl bg-primary text-primary-content text-xs font-bold transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Saving…' : 'Update Role'}
+        </button>
+      </div>
+    </ModalShell>
   );
 }
 
-// ── KYC Update Panel (slide-in) ───────────────────────────────────────────────
-function KycPanel({ user, onClose }) {
-  const dispatch = useDispatch();
-  const loading  = useSelector(selectUpdateKycLoading);
-  const [kycStatus, setKycStatus] = useState("");
-  const [reason, setReason]       = useState("");
+// ─────────────────────────────────────────────────────────────────────────────
+// MODAL: Suspend
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const handleUpdate = async () => {
-    if (!kycStatus) return;
-    const result = await dispatch(updateUserKyc({ userId: user._id, kycStatus, rejectionReason: reason }));
-    if (!result.error) onClose();
-  };
+function SuspendModal({ user, onConfirm, onClose, loading }) {
+  const [reason,       setReason]   = useState('');
+  const [durationDays, setDuration] = useState(30);
+
+  const unblockDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + Number(durationDays));
+    return d;
+  }, [durationDays]);
 
   return (
-    <motion.div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <div className="absolute inset-0 backdrop-blur-strong" style={{ background: "rgba(0,0,0,0.55)" }}
-        onClick={onClose} />
-      <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
-        className="glass-card p-7 w-full max-w-md relative z-10">
+    <ModalShell title="Suspend Account" icon={ShieldOff} accentKey="error" onClose={onClose}>
+      <UserSummary user={user} accentKey="error" />
 
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: "color-mix(in srgb, var(--primary), transparent 85%)" }}>
-            <Fingerprint size={20} style={{ color: "var(--primary)" }} />
-          </div>
-          <div>
-            <h3 className="font-display font-black text-lg" style={{ color: "var(--base-content)" }}>
-              Update KYC
-            </h3>
-            <p className="text-xs opacity-50">{user.name} · {user.email}</p>
-          </div>
+      <div className="flex flex-col gap-3 mb-4">
+        <div>
+          <label htmlFor="sr" className="block text-[10px] font-semibold text-base-content/55 mb-1.5">
+            Reason <span className="text-base-content/30">(optional)</span>
+          </label>
+          <textarea
+            id="sr" value={reason} onChange={(e) => setReason(e.target.value)}
+            placeholder="Violation of terms, abusive behaviour…"
+            rows={3}
+            className="w-full rounded-xl border border-base-300 bg-base-200/60 px-4 py-2.5 text-xs text-base-content resize-none outline-none focus:ring-2 focus:ring-error/30 focus:border-error transition-all"
+          />
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block mb-2">New KYC Status</label>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(KYC_STATUS).map(([val, cfg]) => {
-                const Icon = cfg.icon;
-                return (
-                  <button key={val} onClick={() => setKycStatus(val)}
-                    className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
-                    style={kycStatus === val ? {
-                      background: cfg.color,
-                      color: "white",
-                      borderColor: cfg.color,
-                    } : {
-                      background: `color-mix(in srgb, ${cfg.color}, transparent 90%)`,
-                      color: cfg.color,
-                      borderColor: `color-mix(in srgb, ${cfg.color}, transparent 70%)`,
-                    }}>
-                    <Icon size={12} />{cfg.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {kycStatus === "rejected" && (
-            <div>
-              <label className="block mb-1.5">Rejection Reason</label>
-              <textarea value={reason} onChange={e => setReason(e.target.value)}
-                rows={3} placeholder="Explain why documents were rejected…"
-                className="input-field w-full resize-none" />
-            </div>
-          )}
+        <div>
+          <label htmlFor="sd" className="block text-[10px] font-semibold text-base-content/55 mb-1.5">
+            Duration — <span className="text-error font-bold">{durationDays} days</span>
+          </label>
+          <input
+            id="sd" type="range" min={1} max={365}
+            value={durationDays} onChange={(e) => setDuration(Number(e.target.value))}
+            className="w-full h-1.5 cursor-pointer accent-error"
+          />
+          <p className="text-[10px] text-base-content/35 mt-1">
+            Auto-unblock on {fmtDate(unblockDate)}
+          </p>
         </div>
+      </div>
 
-        <div className="flex gap-3 mt-6">
-          <button onClick={onClose} className="btn-secondary flex-1 !py-2.5">Cancel</button>
-          <button onClick={handleUpdate} disabled={!kycStatus || loading}
-            className="btn-primary-cta flex-1 !py-2.5 flex items-center justify-center gap-2">
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <FileCheck size={14} />}
-            Update KYC
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
+      <div className="flex items-start gap-2 p-3 rounded-xl bg-error/8 border border-error/25 text-[10px] text-error mb-4">
+        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+        <span>All active sessions and push tokens will be revoked immediately.</span>
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={onClose}
+          className="flex-1 h-10 rounded-xl border-2 border-base-300 text-base-content/70 text-xs font-bold hover:bg-base-200 transition-all">
+          Cancel
+        </button>
+        <button
+          onClick={() => onConfirm({ id: user._id, reason: reason || undefined, durationDays })}
+          disabled={loading}
+          className="flex-1 h-10 rounded-xl bg-error text-error-content text-xs font-bold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+        >
+          {loading ? 'Suspending…' : 'Suspend User'}
+        </button>
+      </div>
+    </ModalShell>
   );
 }
 
-// ── Coin Adjust Panel ─────────────────────────────────────────────────────────
-function CoinPanel({ user, onClose }) {
-  const dispatch = useDispatch();
-  const loading  = useSelector(selectAdjustCoinsLoading);
-  const [action, setAction] = useState("credit");
-  const [amount, setAmount] = useState("");
-  const [reason, setReason] = useState("");
+// ─────────────────────────────────────────────────────────────────────────────
+// MODAL: Unblock
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const handleSubmit = async () => {
-    if (!amount || !reason) return;
-    const result = await dispatch(adjustUserCoins({
-      userId: user._id, action, amount: Number(amount), reason,
-    }));
-    if (!result.error) onClose();
-  };
+function UnblockModal({ user, onConfirm, onClose, loading }) {
+  return (
+    <ModalShell title="Unblock Account" icon={Shield} accentKey="success" onClose={onClose}>
+      <UserSummary user={user} accentKey="success" />
 
-  const rupeesPreview = amount ? (Number(amount) / 100).toFixed(2) : "0.00";
+      {user.blockReason && (
+        <div className="p-3 bg-base-200 rounded-xl mb-4 text-[10px] text-base-content/55">
+          <p className="font-semibold text-base-content/75 mb-0.5">Suspension reason:</p>
+          <p>{user.blockReason}</p>
+        </div>
+      )}
+
+      <p className="text-xs text-base-content/65 mb-5">
+        This will immediately restore full access to{' '}
+        <strong className="text-base-content">{user.name}</strong>.
+        They will receive an SMS and WhatsApp notification.
+      </p>
+
+      <div className="flex gap-2">
+        <button onClick={onClose}
+          className="flex-1 h-10 rounded-xl border-2 border-base-300 text-base-content/70 text-xs font-bold hover:bg-base-200 transition-all">
+          Cancel
+        </button>
+        <button
+          onClick={() => onConfirm(user._id)} disabled={loading}
+          className="flex-1 h-10 rounded-xl bg-success text-success-content text-xs font-bold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+        >
+          {loading ? 'Unblocking…' : 'Unblock User'}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODAL: Reset OTP
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ResetOtpModal({ user, onConfirm, onClose, loading }) {
+  return (
+    <ModalShell title="Reset OTP State" icon={RotateCcw} accentKey="warning" onClose={onClose}>
+      <UserSummary user={user} accentKey="warning" />
+
+      <p className="text-xs text-base-content/65 mb-5">
+        Clears any pending OTP and expiry from{' '}
+        <strong className="text-base-content">{user.name}</strong>'s account,
+        unblocking them from OTP-gated flows. Use when a user is stuck in a login loop.
+      </p>
+
+      <div className="flex gap-2">
+        <button onClick={onClose}
+          className="flex-1 h-10 rounded-xl border-2 border-base-300 text-base-content/70 text-xs font-bold hover:bg-base-200 transition-all">
+          Cancel
+        </button>
+        <button
+          onClick={() => onConfirm(user.email)} disabled={loading}
+          className="flex-1 h-10 rounded-xl bg-warning text-warning-content text-xs font-bold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+        >
+          {loading ? 'Clearing…' : 'Clear OTP'}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODAL ORCHESTRATOR
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PermissionModals({ modal, onClose, onUpdateRole, onSuspend, onUnblock, onResetOtp, loaders }) {
+  if (!modal.user) return null;
+  return (
+    <AnimatePresence>
+      {modal.type === 'role' && (
+        <RoleModal key="role" user={modal.user} onConfirm={onUpdateRole}
+          onClose={onClose} loading={loaders.adminUpdateRole} />
+      )}
+      {modal.type === 'suspend' && (
+        <SuspendModal key="suspend" user={modal.user} onConfirm={onSuspend}
+          onClose={onClose} loading={loaders.adminSuspendUser} />  // FIX 2: was adminSuspend
+      )}
+      {modal.type === 'unblock' && (
+        <UnblockModal key="unblock" user={modal.user} onConfirm={onUnblock}
+          onClose={onClose} loading={loaders.adminUnblockUser} />  // FIX 2: was adminUnblock
+      )}
+      {modal.type === 'resetOtp' && (
+        <ResetOtpModal key="otp" user={modal.user} onConfirm={onResetOtp}
+          onClose={onClose} loading={loaders.adminResetOtp} />
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAGE EXPORT
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function PermissionsPage() {
+  const {
+    users, total, pages, currentPage,
+    filters, loaders, error,
+    modal, openModal, closeModal,
+    handleSearch, applyFilter, goToPage,
+    handleUpdateRole, handleSuspend, handleUnblock, handleResetOtp,
+    refetch,
+  } = usePermissions();
 
   return (
-    <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <div className="absolute inset-0 backdrop-blur-strong" style={{ background: "rgba(0,0,0,0.55)" }}
-        onClick={onClose} />
-      <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
-        className="glass-card p-7 w-full max-w-md relative z-10">
+    <div data-theme="admin" className="min-h-screen bg-base-100 py-6 px-4  ">
+      <div className="max-w-screen-xl mx-auto">
 
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: "color-mix(in srgb, var(--warning), transparent 82%)" }}>
-            <Coins size={20} style={{ color: "var(--warning)" }} />
+        {/* ── Header ── */}
+        <motion.div
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+          className="flex items-center gap-3 mb-7"
+        >
+          <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
+            <ShieldCheck className="w-6 h-6 text-primary" strokeWidth={2} />
           </div>
           <div>
-            <h3 className="font-display font-black text-lg">Adjust Coins</h3>
-            <p className="text-xs opacity-50">
-              {user.name} · Current balance: <strong>{user.coins || 0}</strong> coins
-              (₹{((user.coins || 0) / 100).toFixed(2)})
+            <h1
+              className="text-2xl md:text-3xl font-black text-base-content leading-tight"
+              style={{ fontFamily: 'var(--font-family-montserrat,sans-serif)' }}
+            >
+              User Permissions
+            </h1>
+            <p className="text-xs text-base-content/45 mt-0.5">
+              Manage roles, suspend accounts and reset authentication states
             </p>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="space-y-4">
-          {/* Action toggle */}
-          <div className="flex rounded-xl overflow-hidden border" style={{ borderColor: "var(--base-300)" }}>
-            {["credit", "debit"].map(a => (
-              <button key={a} onClick={() => setAction(a)}
-                className="flex-1 py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition-all"
-                style={action === a ? {
-                  background: a === "credit" ? "var(--success)" : "var(--error)",
-                  color: "white"
-                } : {
-                  background: "var(--base-200)",
-                  color: "var(--base-content)",
-                  opacity: 0.6,
-                }}>
-                {a === "credit" ? <Plus size={14} /> : <Minus size={14} />}
-                {a.charAt(0).toUpperCase() + a.slice(1)}
-              </button>
-            ))}
-          </div>
+        {/* ── Stats ── */}
+        <StatsBar users={users} total={total} />
 
-          <div>
-            <label className="block mb-1.5">Coin Amount</label>
-            <input type="number" min="1" value={amount}
-              onChange={e => setAmount(e.target.value)}
-              placeholder="e.g. 500 (= ₹5)"
-              className="input-field w-full" />
-            {amount && (
-              <p className="text-xs mt-1 opacity-50">
-                ≈ ₹{rupeesPreview} ({amount} coins = ₹{rupeesPreview})
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block mb-1.5">Reason <span className="text-error">*</span></label>
-            <input type="text" value={reason} onChange={e => setReason(e.target.value)}
-              placeholder="e.g. Referral bonus, promotional credit…"
-              className="input-field w-full" />
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-6">
-          <button onClick={onClose} className="btn-secondary flex-1 !py-2.5">Cancel</button>
-          <button onClick={handleSubmit} disabled={!amount || !reason || loading}
-            className="flex-1 !py-2.5 flex items-center justify-center gap-2 font-bold text-sm uppercase tracking-wider rounded-lg transition-all"
-            style={{
-              background: action === "credit" ? "var(--success)" : "var(--error)",
-              color: "white",
-              opacity: (!amount || !reason || loading) ? 0.5 : 1,
-            }}>
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Coins size={14} />}
-            {action === "credit" ? "Credit" : "Debit"} Coins
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-// ── Send Notification Panel ───────────────────────────────────────────────────
-function NotifPanel({ user, onClose }) {
-  const dispatch = useDispatch();
-  const loading  = useSelector(selectSendNotificationLoading);
-  const NOTIF_TYPES = [
-    "Admin_Announcement", "Account_Security", "Account_Status",
-    "Promo_Marketing", "Coins_Credited", "KYC_Approved", "KYC_Rejected",
-  ];
-  const [form, setForm] = useState({
-    title: "", body: "", type: "Admin_Announcement", priority: "Medium",
-  });
-
-  const handleSend = async () => {
-    if (!form.title || !form.body) return;
-    const result = await dispatch(sendUserNotification({ userId: user._id, ...form }));
-    if (!result.error) onClose();
-  };
-
-  return (
-    <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <div className="absolute inset-0 backdrop-blur-strong" style={{ background: "rgba(0,0,0,0.55)" }}
-        onClick={onClose} />
-      <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
-        className="glass-card p-7 w-full max-w-md relative z-10">
-
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: "color-mix(in srgb, var(--info), transparent 82%)" }}>
-            <Send size={18} style={{ color: "var(--info)" }} />
-          </div>
-          <div>
-            <h3 className="font-display font-black text-lg">Send Notification</h3>
-            <p className="text-xs opacity-50">{user.name} · {user.email}</p>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label className="block mb-1.5">Title</label>
-            <input type="text" value={form.title}
-              onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-              placeholder="Notification title…" className="input-field w-full" />
-          </div>
-          <div>
-            <label className="block mb-1.5">Message Body</label>
-            <textarea rows={3} value={form.body}
-              onChange={e => setForm(p => ({ ...p, body: e.target.value }))}
-              placeholder="Write your message…" className="input-field w-full resize-none" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block mb-1.5">Type</label>
-              <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
-                className="input-field w-full text-sm cursor-pointer">
-                {NOTIF_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block mb-1.5">Priority</label>
-              <select value={form.priority} onChange={e => setForm(p => ({ ...p, priority: e.target.value }))}
-                className="input-field w-full text-sm cursor-pointer">
-                {["Low", "Medium", "High", "Critical"].map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-6">
-          <button onClick={onClose} className="btn-secondary flex-1 !py-2.5">Cancel</button>
-          <button onClick={handleSend} disabled={!form.title || !form.body || loading}
-            className="btn-primary-cta flex-1 !py-2.5 flex items-center justify-center gap-2">
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            Send
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-// ── User permission row ───────────────────────────────────────────────────────
-function PermissionRow({ user, index, onKyc, onCoin, onNotif }) {
-  const kycStatus = user.profile?.ownerKyc?.kycStatus
-    || user.profile?.kyc?.verificationStatus?.toLowerCase()
-    || "not-submitted";
-
-  return (
-    <motion.tr
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      transition={{ delay: index * 0.04 }}
-      className="hover:bg-base-200 transition-colors group"
-      style={{ borderBottom: "1px solid var(--base-300)" }}
-    >
-      {/* User */}
-      <td className="px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0"
-            style={{ background: "var(--base-300)" }}>
-            {user.avatar
-              ? <img src={user.avatar} alt="" className="w-full h-full object-cover" />
-              : <div className="w-full h-full flex items-center justify-center text-xs font-black"
-                  style={{ color: "var(--primary)" }}>
-                  {user.name?.[0]?.toUpperCase()}
-                </div>
-            }
-          </div>
-          <div>
-            <p className="font-semibold text-sm">{user.name}</p>
-            <p className="text-xs opacity-45">{user.role}</p>
-          </div>
-        </div>
-      </td>
-
-      {/* Email verified */}
-      <td className="px-5 py-4">
-        {user.isEmailVerified
-          ? <CheckCircle size={16} style={{ color: "var(--success)" }} />
-          : <AlertTriangle size={16} style={{ color: "var(--warning)" }} />
-        }
-      </td>
-
-      {/* KYC */}
-      <td className="px-5 py-4">
-        {KYC_ROLES.includes(user.role)
-          ? <KycBadge status={kycStatus} />
-          : <span className="text-xs opacity-30">N/A</span>
-        }
-      </td>
-
-      {/* Coins */}
-      <td className="px-5 py-4">
-        <div className="flex items-center gap-1.5">
-          <Coins size={12} style={{ color: "var(--warning)" }} />
-          <span className="text-sm font-semibold">{(user.coins || 0).toLocaleString()}</span>
-          <span className="text-xs opacity-40">= ₹{((user.coins || 0) / 100).toFixed(0)}</span>
-        </div>
-      </td>
-
-      {/* Blocked */}
-      <td className="px-5 py-4">
-        {user.isBlocked
-          ? <span className="badge badge-error gap-1"><XCircle size={10} />Blocked</span>
-          : <span className="badge badge-success gap-1"><CheckCircle size={10} />Active</span>
-        }
-      </td>
-
-      {/* Actions */}
-      <td className="px-5 py-4">
-        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Link href={`/admin/users/${user._id}`}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-base-300 transition-colors"
-            title="View Profile">
-            <Eye size={14} />
-          </Link>
-          {KYC_ROLES.includes(user.role) && (
-            <button onClick={() => onKyc(user)}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-base-300 transition-colors"
-              title="Update KYC">
-              <ShieldCheck size={14} style={{ color: "var(--info)" }} />
-            </button>
-          )}
-          <button onClick={() => onCoin(user)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-base-300 transition-colors"
-            title="Adjust Coins">
-            <Coins size={14} style={{ color: "var(--warning)" }} />
-          </button>
-          <button onClick={() => onNotif(user)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-base-300 transition-colors"
-            title="Send Notification">
-            <Send size={14} style={{ color: "var(--primary)" }} />
-          </button>
-        </div>
-      </td>
-    </motion.tr>
-  );
-}
-
-// ── MAIN PAGE ─────────────────────────────────────────────────────────────────
-export default function Permissions() {
-  const dispatch = useDispatch();
-  const users      = useSelector(selectAllUsers);
-  const filters    = useSelector(selectUsersFilters);
-  const listLoading = useSelector(selectListLoading);
-
-  const [search, setSearch]       = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [kycFilter, setKycFilter] = useState("");
-  const [kycTarget, setKycTarget] = useState(null);
-  const [coinTarget, setCoinTarget] = useState(null);
-  const [notifTarget, setNotifTarget] = useState(null);
-
-  useEffect(() => {
-    dispatch(fetchAllUsers({ ...filters, search, role: roleFilter, page: 1, limit: 50 }));
-  }, [dispatch, search, roleFilter]);
-
-  // Stats
-  const totalCoins     = users.reduce((s, u) => s + (u.coins || 0), 0);
-  const kycPending     = users.filter(u => u.profile?.ownerKyc?.kycStatus === "pending").length;
-  const kycVerified    = users.filter(u => u.profile?.ownerKyc?.kycStatus === "verified").length;
-  const verifiedEmails = users.filter(u => u.isEmailVerified).length;
-
-  const kycDistData = [
-    { name: "Verified",      value: kycVerified,   color: "var(--success)" },
-    { name: "Pending",       value: kycPending,     color: "var(--warning)" },
-    { name: "Rejected",      value: users.filter(u => u.profile?.ownerKyc?.kycStatus === "rejected").length, color: "var(--error)" },
-    { name: "Under Review",  value: users.filter(u => u.profile?.ownerKyc?.kycStatus === "under-review").length, color: "var(--info)" },
-  ].filter(d => d.value > 0);
-
-  const filtered = users.filter(u =>
-    (!search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())) &&
-    (!roleFilter || u.role === roleFilter)
-  );
-
-  return (
-    <div className="min-h-screen p-6 space-y-8" style={{ background: "var(--base-100)" }}>
-
-      {/* ── Header ── */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Link href="/admin/users" className="text-xs opacity-50 hover:opacity-80 transition-opacity">
-              User Management
-            </Link>
-            <ChevronRight size={12} className="opacity-30" />
-            <span className="text-xs font-semibold" style={{ color: "var(--primary)" }}>Permissions & KYC</span>
-          </div>
-          <h1 className="section-heading !mb-0">Permissions &amp; KYC</h1>
-          <p className="section-subheading !mb-0">Verify identities, adjust coins, manage access</p>
-        </div>
-      </motion.div>
-
-      {/* ── Summary pills ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { icon: BadgeCheck, label: "KYC Verified",   value: kycVerified,   color: "var(--success)" },
-          { icon: Clock,      label: "KYC Pending",    value: kycPending,    color: "var(--warning)" },
-          { icon: CheckCircle,label: "Emails Verified",value: verifiedEmails,color: "var(--chart-1)" },
-          { icon: Coins,      label: "Total Coins",    value: totalCoins.toLocaleString(), color: "var(--warning)" },
-        ].map((p, i) => (
-          <motion.div key={p.label}
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
-            <Pill {...p} />
+        {/* ── Error banner ── */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+            className="flex items-center gap-2 p-3 mb-5 rounded-xl bg-error/10 border border-error/25 text-xs text-error"
+          >
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            {error}
           </motion.div>
-        ))}
+        )}
+
+        {/* ── Filters ── */}
+        <FiltersBar
+          filters={filters}
+          onSearch={handleSearch}
+          onFilter={applyFilter}
+          onRefetch={refetch}
+          loading={loaders.adminUsers}
+        />
+
+        {/* ── Table ── */}
+        <UsersTable
+          users={users}
+          loading={loaders.adminUsers}
+          onOpenModal={openModal}
+        />
+
+        {/* ── Pagination ── */}
+        <Pagination
+          currentPage={currentPage}
+          pages={pages}
+          total={total}
+          limit={filters.limit}
+          onPage={goToPage}
+        />
       </div>
 
-      {/* ── Charts row ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-        {/* KYC Distribution */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          className="glass-card p-5">
-          <h3 className="text-base font-bold mb-4">KYC Distribution</h3>
-          {kycDistData.length > 0 ? (
-            <div className="flex items-center gap-6">
-              <ResponsiveContainer width={160} height={160}>
-                <PieChart>
-                  <Pie data={kycDistData} cx="50%" cy="50%" innerRadius={45} outerRadius={70}
-                    paddingAngle={4} dataKey="value">
-                    {kycDistData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{
-                    background: "var(--base-100)", border: "1px solid var(--base-300)",
-                    borderRadius: "var(--r-box)", fontSize: 12
-                  }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex flex-col gap-2">
-                {kycDistData.map(d => (
-                  <div key={d.name} className="flex items-center gap-2 text-sm">
-                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: d.color }} />
-                    <span className="opacity-65">{d.name}</span>
-                    <span className="font-bold ml-auto">{d.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="h-40 flex items-center justify-center opacity-30 text-sm">
-              No KYC data yet
-            </div>
-          )}
-        </motion.div>
-
-        {/* Verification coverage */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-          className="glass-card p-5">
-          <h3 className="text-base font-bold mb-4">Verification Coverage</h3>
-          <div className="space-y-4 mt-2">
-            {[
-              { label: "Email Verified",   value: verifiedEmails,  total: users.length, color: "var(--chart-1)" },
-              { label: "KYC Verified",     value: kycVerified,     total: Math.max(users.filter(u => KYC_ROLES.includes(u.role)).length, 1), color: "var(--success)" },
-              { label: "Not Blocked",      value: users.filter(u => !u.isBlocked).length, total: users.length, color: "var(--chart-2)" },
-            ].map(item => {
-              const pct = users.length > 0 ? Math.round((item.value / item.total) * 100) : 0;
-              return (
-                <div key={item.label}>
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="opacity-60 font-semibold">{item.label}</span>
-                    <span className="font-bold">{item.value} / {item.total} ({pct}%)</span>
-                  </div>
-                  <div className="h-2 rounded-full" style={{ background: "var(--base-300)" }}>
-                    <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
-                      transition={{ duration: 0.8, delay: 0.3 }}
-                      className="h-full rounded-full" style={{ background: item.color }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* ── Table ── */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-        className="glass-card overflow-hidden">
-
-        {/* Toolbar */}
-        <div className="p-5 border-b flex flex-col sm:flex-row gap-4 items-start sm:items-center"
-          style={{ borderColor: "var(--base-300)" }}>
-          <div className="flex items-center gap-2 input-field flex-1 max-w-xs">
-            <Search size={14} className="opacity-40" />
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search user…" className="bg-transparent flex-1 outline-none text-sm" />
-          </div>
-          <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
-            className="input-field text-sm cursor-pointer">
-            <option value="">All Roles</option>
-            {["customer","doctor","pharmacy","transportpartner","lab partner","care assistant","driver"].map(r => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-          <p className="text-xs opacity-40 ml-auto">{filtered.length} users</p>
-        </div>
-
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ background: "var(--base-200)", borderBottom: "1px solid var(--base-300)" }}>
-                {["User", "Email", "KYC Status", "Coins", "Account", "Quick Actions"].map(h => (
-                  <th key={h} className="px-5 py-3.5 text-left text-xs font-bold uppercase tracking-wider"
-                    style={{ color: "color-mix(in oklch, var(--base-content) 50%, transparent)" }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <AnimatePresence>
-                {listLoading
-                  ? Array.from({ length: 8 }).map((_, i) => (
-                      <tr key={i} style={{ borderBottom: "1px solid var(--base-300)" }}>
-                        {Array.from({ length: 6 }).map((_, j) => (
-                          <td key={j} className="px-5 py-4"><div className="skeleton h-4 rounded" /></td>
-                        ))}
-                      </tr>
-                    ))
-                  : filtered.map((user, i) => (
-                      <PermissionRow key={user._id} user={user} index={i}
-                        onKyc={setKycTarget}
-                        onCoin={setCoinTarget}
-                        onNotif={setNotifTarget} />
-                    ))
-                }
-              </AnimatePresence>
-            </tbody>
-          </table>
-          {!listLoading && filtered.length === 0 && (
-            <div className="text-center py-16 opacity-30">
-              <Users size={36} className="mx-auto mb-3" />
-              <p className="text-sm font-semibold">No users match your filters</p>
-            </div>
-          )}
-        </div>
-      </motion.div>
-
-      {/* ── Panels ── */}
-      <AnimatePresence>
-        {kycTarget   && <KycPanel   user={kycTarget}   onClose={() => setKycTarget(null)} />}
-        {coinTarget  && <CoinPanel  user={coinTarget}  onClose={() => setCoinTarget(null)} />}
-        {notifTarget && <NotifPanel user={notifTarget} onClose={() => setNotifTarget(null)} />}
-      </AnimatePresence>
+      {/* ── Modals ── */}
+      <PermissionModals
+        modal={modal}
+        onClose={closeModal}
+        onUpdateRole={handleUpdateRole}
+        onSuspend={handleSuspend}
+        onUnblock={handleUnblock}
+        onResetOtp={handleResetOtp}
+        loaders={loaders}
+      />
     </div>
   );
 }

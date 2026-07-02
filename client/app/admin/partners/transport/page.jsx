@@ -1,2200 +1,1984 @@
 'use client';
 
-/**
- * TransportPartnerManagement.jsx — Likeson.in
- * Superadmin — Full Transport Partner Management
- *
- * FIXES APPLIED:
- *  1. Data persistence on tab switch — each section stores its own data in Redux
- *     and re-fetches only when deps change (not on every render).
- *  2. All input fields now have placeholder + helper-note.
- *  3. Analytics upgraded to multi-chart professional layout.
- *  4. Password: auto-generate (LKS prefix, unique) OR manual entry.
- *  5. platformFee object rendering fixed (safeVal / formatFee).
- *  6. vehicleStats byType array safe-rendered.
- */
-
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import {
+  useState, useCallback, useMemo, useEffect, useRef, memo,
+} from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, RadarChart, Radar, PolarGrid, PolarAngleAxis,
-  LineChart, Line, ComposedChart,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import {
-  Building2, Users, Car, MapPin, Wallet, ShieldCheck, Activity,
-  Plus, Search, Filter, ChevronDown, ChevronRight, Eye, Edit3,
-  Trash2, Ban, CheckCircle2, XCircle, Clock, AlertTriangle,
-  TrendingUp, Star, DollarSign, FileText, Settings, Bell,
-  Upload, Link2, X, Check, RefreshCw, Download, MoreVertical,
-  ArrowUpRight, Truck, CreditCard, Zap, Globe, Phone,
-  Mail, Calendar, Hash, Shield, Lock, ChevronUp,
-  BarChart2, List, Send, Pause, Play, AlertCircle,
-  Info, ExternalLink, Copy, Camera, Navigation,
-  Award, Target, Layers, Percent, Package, ClipboardList,
-  UserCheck, UserX, KeyRound, Wrench, Coins, PieChart as PieIcon,
-  ToggleLeft, ToggleRight, BookOpen, RefreshCcw, Shuffle,
-  EyeOff, BadgeCheck, Banknote, TrendingDown, Hash as HashIcon,
+  Building2, Users, Truck, ShieldCheck, ShieldX, DollarSign,
+  Search, Plus, Eye, Pencil, Trash2, AlertTriangle, BarChart2,
+  FileText, MapPin, RefreshCw, ChevronLeft, ChevronRight,
+  Activity, Lock, Unlock, StickyNote, Star,
+  Loader2, X, Check, Ban, Wallet, Globe,
+  Info, BadgeCheck, Receipt, Coins, Image, ExternalLink,
+  FileImage, FileBadge, Car,
 } from 'lucide-react';
 
 import {
-  adminFetchPartners, adminFetchPartnerById, adminCreatePartner,
-  adminUpdatePartner, adminUpdatePartnerStatus, adminUpdatePartnerKyc,
-  adminUpdatePartnerNotes, adminDeletePartner, adminFetchPartnerLogs,
-  adminFetchPendingVehicles, adminVerifyVehicle,
-  adminFetchAllDrivers, adminFetchAvailableDrivers, adminFetchDriverById,
-  adminVerifyDriverKyc, adminBlockDriver, adminUnblockDriver,
-  adminUpdateDriverNotes, adminAdjustDriverCoins, adminFetchDriverLogs,
-  adminFetchGlobalPricing, adminUpdateGlobalPricing,
-  adminSetPartnerPlatformFee, adminProcessPartnerSettlement,
-  adminFetchTransportLogs, adminFetchTransportStats,
-  clearTPError,
+  adminFetchPartners,
+  adminFetchPartnerById,
+  adminCreatePartner,
+  adminUpdatePartner,
+  adminUpdatePartnerStatus,
+  adminUpdatePartnerKyc,
+  adminUpdatePartnerNotes,
+  adminDeletePartner,
+  adminFetchPartnerLogs,
+  adminFetchPendingVehicles,
+  adminVerifyVehicle,
+  adminFetchAllDrivers,
+  adminFetchAvailableDrivers,
+  adminFetchDriverById,
+  adminVerifyDriverKyc,
+  adminBlockDriver,
+  adminUnblockDriver,
+  adminUpdateDriverNotes,
+  adminAdjustDriverCoins,
+  adminFetchDriverLogs,
+  adminFetchGlobalPricing,
+  adminUpdateGlobalPricing,
+  adminSetPartnerPlatformFee,
+  adminProcessPartnerSettlement,
+  adminFetchTransportLogs,
+  adminFetchTransportStats,
 } from '@/store/slices/transportPartnerSlice';
 
-import { uploadSingleFile } from '@/store/slices/uploadSlice';
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Animation variants
-// ─────────────────────────────────────────────────────────────────────────────
-const fadeUp  = { hidden: { opacity: 0, y: 16 },     visible: { opacity: 1, y: 0,     transition: { duration: 0.35 } } };
-const fadeIn  = { hidden: { opacity: 0 },             visible: { opacity: 1,           transition: { duration: 0.25 } } };
-const scaleIn = { hidden: { opacity: 0, scale: 0.96 },visible: { opacity: 1, scale: 1, transition: { duration: 0.22 } } };
-const stagger = { visible: { transition: { staggerChildren: 0.06 } } };
+const TABS = [
+  { id: 'overview', label: 'Overview',    icon: BarChart2 },
+  { id: 'partners', label: 'Partners',    icon: Building2 },
+  { id: 'vehicles', label: 'Vehicles',    icon: Truck },
+  { id: 'drivers',  label: 'Drivers',     icon: Users },
+  { id: 'pricing',  label: 'Pricing',     icon: DollarSign },
+  { id: 'logs',     label: 'System Logs', icon: FileText },
+];
 
-const CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899'];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-const safeVal = (val) => {
-  if (val === null || val === undefined) return '—';
-  if (typeof val === 'boolean') return val ? 'Yes' : 'No';
-  if (typeof val === 'object') return JSON.stringify(val);
-  return String(val);
+const STATUS_CSS = {
+  active:          'badge-success',
+  pending:         'badge-warning',
+  'under-review':  'badge-info',
+  suspended:       'badge-error',
+  rejected:        'badge-error',
 };
 
-const formatFee = (fee) => {
-  if (!fee) return 'Global default';
-  if (typeof fee === 'object' && fee.type && fee.value !== undefined)
-    return fee.type === 'percentage' ? `${fee.value}%` : `₹${fee.value} flat`;
-  return safeVal(fee);
+const KYC_CSS = {
+  verified:        'badge-success',
+  pending:         'badge-warning',
+  'under-review':  'badge-info',
+  rejected:        'badge-error',
+  'not-submitted': 'badge-ghost',
 };
 
-const inr = (n) => `₹${(Number(n) || 0).toLocaleString('en-IN')}`;
-
-/** Generate a unique Likeson password: LKS + 4 random uppercase + 4 digits + 1 symbol */
-const generatePassword = () => {
-  const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const digits = '0123456789';
-  const syms   = '@#$!';
-  const rand = (s) => s[Math.floor(Math.random() * s.length)];
-  const uid = Date.now().toString(36).slice(-4).toUpperCase();
-  return `LKS${uid}${rand(upper)}${rand(upper)}${rand(digits)}${rand(digits)}${rand(syms)}`;
+const DRIVER_KYC_CSS = {
+  Verified:        'badge-success',
+  Pending:         'badge-warning',
+  'Under-Review':  'badge-info',
+  Rejected:        'badge-error',
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Status Badge
-// ─────────────────────────────────────────────────────────────────────────────
-const StatusBadge = ({ status }) => {
-  const map = {
-    active: 'badge-success', pending: 'badge-warning', 'under-review': 'badge-info',
-    suspended: 'badge-error', rejected: 'badge-error', verified: 'badge-success',
-    Verified: 'badge-success', 'not-submitted': 'badge', Available: 'badge-success',
-    'On-Trip': 'badge-info', Offline: 'badge', Blocked: 'badge-error',
-    Pending: 'badge-warning', 'Under-Review': 'badge-info',
-  };
-  return <span className={`badge ${map[status] || 'badge'} text-[10px]`}>{safeVal(status)}</span>;
-};
+const DRIVER_KYC_STATUSES      = ['Pending', 'Under-Review', 'Verified', 'Rejected'];
+const VEHICLE_VERIFY_STATUSES  = ['under-review', 'verified', 'rejected'];
+const PARTNERSHIP_STATUSES     = ['pending', 'under-review', 'active', 'suspended', 'rejected'];
+
+const CHART_PALETTE = [
+  'var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)',
+  'var(--chart-4)', 'var(--chart-5)', 'var(--chart-6)',
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Stat Card
+// FRAMER VARIANTS
 // ─────────────────────────────────────────────────────────────────────────────
-const StatCard = ({ icon: Icon, label, value, sub, trend, color = 'var(--primary)' }) => (
-  <motion.div variants={fadeUp} className="glass-card p-5 flex flex-col gap-3 hover:shadow-lg transition-shadow">
-    <div className="flex items-start justify-between">
-      <div className="p-2.5 rounded-xl" style={{ background: `color-mix(in srgb, ${color}, transparent 85%)` }}>
-        <Icon size={20} style={{ color }} />
-      </div>
-      {trend !== undefined && (
-        <span className={`text-xs font-semibold flex items-center gap-1 ${trend >= 0 ? 'text-success' : 'text-error'}`}>
-          {trend >= 0 ? <ChevronUp size={12} /> : <TrendingDown size={12} />}
-          {Math.abs(trend)}%
-        </span>
-      )}
-    </div>
-    <div>
-      <p className="text-2xl font-black text-base-content">{safeVal(value)}</p>
-      <p className="text-xs font-semibold text-base-content/60 mt-0.5">{label}</p>
-      {sub && <p className="text-[11px] text-base-content/40 mt-1">{safeVal(sub)}</p>}
-    </div>
-  </motion.div>
-);
+
+const fadeUp  = { hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0, transition: { duration: 0.26, ease: 'easeOut' } } };
+const stagger = { visible: { transition: { staggerChildren: 0.055 } } };
+const slideIn = { hidden: { opacity: 0, x: 20 }, visible: { opacity: 1, x: 0, transition: { duration: 0.24, ease: 'easeOut' } }, exit: { opacity: 0, x: 20, transition: { duration: 0.16 } } };
+const scaleIn = { hidden: { opacity: 0, scale: 0.96 }, visible: { opacity: 1, scale: 1, transition: { duration: 0.2 } }, exit: { opacity: 0, scale: 0.96, transition: { duration: 0.14 } } };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Section Header
+// HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-const SectionHeader = ({ icon: Icon, title, subtitle, actions }) => (
-  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-    <div className="flex items-center gap-3">
-      <div className="p-2.5 rounded-xl" style={{ background: 'color-mix(in srgb, var(--primary), transparent 85%)' }}>
-        <Icon size={20} style={{ color: 'var(--primary)' }} />
-      </div>
-      <div>
-        <h2 className="text-xl font-black text-base-content">{title}</h2>
-        {subtitle && <p className="text-xs text-base-content/50 mt-0.5">{subtitle}</p>}
-      </div>
-    </div>
-    {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
-  </div>
-);
+
+/** Detect if URL is a PDF */
+const isPdf = (url) => url && url.toLowerCase().includes('.pdf');
+
+/** Detect if URL is an image */
+const isImage = (url) => url && /\.(jpg|jpeg|png|webp|gif|svg|avif)(\?|$)/i.test(url);
+
+/** Format INR */
+const inr = (n) => Number(n ?? 0).toLocaleString('en-IN');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Modal
+// DOC VIEWER MODAL
 // ─────────────────────────────────────────────────────────────────────────────
-const Modal = ({ open, onClose, title, children, size = 'md' }) => {
-  const sizes = { sm: 'max-w-md', md: 'max-w-2xl', lg: 'max-w-4xl', xl: 'max-w-6xl' };
+
+const DocViewerModal = memo(({ open, onClose, url, title }) => {
+  if (!open || !url) return null;
+  const pdf = isPdf(url);
+  const img = isImage(url);
+
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <motion.div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <motion.div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(8px)' }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          onClick={onClose}
+        >
           <motion.div
-            className={`relative z-10 w-full ${sizes[size]} glass-card p-6 max-h-[90vh] overflow-y-auto`}
-            variants={scaleIn} initial="hidden" animate="visible" exit="hidden">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-black text-base-content">{title}</h3>
-              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-base-300 transition-colors"><X size={18} /></button>
+            variants={scaleIn} initial="hidden" animate="visible" exit="exit"
+            className="bg-base-100 rounded-xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-base-300 shrink-0">
+              <div className="flex items-center gap-2">
+                {pdf ? <FileText size={15} className="text-error" /> : <FileImage size={15} className="text-primary" />}
+                <span className="text-sm font-bold text-base-content">{title}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs gap-1" title="Open in new tab">
+                  <ExternalLink size={12} /> Open
+                </a>
+                <button onClick={onClose} className="btn btn-ghost btn-xs btn-circle"><X size={14} /></button>
+              </div>
             </div>
-            {children}
+            {/* Body */}
+            <div className="flex-1 overflow-auto p-4 flex items-start justify-center">
+              {pdf ? (
+                <iframe
+                  src={url}
+                  className="w-full rounded-lg border border-base-300"
+                  style={{ minHeight: '70vh' }}
+                  title={title}
+                />
+              ) : img ? (
+                <img
+                  src={url}
+                  alt={title}
+                  className="max-w-full max-h-[72vh] rounded-lg object-contain border border-base-300 shadow"
+                />
+              ) : (
+                <div className="text-center py-16">
+                  <FileText size={48} className="mx-auto mb-4 text-base-content/20" />
+                  <p className="text-sm text-base-content/50 mb-4">Cannot preview this file type.</p>
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm gap-2">
+                    <ExternalLink size={13} /> Open in New Tab
+                  </a>
+                </div>
+              )}
+            </div>
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
   );
-};
+});
+DocViewerModal.displayName = 'DocViewerModal';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Field wrapper (label + helper note)
+// DOC THUMB
 // ─────────────────────────────────────────────────────────────────────────────
-const Field = ({ label, children, required, note }) => (
+
+const DocThumb = memo(({ url, label }) => {
+  const [open, setOpen] = useState(false);
+  if (!url) return (
+    <div className="flex flex-col items-center gap-1.5 p-3 rounded-lg border border-dashed border-base-300 bg-base-200/50 min-w-[100px]">
+      <FileText size={22} className="text-base-content/20" />
+      <span className="text-xs text-base-content/40 text-center leading-tight">{label}</span>
+      <span className="text-xs text-base-content/30 italic">Not uploaded</span>
+    </div>
+  );
+  const pdf = isPdf(url);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="flex flex-col items-center gap-1.5 p-3 rounded-lg border border-base-300 bg-base-200 hover:border-primary hover:bg-primary/5 transition-all min-w-[100px] cursor-pointer group"
+        title={`View ${label}`}
+      >
+        {pdf ? (
+          <div className="w-16 h-12 flex items-center justify-center bg-error/10 rounded-md">
+            <FileText size={28} className="text-error" />
+          </div>
+        ) : (
+          <img
+            src={url}
+            alt={label}
+            className="w-16 h-12 object-cover rounded-md border border-base-300 group-hover:ring-2 group-hover:ring-primary transition-all"
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
+        )}
+        <span className="text-xs text-base-content/60 text-center leading-tight font-medium">{label}</span>
+        <span className="text-xs text-primary flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Eye size={10} /> View
+        </span>
+      </button>
+      <DocViewerModal open={open} onClose={() => setOpen(false)} url={url} title={label} />
+    </>
+  );
+});
+DocThumb.displayName = 'DocThumb';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED MICRO-COMPONENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FieldNote = memo(({ label, note, children, required = false }) => (
   <div className="flex flex-col gap-1">
-    <label className="text-xs font-semibold text-base-content/70">
-      {label}{required && <span className="text-error ml-1">*</span>}
+    <label className="label-text flex items-center gap-1">
+      {label}
+      {required && <span className="text-error text-xs leading-none">*</span>}
     </label>
     {children}
-    {note && <p className="text-[10px] text-base-content/40 mt-0.5">{note}</p>}
+    {note && (
+      <p className="flex items-center gap-1 text-xs text-base-content/50 leading-snug">
+        <Info size={10} className="shrink-0" />
+        {note}
+      </p>
+    )}
   </div>
-);
+));
+FieldNote.displayName = 'FieldNote';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Media Input
-// ─────────────────────────────────────────────────────────────────────────────
-const MediaInput = ({ label, value, onChange, folder = 'transport', note }) => {
-  const dispatch = useDispatch();
-  const { isUploading } = useSelector((s) => s.upload);
-  const [mode, setMode] = useState('url');
-  const fileRef = useRef();
+const SkeletonRow = memo(({ cols = 6 }) => (
+  <tr aria-hidden="true">
+    {Array.from({ length: cols }).map((_, i) => (
+      <td key={i} className="px-4 py-3">
+        <div className="skeleton h-4 w-full rounded animate-pulse bg-base-300" />
+      </td>
+    ))}
+  </tr>
+));
+SkeletonRow.displayName = 'SkeletonRow';
 
-  const handleFile = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const res = await dispatch(uploadSingleFile({ file, folder }));
-    if (res.payload?.url) onChange(res.payload.url);
-  };
+const StatCard = memo(({ icon: Icon, label, value, sub, color = 'primary' }) => (
+  <motion.div variants={fadeUp} className="stat-card relative overflow-hidden flex flex-col gap-2">
+    <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-2xl opacity-60"
+      style={{ backgroundColor: `color-mix(in srgb, var(--${color}), transparent 85%)` }} aria-hidden="true" />
+    <div className="p-2 rounded-lg w-fit" style={{ backgroundColor: `color-mix(in srgb, var(--${color}), transparent 88%)` }}>
+      <Icon size={18} style={{ color: `var(--${color})` }} />
+    </div>
+    <div>
+      <p className="stat-card-label">{label}</p>
+      <p className="stat-card-value" style={{ color: `var(--${color})` }}>{value ?? '—'}</p>
+      {sub && <p className="text-xs text-base-content/40 mt-0.5">{sub}</p>}
+    </div>
+  </motion.div>
+));
+StatCard.displayName = 'StatCard';
+
+const StatusBadge = memo(({ status, className = '' }) => (
+  <span className={`badge ${STATUS_CSS[status] ?? 'badge-ghost'} ${className}`}>{status ?? 'unknown'}</span>
+));
+StatusBadge.displayName = 'StatusBadge';
+
+const KycBadge = memo(({ status, className = '' }) => (
+  <span className={`badge ${KYC_CSS[status?.toLowerCase?.()] ?? 'badge-ghost'} ${className}`}>{status ?? 'n/a'}</span>
+));
+KycBadge.displayName = 'KycBadge';
+
+const DriverKycBadge = memo(({ status, className = '' }) => (
+  <span className={`badge ${DRIVER_KYC_CSS[status] ?? 'badge-ghost'} ${className}`}>{status ?? 'n/a'}</span>
+));
+DriverKycBadge.displayName = 'DriverKycBadge';
+
+const CurrentValueRow = memo(({ label, children }) => (
+  <div className="flex items-center gap-3 bg-base-200 rounded-lg px-4 py-2.5 text-sm">
+    <span className="text-base-content/50 font-medium shrink-0">{label}:</span>
+    <span className="font-semibold text-base-content">{children}</span>
+  </div>
+));
+CurrentValueRow.displayName = 'CurrentValueRow';
+
+const Pagination = memo(({ page, total, limit, onPageChange }) => {
+  const pages = Math.max(1, Math.ceil(total / limit));
+  if (pages <= 1) return null;
+  const visiblePages = useMemo(() => {
+    const range = [];
+    const delta = 2;
+    for (let i = Math.max(1, page - delta); i <= Math.min(pages, page + delta); i++) range.push(i);
+    return range;
+  }, [page, pages]);
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <label className="text-xs font-semibold text-base-content/70">{label}</label>
-        <div className="flex rounded-lg overflow-hidden border border-base-300 ml-auto">
-          {['url', 'upload'].map((m) => (
-            <button key={m} type="button" onClick={() => setMode(m)}
-              className={`px-2.5 py-1 text-[11px] font-bold transition-colors ${mode === m ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/50'}`}>
-              {m === 'url' ? <Link2 size={11} /> : <Upload size={11} />}
-            </button>
-          ))}
-        </div>
+    <div className="flex items-center justify-between px-4 py-3 border-t border-base-300 flex-wrap gap-2">
+      <p className="text-xs text-base-content/50">
+        {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
+      </p>
+      <div className="flex items-center gap-1" role="navigation" aria-label="Pagination">
+        <button className="btn btn-ghost btn-xs btn-circle" disabled={page <= 1} onClick={() => onPageChange(page - 1)} aria-label="Previous">
+          <ChevronLeft size={13} />
+        </button>
+        {visiblePages.map((p) => (
+          <button key={p} className={`btn btn-xs btn-circle ${page === p ? 'btn-primary' : 'btn-ghost'}`} onClick={() => onPageChange(p)} aria-current={page === p ? 'page' : undefined}>
+            {p}
+          </button>
+        ))}
+        <button className="btn btn-ghost btn-xs btn-circle" disabled={page >= pages} onClick={() => onPageChange(page + 1)} aria-label="Next">
+          <ChevronRight size={13} />
+        </button>
       </div>
-      {mode === 'url' ? (
-        <input type="url" value={value || ''} onChange={(e) => onChange(e.target.value)}
-          placeholder="https://cdn.example.com/doc.jpg" className="input-field w-full text-xs" />
-      ) : (
-        <div onClick={() => fileRef.current?.click()}
-          className="border-2 border-dashed border-base-300 rounded-xl p-4 text-center cursor-pointer hover:border-primary transition-colors">
-          {isUploading ? <span className="spinner mx-auto" /> : value ? (
-            <div className="flex flex-col items-center gap-1">
-              <CheckCircle2 size={20} className="text-success" />
-              <p className="text-[11px] text-success font-semibold">Uploaded</p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-1">
-              <Upload size={20} className="text-base-content/30" />
-              <p className="text-[11px] text-base-content/50">Click to upload (image / PDF)</p>
-            </div>
-          )}
-          <input ref={fileRef} type="file" className="hidden" accept="image/*,.pdf" onChange={handleFile} />
-        </div>
-      )}
-      {value && <p className="text-[10px] text-base-content/40 truncate">{value}</p>}
-      {note && <p className="text-[10px] text-base-content/40">{note}</p>}
     </div>
   );
-};
+});
+Pagination.displayName = 'Pagination';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Confirm Dialog
-// ─────────────────────────────────────────────────────────────────────────────
-const ConfirmDialog = ({ open, onClose, onConfirm, title, message, danger }) => (
-  <Modal open={open} onClose={onClose} title={title} size="sm">
-    <p className="text-sm text-base-content/70 mb-6">{message}</p>
-    <div className="flex gap-3 justify-end">
-      <button onClick={onClose} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-      <button onClick={() => { onConfirm(); onClose(); }}
-        className="btn-primary-cta text-xs px-4 py-2"
-        style={danger ? { background: 'var(--error)' } : {}}>
-        Confirm
-      </button>
+const Modal = memo(({ open, onClose, title, children, width = 'max-w-2xl' }) => {
+  const overlayRef = useRef(null);
+  const handleOverlayClick = useCallback((e) => { if (e.target === overlayRef.current) onClose(); }, [onClose]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          ref={overlayRef}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(6px)' }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          onClick={handleOverlayClick}
+          role="dialog" aria-modal="true" aria-label={title}
+        >
+          <motion.div
+            variants={scaleIn} initial="hidden" animate="visible" exit="exit"
+            className={`bg-base-100 rounded-xl shadow-2xl w-full ${width} max-h-[90vh] flex flex-col`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-base-300 shrink-0">
+              <h2 className="text-base font-bold text-base-content">{title}</h2>
+              <button onClick={onClose} className="btn btn-ghost btn-xs btn-circle" aria-label="Close modal"><X size={15} /></button>
+            </div>
+            <div className="px-6 py-5 overflow-y-auto flex-1">{children}</div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+});
+Modal.displayName = 'Modal';
+
+const ConfirmDialog = memo(({ open, onClose, onConfirm, title, message, danger = false, loading = false }) => (
+  <Modal open={open} onClose={onClose} title={title} width="max-w-sm">
+    <div className="space-y-4">
+      {danger && (
+        <div className="alert alert-error text-sm">
+          <AlertTriangle size={15} />
+          <span>This action cannot be undone.</span>
+        </div>
+      )}
+      <p className="text-sm text-base-content/70">{message}</p>
+      <div className="flex gap-2 justify-end">
+        <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={loading}>Cancel</button>
+        <button className={`btn btn-sm ${danger ? 'btn-error' : 'btn-primary'}`} onClick={onConfirm} disabled={loading}>
+          {loading ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+          Confirm
+        </button>
+      </div>
     </div>
   </Modal>
-);
+));
+ConfirmDialog.displayName = 'ConfirmDialog';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Info Row / Cell
-// ─────────────────────────────────────────────────────────────────────────────
-const InfoRow = ({ label, value }) => (
-  <div className="flex items-center justify-between text-sm py-1.5 border-b border-base-300/40 last:border-0">
-    <span className="text-base-content/50 text-xs">{label}</span>
-    <span className="font-semibold text-xs text-right max-w-[60%] truncate">{safeVal(value)}</span>
+const SectionTabs = memo(({ sections, active, onChange }) => (
+  <div className="flex flex-wrap gap-1 border-b border-base-300 pb-2 mb-4" role="tablist">
+    {sections.map(({ id, label, icon: Icon }) => (
+      <button key={id} role="tab" aria-selected={active === id}
+        className={`btn btn-xs gap-1 ${active === id ? 'btn-primary' : 'btn-ghost'}`}
+        onClick={() => onChange(id)}>
+        <Icon size={11} />{label}
+      </button>
+    ))}
   </div>
-);
-
-const InfoCell = ({ label, value, valueNode }) => (
-  <div className="flex flex-col gap-1 p-3 bg-base-200/50 rounded-xl">
-    <span className="text-[10px] font-bold text-base-content/40 uppercase tracking-wider">{label}</span>
-    {valueNode ?? <span className="text-sm font-semibold">{safeVal(value)}</span>}
-  </div>
-);
+));
+SectionTabs.displayName = 'SectionTabs';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Password field with auto-generate / manual toggle
+// OVERVIEW TAB
 // ─────────────────────────────────────────────────────────────────────────────
-const PasswordField = ({ value, onChange }) => {
-  const [mode,    setMode]    = useState('auto');   // 'auto' | 'manual'
-  const [visible, setVisible] = useState(false);
 
-  const reGenerate = useCallback(() => {
-    onChange(generatePassword());
-  }, [onChange]);
-
-  // Auto-generate on first render
-  useEffect(() => {
-    if (mode === 'auto' && !value) reGenerate();
-  }, []); // eslint-disable-line
-
-  const switchMode = (m) => {
-    setMode(m);
-    if (m === 'auto') reGenerate();
-    else onChange('');
-  };
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <label className="text-xs font-semibold text-base-content/70">
-          Password <span className="text-error">*</span>
-        </label>
-        {/* Mode toggle */}
-        <div className="flex rounded-lg overflow-hidden border border-base-300">
-          {['auto', 'manual'].map((m) => (
-            <button key={m} type="button" onClick={() => switchMode(m)}
-              className={`px-3 py-1 text-[10px] font-black uppercase tracking-wide transition-colors ${
-                mode === m ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/50 hover:bg-base-300'
-              }`}>
-              {m === 'auto' ? '⚡ Auto' : '✏️ Manual'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {mode === 'auto' ? (
-        <div className="flex items-center gap-2">
-          <div className="flex-1 flex items-center gap-2 input-field bg-base-200/80 font-mono text-sm">
-            <span className="text-primary font-black tracking-wide">{visible ? value : value?.replace(/./g, '•')}</span>
-          </div>
-          <button type="button" onClick={() => setVisible((v) => !v)}
-            className="p-2.5 rounded-xl border border-base-300 hover:bg-base-200 transition-colors" title="Show/hide">
-            <EyeOff size={15} className={visible ? 'text-primary' : 'text-base-content/40'} />
-          </button>
-          <button type="button" onClick={reGenerate}
-            className="p-2.5 rounded-xl border border-base-300 hover:bg-base-200 transition-colors" title="Regenerate">
-            <RefreshCcw size={15} className="text-base-content/60" />
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <input
-            type={visible ? 'text' : 'password'}
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="Enter a strong password..."
-            className="input-field flex-1 text-sm"
-          />
-          <button type="button" onClick={() => setVisible((v) => !v)}
-            className="p-2.5 rounded-xl border border-base-300 hover:bg-base-200 transition-colors">
-            <EyeOff size={15} className={visible ? 'text-primary' : 'text-base-content/40'} />
-          </button>
-        </div>
-      )}
-
-      <p className="text-[10px] text-base-content/40">
-        {mode === 'auto'
-          ? 'Auto-generated passwords start with LKS and are unique to this account. This password will be emailed to the partner.'
-          : 'Min 8 characters. Include uppercase, number and symbol for security.'}
-      </p>
-    </div>
-  );
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-// §M  Platform Stats — Professional analytics dashboard
-// ═════════════════════════════════════════════════════════════════════════════
-const PlatformStats = () => {
+const OverviewTab = memo(() => {
   const dispatch = useDispatch();
   const { adminStats, loading } = useSelector((s) => s.transportPartner);
 
-  // FIX: fetch only once on mount, not on every re-render
   useEffect(() => { dispatch(adminFetchTransportStats()); }, [dispatch]);
 
-  const partnerStats = useMemo(() => adminStats?.partnerStats || [], [adminStats]);
-  const driverStats  = useMemo(() => adminStats?.driverStats  || [], [adminStats]);
-  const vehicleStats = useMemo(() => adminStats?.vehicleStats  || [], [adminStats]);
+  const partnerData = useMemo(() =>
+    (adminStats?.partnerStats ?? []).map((s) => ({ name: s._id ?? 'unknown', count: s.count, rides: s.totalRides ?? 0, earnings: s.totalEarnings ?? 0 })), [adminStats]);
+  const driverData  = useMemo(() =>
+    (adminStats?.driverStats  ?? []).map((s) => ({ name: s._id ?? 'unknown', count: s.count })), [adminStats]);
+  const vehicleData = useMemo(() =>
+    (adminStats?.vehicleStats ?? []).map((s) => ({ name: s._id ?? 'unknown', count: s.count })), [adminStats]);
 
-  const totalPartners = partnerStats.reduce((a, s) => a + (s.count || 0), 0);
-  const totalVehicles = partnerStats.reduce((a, s) => a + (s.totalVehicles || 0), 0);
-  const totalRides    = partnerStats.reduce((a, s) => a + (s.totalRides || 0), 0);
-  const totalEarnings = partnerStats.reduce((a, s) => a + (s.totalEarnings || 0), 0);
+  const kpis = useMemo(() => ({
+    totalPartners:  partnerData.reduce((a, b) => a + b.count, 0),
+    activePartners: partnerData.find((p) => p.name === 'active')?.count ?? 0,
+    totalDrivers:   driverData.reduce((a, b)  => a + b.count, 0),
+    totalVehicles:  vehicleData.reduce((a, b) => a + b.count, 0),
+  }), [partnerData, driverData, vehicleData]);
 
-  const activePartners    = partnerStats.find((s) => s._id === 'active')?.count || 0;
-  const pendingPartners   = partnerStats.find((s) => s._id === 'pending')?.count || 0;
-  const availableDrivers  = driverStats.find((s)  => s._id === 'Available')?.count || 0;
-  const onTripDrivers     = driverStats.find((s)  => s._id === 'On-Trip')?.count || 0;
-  const verifiedVehicles  = vehicleStats.find((s) => s._id === 'verified')?.count || 0;
-  const pendingVehicles   = vehicleStats.find((s) => s._id === 'pending')?.count || 0;
-
-  // Utilization gauge data
-  const utilization = totalVehicles > 0 ? Math.round((onTripDrivers / totalVehicles) * 100) : 0;
-
-  // Revenue breakdown per status for area chart
-  const revenueByStatus = partnerStats.map((s) => ({
-    name:     String(s._id),
-    earnings: s.totalEarnings || 0,
-    rides:    s.totalRides    || 0,
-    vehicles: s.totalVehicles || 0,
-  }));
-
-  // Driver availability donut data
-  const driverDonut = driverStats.map((d, i) => ({
-    name:  String(d._id),
-    value: d.count || 0,
-    fill:  CHART_COLORS[i % CHART_COLORS.length],
-  }));
-
-  // Vehicle verification bar data
-  const vehicleBar = vehicleStats.map((v) => ({
-    name:  String(v._id),
-    count: v.count || 0,
-  }));
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div className="glass-card p-3 shadow-xl text-xs">
-        <p className="font-black text-base-content mb-2">{label}</p>
-        {payload.map((p, i) => (
-          <p key={i} style={{ color: p.color }} className="font-semibold">
-            {p.name}: {typeof p.value === 'number' && p.name?.toLowerCase().includes('earn')
-              ? inr(p.value) : p.value.toLocaleString('en-IN')}
-          </p>
-        ))}
-      </div>
-    );
-  };
-
-  if (loading && !adminStats) {
-    return <div className="flex justify-center py-24"><span className="spinner" /></div>;
-  }
+  if (loading && !adminStats) return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="stat-card animate-pulse">
+          <div className="skeleton h-8 w-20 rounded mb-3 bg-base-300" />
+          <div className="skeleton h-5 w-12 rounded bg-base-300" />
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-6">
-      <SectionHeader icon={BarChart2} title="Platform Analytics"
-        subtitle="Real-time transport ecosystem overview"
-        actions={
-          <button onClick={() => dispatch(adminFetchTransportStats())}
-            className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5">
-            <RefreshCw size={13} /> Refresh
-          </button>
-        }
-      />
-
-      {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Building2} label="Total Partners"     value={totalPartners}  sub={`${activePartners} active`}   color="var(--primary)"   />
-        <StatCard icon={Car}       label="Fleet Vehicles"     value={totalVehicles}  sub={`${verifiedVehicles} verified`} color="var(--info)"    />
-        <StatCard icon={Users}     label="Registered Drivers" value={driverStats.reduce((a, d) => a + d.count, 0)} sub={`${availableDrivers} available`} color="var(--success)" />
-        <StatCard icon={Wallet}    label="Total Earnings"     value={inr(totalEarnings)} sub={`${totalRides.toLocaleString('en-IN')} rides`} color="var(--secondary)" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard icon={Building2}  label="Total Partners"  value={kpis.totalPartners}  sub={`${kpis.activePartners} active`} color="primary" />
+        <StatCard icon={ShieldCheck} label="Active Partners" value={kpis.activePartners} color="success" />
+        <StatCard icon={Users}      label="Total Drivers"   value={kpis.totalDrivers}   color="secondary" />
+        <StatCard icon={Truck}      label="Total Vehicles"  value={kpis.totalVehicles}  color="accent" />
       </div>
 
-      {/* Secondary KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: 'Active Partners',    val: activePartners,   icon: CheckCircle2, color: 'var(--success)' },
-          { label: 'Pending Approval',   val: pendingPartners,  icon: Clock,        color: 'var(--warning)' },
-          { label: 'On-Trip Now',        val: onTripDrivers,    icon: Truck,        color: 'var(--info)'    },
-          { label: 'Vehicles Pending',   val: pendingVehicles,  icon: AlertTriangle,color: 'var(--error)'   },
-        ].map(({ label, val, icon: Icon, color }) => (
-          <motion.div key={label} variants={fadeUp}
-            className="glass-card p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg" style={{ background: `color-mix(in srgb, ${color}, transparent 88%)` }}>
-              <Icon size={16} style={{ color }} />
-            </div>
-            <div>
-              <p className="text-xl font-black text-base-content">{val}</p>
-              <p className="text-[10px] text-base-content/50 font-semibold">{label}</p>
-            </div>
-          </motion.div>
-        ))}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="card p-5 lg:col-span-2">
+          <h3 className="text-sm font-bold text-base-content mb-4">Partners by Status</h3>
+          <ResponsiveContainer width="100%" height={210}>
+            <BarChart data={partnerData} barSize={28}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--base-300)" />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--base-content)' }} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--base-content)' }} allowDecimals={false} />
+              <Tooltip contentStyle={{ background: 'var(--base-200)', border: '1px solid var(--base-300)', borderRadius: 8, fontSize: 12 }} labelStyle={{ fontWeight: 700, color: 'var(--base-content)' }} />
+              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                {partnerData.map((_, i) => <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="card p-5">
+          <h3 className="text-sm font-bold text-base-content mb-4">Driver Status Split</h3>
+          <ResponsiveContainer width="100%" height={210}>
+            <PieChart>
+              <Pie data={driverData} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={72}
+                label={({ name, percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ''} labelLine={false}>
+                {driverData.map((_, i) => <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />)}
+              </Pie>
+              <Tooltip contentStyle={{ background: 'var(--base-200)', border: '1px solid var(--base-300)', borderRadius: 8, fontSize: 12 }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
-      {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Revenue by Partner Status — Composed */}
-        <motion.div variants={fadeUp} className="glass-card p-5 lg:col-span-2">
-          <p className="text-sm font-black text-base-content mb-1">Revenue by Partner Status</p>
-          <p className="text-[11px] text-base-content/40 mb-4">Earnings and ride volume across partnership states</p>
-          {revenueByStatus.length === 0 ? (
-            <p className="text-sm text-base-content/30 text-center py-12">No data available</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <ComposedChart data={revenueByStatus}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--base-300)" strokeOpacity={0.5} />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--base-content)', opacity: 0.5 }} />
-                <YAxis yAxisId="left" tick={{ fontSize: 11, fill: 'var(--base-content)', opacity: 0.5 }} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: 'var(--base-content)', opacity: 0.5 }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="left" dataKey="rides" name="Rides" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} opacity={0.85} />
-                <Line yAxisId="right" type="monotone" dataKey="earnings" name="Earnings (₹)" stroke={CHART_COLORS[2]} strokeWidth={2.5} dot={{ r: 4, fill: CHART_COLORS[2] }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          )}
-        </motion.div>
-
-        {/* Driver Status Donut */}
-        <motion.div variants={fadeUp} className="glass-card p-5">
-          <p className="text-sm font-black text-base-content mb-1">Driver Status</p>
-          <p className="text-[11px] text-base-content/40 mb-4">Real-time availability breakdown</p>
-          {driverDonut.length === 0 ? (
-            <p className="text-sm text-base-content/30 text-center py-12">No data</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={driverDonut} dataKey="value" nameKey="name" cx="50%" cy="50%"
-                  innerRadius={55} outerRadius={85} paddingAngle={3}
-                  label={({ name, value }) => `${name}: ${value}`}
-                  labelLine={false}>
-                  {driverDonut.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(val, name) => [val, name]} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-          <div className="flex flex-wrap gap-2 mt-2">
-            {driverDonut.map((d) => (
-              <span key={d.name} className="flex items-center gap-1.5 text-[10px] font-semibold text-base-content/60">
-                <span className="w-2 h-2 rounded-full" style={{ background: d.fill }} />
-                {d.name} ({d.value})
-              </span>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Vehicle Verification Horizontal Bar */}
-        <motion.div variants={fadeUp} className="glass-card p-5">
-          <p className="text-sm font-black text-base-content mb-1">Vehicle Verification Pipeline</p>
-          <p className="text-[11px] text-base-content/40 mb-4">Document verification funnel</p>
-          {vehicleBar.length === 0 ? (
-            <p className="text-sm text-base-content/30 text-center py-10">No data</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={vehicleBar} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--base-300)" strokeOpacity={0.5} />
-                <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--base-content)', opacity: 0.5 }} />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: 'var(--base-content)', opacity: 0.5 }} width={100} />
-                <Tooltip />
-                <Bar dataKey="count" name="Vehicles" radius={[0, 6, 6, 0]}>
-                  {vehicleBar.map((entry, i) => (
-                    <Cell key={i} fill={
-                      entry.name === 'verified'   ? '#10b981' :
-                      entry.name === 'rejected'   ? '#ef4444' :
-                      entry.name === 'pending'    ? '#f59e0b' : '#3b82f6'
-                    } />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-          {/* byType breakdown */}
-          {vehicleStats.filter((vs) => Array.isArray(vs.byType) && vs.byType.length > 0).map((vs) => (
-            <div key={vs._id} className="mt-3 flex items-start gap-2 flex-wrap">
-              <StatusBadge status={vs._id} />
-              {vs.byType.map((t, i) => (
-                <span key={i} className="text-[10px] px-2 py-0.5 bg-base-200 rounded-full font-medium text-base-content/60">
-                  {String(t)}
-                </span>
-              ))}
-            </div>
-          ))}
-        </motion.div>
-
-        {/* Fleet Utilization + Per-status breakdown */}
-        <motion.div variants={fadeUp} className="glass-card p-5 space-y-4">
-          <div>
-            <p className="text-sm font-black text-base-content mb-1">Fleet Utilization</p>
-            <p className="text-[11px] text-base-content/40">Active trips vs. total fleet capacity</p>
-          </div>
-          {/* Utilization bar */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs">
-              <span className="text-base-content/60 font-semibold">On-Trip</span>
-              <span className="font-black text-base-content">{utilization}%</span>
-            </div>
-            <div className="h-3 bg-base-300 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }} animate={{ width: `${utilization}%` }}
-                transition={{ duration: 1, ease: 'easeOut' }}
-                className="h-full rounded-full"
-                style={{ background: 'linear-gradient(90deg, var(--primary), var(--secondary))' }}
-              />
-            </div>
-            <div className="flex justify-between text-[10px] text-base-content/40">
-              <span>{onTripDrivers} on-trip</span>
-              <span>{totalVehicles} total vehicles</span>
-            </div>
-          </div>
-          {/* Per-status summary */}
-          <div className="space-y-2 pt-2">
-            {partnerStats.map((s, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-base-200/50 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
-                  <StatusBadge status={s._id} />
-                </div>
-                <div className="flex gap-4 text-xs text-right">
-                  <span className="text-base-content/50">{s.count} partners</span>
-                  <span className="font-black text-base-content">{inr(s.totalEarnings)}</span>
-                </div>
+      {vehicleData.length > 0 && (
+        <div className="card p-5">
+          <h3 className="text-sm font-bold text-base-content mb-4">Vehicles by Verification Status</h3>
+          <div className="flex flex-wrap gap-3">
+            {vehicleData.map((v, i) => (
+              <div key={v.name} className="stat-card flex-1 min-w-[100px] text-center py-4">
+                <p className="stat-card-value" style={{ color: CHART_PALETTE[i % CHART_PALETTE.length] }}>{v.count}</p>
+                <p className="stat-card-label">{v.name}</p>
               </div>
             ))}
           </div>
-        </motion.div>
-      </div>
+        </div>
+      )}
     </motion.div>
   );
+});
+OverviewTab.displayName = 'OverviewTab';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CREATE / EDIT PARTNER MODAL
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BLANK_PARTNER = {
+  name: '', email: '', phone: '', password: '',
+  businessName: '', ownerName: '', ownerPhone: '', ownerEmail: '',
+  businessType: 'proprietorship', gstNumber: '', panNumber: '',
+  partnershipStatus: 'pending',
 };
 
-// ═════════════════════════════════════════════════════════════════════════════
-// §I  Partner List
-// FIX: fetch is stable — no re-fetch on unrelated state changes
-// ═════════════════════════════════════════════════════════════════════════════
-const PartnerList = ({ onSelectPartner }) => {
+const PartnerFormModal = memo(({ open, onClose, editData }) => {
   const dispatch = useDispatch();
-  const { adminPartners, adminPartnersTotal, loading } = useSelector((s) => s.transportPartner);
+  const { loading } = useSelector((s) => s.transportPartner);
+  const [form, setForm] = useState(BLANK_PARTNER);
+  const isEdit = !!editData;
 
-  const [search, setSearch]         = useState('');
-  const [status, setStatus]         = useState('');
-  const [page,   setPage]           = useState(1);
-  const [showCreate, setShowCreate] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-
-  const defaultForm = {
-    name: '', email: '', phone: '', password: generatePassword(),
-    businessName: '', ownerName: '', ownerPhone: '', ownerEmail: '',
-    businessType: 'proprietorship', gstNumber: '', partnershipStatus: 'pending',
-  };
-  const [form, setForm] = useState(defaultForm);
-
-  const load = useCallback(() => {
-    dispatch(adminFetchPartners({ page, limit: 15, search, status }));
-  }, [dispatch, page, search, status]);
-
-  // FIX: only fetch when deps actually change
-  useEffect(() => { load(); }, [load]);
-
-  const setF = (k) => (v) => setForm((f) => ({ ...f, [k]: typeof v === 'string' ? v : v.target.value }));
-
-  const handleCreate = async () => {
-    const res = await dispatch(adminCreatePartner(form));
-    if (!res.error) {
-      setShowCreate(false);
-      setForm(defaultForm);
-      load();
+  useEffect(() => {
+    if (editData) {
+      setForm({
+        ...BLANK_PARTNER,
+        businessName:      editData.businessName      ?? '',
+        ownerName:         editData.ownerName         ?? '',
+        ownerPhone:        editData.ownerPhone        ?? '',
+        ownerEmail:        editData.ownerEmail        ?? '',
+        businessType:      editData.businessType      ?? 'proprietorship',
+        gstNumber:         editData.gstNumber         ?? '',
+        partnershipStatus: editData.partnershipStatus ?? 'pending',
+      });
+    } else {
+      setForm(BLANK_PARTNER);
     }
-  };
+  }, [editData, open]);
+
+  const set = useCallback((k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value })), []);
+
+  const handleSubmit = useCallback(async (e) => {
+    e.preventDefault();
+    if (isEdit) {
+      const { name, email, phone, password, panNumber, ...rest } = form;
+      await dispatch(adminUpdatePartner({ partnerId: editData._id, data: rest }));
+    } else {
+      await dispatch(adminCreatePartner(form));
+    }
+    onClose();
+  }, [dispatch, form, isEdit, editData, onClose]);
 
   return (
-    <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-5">
-      <SectionHeader icon={Building2} title="Transport Partners"
-        subtitle={`${adminPartnersTotal || 0} total partners on platform`}
-        actions={
-          <button onClick={() => setShowCreate(true)} className="btn-primary-cta text-xs px-4 py-2 flex items-center gap-2">
-            <Plus size={14} /> Add Partner
-          </button>
-        }
-      />
-
-      {/* Filters */}
-      <motion.div variants={fadeUp} className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-48">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" />
-          <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search by name, email, phone..." className="input-field w-full pl-9 text-sm" />
-        </div>
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="input-field text-sm">
-          <option value="">All Status</option>
-          {['pending', 'under-review', 'active', 'suspended', 'rejected'].map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-        <button onClick={load} className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5">
-          <RefreshCw size={13} /> Refresh
-        </button>
-      </motion.div>
-
-      {/* Table */}
-      <motion.div variants={fadeUp} className="glass-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-base-300 bg-base-200/40">
-                {['Business', 'Owner', 'Status', 'KYC', 'Drivers', 'Vehicles', 'Actions'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-[10px] font-black text-base-content/50 uppercase tracking-widest">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading && !adminPartners.length ? (
-                <tr><td colSpan={7} className="py-16 text-center"><span className="spinner mx-auto" /></td></tr>
-              ) : adminPartners.length === 0 ? (
-                <tr><td colSpan={7} className="py-16 text-center text-base-content/40 text-sm">No partners found</td></tr>
-              ) : adminPartners.map((p) => (
-                <tr key={p._id}
-                  className="border-b border-base-300/40 hover:bg-base-200/50 transition-colors cursor-pointer"
-                  onClick={() => onSelectPartner(p._id)}>
-                  <td className="px-4 py-3">
-                    <p className="font-bold text-sm">{p.businessName}</p>
-                    <p className="text-[10px] text-base-content/40 mt-0.5">{p.businessType}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-medium">{p.ownerName}</p>
-                    <p className="text-[10px] text-base-content/40">{p.ownerPhone}</p>
-                  </td>
-                  <td className="px-4 py-3"><StatusBadge status={p.partnershipStatus} /></td>
-                  <td className="px-4 py-3"><StatusBadge status={p.ownerKyc?.kycStatus || 'not-submitted'} /></td>
-                  <td className="px-4 py-3 font-mono text-sm font-bold">{p.drivers?.length ?? 0}</td>
-                  <td className="px-4 py-3 font-mono text-sm font-bold">{p.vehicles?.length ?? 0}</td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => onSelectPartner(p._id)}
-                        className="p-1.5 hover:bg-primary/10 rounded-lg text-primary transition-colors" title="View details">
-                        <Eye size={14} />
-                      </button>
-                      <button onClick={() => setDeleteTarget(p)}
-                        className="p-1.5 hover:bg-error/10 rounded-lg text-error transition-colors" title="Delete partner">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {adminPartnersTotal > 15 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-base-300">
-            <p className="text-xs text-base-content/50">
-              Showing {Math.min((page - 1) * 15 + 1, adminPartnersTotal)}–{Math.min(page * 15, adminPartnersTotal)} of {adminPartnersTotal}
-            </p>
-            <div className="flex gap-2">
-              <button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-40">← Prev</button>
-              <button disabled={page * 15 >= adminPartnersTotal} onClick={() => setPage((p) => p + 1)} className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-40">Next →</button>
+    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit Partner' : 'Create Transport Partner'} width="max-w-3xl">
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+        {!isEdit && (
+          <fieldset className="space-y-4">
+            <legend className="text-xs font-bold uppercase tracking-widest text-base-content/40 pb-1 border-b border-base-300 w-full">
+              User Account Credentials
+            </legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FieldNote label="Full Name" note="Legal name for the login account" required>
+                <input className="input-field w-full" value={form.name} onChange={set('name')} placeholder="Business owner name" required />
+              </FieldNote>
+              <FieldNote label="Email Address" note="Primary login email — must be unique" required>
+                <input className="input-field w-full" type="email" value={form.email} onChange={set('email')} placeholder="owner@business.com" required />
+              </FieldNote>
+              <FieldNote label="Mobile Number" note="10-digit Indian mobile (+91 auto-prefixed)">
+                <input className="input-field w-full" value={form.phone} onChange={set('phone')} placeholder="9876543210" />
+              </FieldNote>
+              <FieldNote label="Temporary Password" note="Share securely — user should change on first login" required>
+                <input className="input-field w-full" type="password" value={form.password} onChange={set('password')} placeholder="Min. 8 characters" required minLength={8} />
+              </FieldNote>
             </div>
-          </div>
+          </fieldset>
         )}
-      </motion.div>
 
-      {/* Create Modal */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Add New Transport Partner" size="lg">
-        <div className="space-y-6">
-          {/* Account credentials section */}
-          <div>
-            <p className="text-xs font-black text-base-content/50 uppercase tracking-widest mb-3 pb-2 border-b border-base-300">
-              Login Account
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Full Name" required note="This becomes the account display name">
-                <input type="text" value={form.name} onChange={setF('name')}
-                  placeholder="e.g. Rajesh Kumar" className="input-field text-sm" />
-              </Field>
-              <Field label="Email Address" required note="Used for login and all notifications">
-                <input type="email" value={form.email} onChange={setF('email')}
-                  placeholder="rajesh@kumarfleet.in" className="input-field text-sm" />
-              </Field>
-              <Field label="Mobile Number" required note="10-digit Indian mobile number">
-                <input type="tel" value={form.phone} onChange={setF('phone')}
-                  placeholder="9876543210" className="input-field text-sm" />
-              </Field>
-              <div className="sm:col-span-1">
-                <PasswordField value={form.password} onChange={(v) => setForm((f) => ({ ...f, password: v }))} />
-              </div>
-            </div>
+        <fieldset className="space-y-4">
+          <legend className="text-xs font-bold uppercase tracking-widest text-base-content/40 pb-1 border-b border-base-300 w-full">
+            Business & Company Details
+          </legend>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FieldNote label="Business / Trade Name" note="Registered or operating name of the company" required>
+              <input className="input-field w-full" value={form.businessName} onChange={set('businessName')} placeholder="Nalluri Transports Pvt Ltd" required />
+            </FieldNote>
+            <FieldNote label="Business Structure" note="Legal incorporation type">
+              <select className="input-field w-full" value={form.businessType} onChange={set('businessType')}>
+                {[['proprietorship', 'Sole Proprietorship'], ['partnership', 'Partnership Firm'],
+                  ['pvt-ltd', 'Private Limited (Pvt Ltd)'], ['ltd', 'Limited (Ltd)'],
+                  ['llp', 'LLP'], ['individual', 'Individual']].map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+            </FieldNote>
+            <FieldNote label="Owner / Promoter Name" note="Full name of the primary business owner">
+              <input className="input-field w-full" value={form.ownerName} onChange={set('ownerName')} placeholder="Owner full name" />
+            </FieldNote>
+            <FieldNote label="Owner Contact Email" note="For owner-specific notifications">
+              <input className="input-field w-full" type="email" value={form.ownerEmail} onChange={set('ownerEmail')} placeholder="owner@business.com" />
+            </FieldNote>
+            <FieldNote label="Owner Mobile" note="Direct contact for the business owner">
+              <input className="input-field w-full" value={form.ownerPhone} onChange={set('ownerPhone')} placeholder="9876543210" />
+            </FieldNote>
+            <FieldNote label="GST Registration Number" note="15-character GSTIN">
+              <input className="input-field w-full" value={form.gstNumber} onChange={set('gstNumber')} placeholder="22AAAAA0000A1Z5" maxLength={15} />
+            </FieldNote>
+            {!isEdit && (
+              <FieldNote label="PAN Card Number" note="10-character PAN — stored encrypted">
+                <input className="input-field w-full" value={form.panNumber} onChange={set('panNumber')} placeholder="ABCDE1234F" maxLength={10} />
+              </FieldNote>
+            )}
+            <FieldNote label="Initial Partnership Status" note="'active' to pre-approve; otherwise starts pending">
+              <select className="input-field w-full" value={form.partnershipStatus} onChange={set('partnershipStatus')}>
+                {(isEdit ? PARTNERSHIP_STATUSES : ['pending', 'under-review', 'active']).map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </FieldNote>
           </div>
+        </fieldset>
 
-          {/* Business details section */}
-          <div>
-            <p className="text-xs font-black text-base-content/50 uppercase tracking-widest mb-3 pb-2 border-b border-base-300">
-              Business Information
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Business Name" required note="Registered company / trade name">
-                <input type="text" value={form.businessName} onChange={setF('businessName')}
-                  placeholder="Kumar Fleet Services Pvt Ltd" className="input-field text-sm" />
-              </Field>
-              <Field label="Owner Name" required note="Legal name of proprietor / director">
-                <input type="text" value={form.ownerName} onChange={setF('ownerName')}
-                  placeholder="Rajesh Kumar" className="input-field text-sm" />
-              </Field>
-              <Field label="Owner Phone" note="Can be same as login number">
-                <input type="tel" value={form.ownerPhone} onChange={setF('ownerPhone')}
-                  placeholder="9876543210" className="input-field text-sm" />
-              </Field>
-              <Field label="Owner Email" note="Business contact email (can differ from login)">
-                <input type="email" value={form.ownerEmail} onChange={setF('ownerEmail')}
-                  placeholder="business@kumarfleet.in" className="input-field text-sm" />
-              </Field>
-              <Field label="GST Number" note="15-digit GSTIN, leave blank if exempt">
-                <input type="text" value={form.gstNumber} onChange={setF('gstNumber')}
-                  placeholder="29AAACC1234C1Z5" className="input-field text-sm" />
-              </Field>
-              <Field label="Business Type" note="Legal structure of the entity">
-                <select value={form.businessType} onChange={setF('businessType')} className="input-field text-sm">
-                  {['individual', 'proprietorship', 'partnership', 'pvt-ltd', 'ltd', 'llp'].map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Initial Partnership Status" note="Set to 'active' to skip approval flow">
-                <select value={form.partnershipStatus} onChange={setF('partnershipStatus')} className="input-field text-sm">
-                  {['pending', 'under-review', 'active'].map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-base-300">
-          <button onClick={() => setShowCreate(false)} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-          <button onClick={handleCreate} disabled={loading} className="btn-primary-cta text-xs px-6 py-2 flex items-center gap-2">
-            {loading ? <span className="spinner w-4 h-4" /> : <Plus size={14} />} Create Partner & Send Email
+        <div className="flex gap-3 justify-end pt-1">
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} disabled={loading}>Cancel</button>
+          <button type="submit" className="btn btn-primary btn-sm" disabled={loading}>
+            {loading ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+            {isEdit ? 'Save Changes' : 'Create Partner'}
           </button>
         </div>
-      </Modal>
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => dispatch(adminDeletePartner(deleteTarget?._id)).then(load)}
-        title="Delete Partner"
-        message={`Permanently delete "${deleteTarget?.businessName}"? All linked drivers will be unlinked. This cannot be undone.`}
-        danger
-      />
-    </motion.div>
+      </form>
+    </Modal>
   );
-};
+});
+PartnerFormModal.displayName = 'PartnerFormModal';
 
-// ═════════════════════════════════════════════════════════════════════════════
-// §I  Partner Detail
-// FIX: fetch keyed by partnerId so returning to same partner shows cached data
-// ═════════════════════════════════════════════════════════════════════════════
-const PartnerDetail = ({ partnerId, onBack }) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// PARTNER DETAIL MODAL
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PARTNER_SECTIONS = [
+  { id: 'info',       label: 'Info',         icon: Info },
+  { id: 'kyc',        label: 'KYC & Docs',   icon: BadgeCheck },
+  { id: 'status',     label: 'Status',       icon: Activity },
+  { id: 'fee',        label: 'Platform Fee', icon: DollarSign },
+  { id: 'settlement', label: 'Settlement',   icon: Wallet },
+  { id: 'notes',      label: 'Notes',        icon: StickyNote },
+  { id: 'logs',       label: 'Logs',         icon: FileText },
+];
+
+const PartnerDetailModal = memo(({ open, onClose, partnerId }) => {
   const dispatch = useDispatch();
   const { adminPartnerDetail: p, adminPartnerLogs, loading } = useSelector((s) => s.transportPartner);
-
-  const [activeTab,   setActiveTab]   = useState('overview');
-  const [statusModal, setStatusModal] = useState(false);
-  const [kycModal,    setKycModal]    = useState(false);
-  const [editModal,   setEditModal]   = useState(false);
-  const [feeModal,    setFeeModal]    = useState(false);
-  const [settleModal, setSettleModal] = useState(false);
-  const [notesModal,  setNotesModal]  = useState(false);
-
+  const [sec, setSec]               = useState('info');
+  const [kycForm, setKycForm]       = useState({ kycStatus: '', aadhaarVerified: false, panVerified: false, rejectionReason: '' });
   const [statusForm, setStatusForm] = useState({ status: '', reason: '' });
-  const [kycForm,    setKycForm]    = useState({ kycStatus: '', aadhaarVerified: false, panVerified: false, rejectionReason: '' });
-  const [editForm,   setEditForm]   = useState({});
-  const [feeForm,    setFeeForm]    = useState({ type: 'percentage', value: '', clear: false });
-  const [settleAmt,  setSettleAmt]  = useState('');
-  const [notes,      setNotes]      = useState('');
+  const [feeForm, setFeeForm]       = useState({ type: 'percentage', value: '', clear: false });
+  const [settlementAmt, setSettlementAmt] = useState('');
+  const [notes, setNotes]           = useState('');
 
-  // FIX: only fetch when partnerId changes
   useEffect(() => {
-    if (!partnerId) return;
+    if (!open || !partnerId) return;
     dispatch(adminFetchPartnerById(partnerId));
-    dispatch(adminFetchPartnerLogs({ partnerId, params: { limit: 20 } }));
-  }, [dispatch, partnerId]);
+    dispatch(adminFetchPartnerLogs({ partnerId }));
+  }, [open, partnerId, dispatch]);
 
   useEffect(() => {
     if (p) {
-      setEditForm({
-        businessName: p.businessName || '',
-        ownerName:    p.ownerName    || '',
-        ownerPhone:   p.ownerPhone   || '',
-        ownerEmail:   p.ownerEmail   || '',
-        gstNumber:    p.gstNumber    || '',
-        isAvailable:  p.isAvailable  ?? true,
+      setNotes(p.internalNotes ?? '');
+      setKycForm({
+        kycStatus:       p.ownerKyc?.kycStatus      ?? '',
+        aadhaarVerified: p.ownerKyc?.aadhaarVerified ?? false,
+        panVerified:     p.ownerKyc?.panVerified     ?? false,
+        rejectionReason: '',
       });
-      setNotes(p.internalNotes || '');
+      setStatusForm({ status: p.partnershipStatus ?? '', reason: '' });
     }
   }, [p]);
 
-  if (loading && !p) return <div className="flex justify-center py-20"><span className="spinner" /></div>;
-  if (!p) return null;
+  const handleKycSave    = useCallback(() => dispatch(adminUpdatePartnerKyc({ partnerId, ...kycForm })), [dispatch, partnerId, kycForm]);
+  const handleStatus     = useCallback(() => dispatch(adminUpdatePartnerStatus({ partnerId, status: statusForm.status, reason: statusForm.reason })), [dispatch, partnerId, statusForm]);
+  const handleFeeSave    = useCallback(() => dispatch(adminSetPartnerPlatformFee({ partnerId, ...feeForm, value: +feeForm.value })), [dispatch, partnerId, feeForm]);
+  const handleSettlement = useCallback(() => { dispatch(adminProcessPartnerSettlement({ partnerId, amount: +settlementAmt })); setSettlementAmt(''); }, [dispatch, partnerId, settlementAmt]);
+  const handleNotesSave  = useCallback(() => dispatch(adminUpdatePartnerNotes({ partnerId, notes })), [dispatch, partnerId, notes]);
 
-  const refresh = () => dispatch(adminFetchPartnerById(p._id));
-
-  const tabs = [
-    { id: 'overview', label: 'Overview',  icon: Activity    },
-    { id: 'kyc',      label: 'KYC',       icon: ShieldCheck },
-    { id: 'vehicles', label: 'Vehicles',  icon: Car         },
-    { id: 'drivers',  label: 'Drivers',   icon: Users       },
-    { id: 'bank',     label: 'Bank',      icon: CreditCard  },
-    { id: 'pricing',  label: 'Pricing',   icon: DollarSign  },
-    { id: 'logs',     label: 'Logs',      icon: FileText    },
-  ];
+  const kyc = p?.ownerKyc ?? {};
 
   return (
-    <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-5">
-      {/* Header */}
-      <motion.div variants={fadeUp} className="flex flex-wrap items-start gap-3">
-        <button onClick={onBack} className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5 mt-1">
-          ← Back
-        </button>
-        <div className="flex-1">
-          <h2 className="text-xl font-black text-base-content">{p.businessName}</h2>
-          <p className="text-xs text-base-content/50 mt-0.5">{p.ownerName} · {p.ownerPhone} · {p.ownerEmail}</p>
-        </div>
-        <StatusBadge status={p.partnershipStatus} />
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => setStatusModal(true)} className="btn-primary-cta text-xs px-3 py-2 flex items-center gap-1.5"><Settings size={13} /> Status</button>
-          <button onClick={() => setEditModal(true)}   className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5"><Edit3 size={13} /> Edit</button>
-          <button onClick={() => setFeeModal(true)}    className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5"><Percent size={13} /> Fee</button>
-          <button onClick={() => setSettleModal(true)} className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5"><DollarSign size={13} /> Settle</button>
-          <button onClick={refresh}                    className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5"><RefreshCw size={13} /></button>
-        </div>
-      </motion.div>
+    <Modal open={open} onClose={onClose} title={p?.businessName ?? 'Partner Details'} width="max-w-4xl">
+      {!p && loading
+        ? <div className="flex justify-center py-14"><Loader2 size={28} className="animate-spin text-primary" /></div>
+        : !p
+          ? <p className="text-center text-base-content/40 py-10 text-sm">No data available.</p>
+          : (
+            <>
+              <SectionTabs sections={PARTNER_SECTIONS} active={sec} onChange={setSec} />
 
-      {/* Quick Stats */}
-      <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard icon={Car}    label="Vehicles"       value={p.vehicles?.length ?? 0} color="var(--info)"      />
-        <StatCard icon={Users}  label="Drivers"        value={p.drivers?.length ?? 0}  color="var(--success)"   />
-        <StatCard icon={Star}   label="Avg Rating"     value={p.rating?.averageRating ? p.rating.averageRating.toFixed(1) : '—'} color="var(--warning)" />
-        <StatCard icon={Wallet} label="Pending Payout" value={inr(p.bankDetails?.pendingSettlementAmount)} color="var(--secondary)" />
-      </motion.div>
-
-      {/* Tabs */}
-      <motion.div variants={fadeUp} className="flex gap-1 overflow-x-auto pb-1 border-b border-base-300">
-        {tabs.map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-t-xl text-xs font-bold whitespace-nowrap transition-all border-b-2 -mb-px ${
-              activeTab === id
-                ? 'text-primary border-primary bg-primary/5'
-                : 'text-base-content/60 border-transparent hover:bg-base-200'
-            }`}>
-            <Icon size={13} /> {label}
-          </button>
-        ))}
-      </motion.div>
-
-      <AnimatePresence mode="wait">
-        <motion.div key={activeTab} variants={fadeIn} initial="hidden" animate="visible" exit="hidden">
-
-          {/* Overview */}
-          {activeTab === 'overview' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <div className="glass-card p-5">
-                <h3 className="text-sm font-black mb-4 flex items-center gap-2"><Building2 size={15} /> Business Details</h3>
-                <InfoRow label="Business Type"  value={p.businessType} />
-                <InfoRow label="GST Number"     value={p.gstNumber} />
-                <InfoRow label="MSME / Udyam"   value={p.msmeUdyamNumber} />
-                <InfoRow label="Partner Since"  value={p.partnerSince ? new Date(p.partnerSince).toLocaleDateString('en-IN') : null} />
-                <InfoRow label="Settlement"     value={p.settlementCycle} />
-                <InfoRow label="Onboarding"     value={p.isOnboardingComplete ? 'Complete ✅' : 'Incomplete ⏳'} />
-                <InfoRow label="Available Now"  value={p.isAvailable ? 'Yes ✅' : 'No'} />
-                <InfoRow label="Dispatch Ready" value={p.isDispatchReady ? 'Yes ✅' : 'No'} />
-              </div>
-              <div className="glass-card p-5">
-                <h3 className="text-sm font-black mb-4 flex items-center gap-2"><Activity size={15} /> Performance</h3>
-                <InfoRow label="Total Rides"      value={(p.stats?.totalRidesCompleted ?? 0).toLocaleString('en-IN')} />
-                <InfoRow label="Cancelled"        value={p.stats?.totalRidesCancelled ?? 0} />
-                <InfoRow label="Disputed"         value={p.stats?.totalRidesDisputed ?? 0} />
-                <InfoRow label="Total Earnings"   value={inr(p.stats?.totalEarnings)} />
-                <InfoRow label="Platform Fees"    value={inr(p.stats?.totalPlatformFeePaid)} />
-                <InfoRow label="Avg Pickup Time"  value={`${p.stats?.averagePickupTimeMinutes ?? 0} min`} />
-                <InfoRow label="On-Time Rate"     value={`${p.stats?.onTimeArrivalRate ?? 100}%`} />
-                <InfoRow label="Last Ride"        value={p.stats?.lastRideAt ? new Date(p.stats.lastRideAt).toLocaleDateString('en-IN') : null} />
-              </div>
-              <div className="glass-card p-5 lg:col-span-2">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-black flex items-center gap-2"><FileText size={15} /> Internal Notes</h3>
-                  <button onClick={() => setNotesModal(true)} className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5">
-                    <Edit3 size={12} /> Edit Notes
-                  </button>
-                </div>
-                <p className="text-sm text-base-content/60 whitespace-pre-wrap leading-relaxed">
-                  {p.internalNotes || 'No internal notes yet. Click "Edit Notes" to add one.'}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* KYC */}
-          {activeTab === 'kyc' && (
-            <div className="glass-card p-5 space-y-5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black">Owner KYC Verification</h3>
-                <button onClick={() => setKycModal(true)} className="btn-primary-cta text-xs px-4 py-2 flex items-center gap-1.5">
-                  <ShieldCheck size={13} /> Update KYC
-                </button>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                <InfoCell label="KYC Status"    valueNode={<StatusBadge status={p.ownerKyc?.kycStatus} />} />
-                <InfoCell label="Full Name"     value={p.ownerKyc?.fullName} />
-                <InfoCell label="Gender"        value={p.ownerKyc?.gender} />
-                <InfoCell label="Aadhaar"       value={p.ownerKyc?.aadhaarLast4 ? `XXXX XXXX ${p.ownerKyc.aadhaarLast4}` : null} />
-                <InfoCell label="KYC Verified"  value={p.ownerKyc?.kycVerifiedAt ? new Date(p.ownerKyc.kycVerifiedAt).toLocaleDateString('en-IN') : null} />
-                <InfoCell label="Aadhaar Verif" value={p.ownerKyc?.aadhaarVerified ? '✅ Yes' : '❌ No'} />
-                <InfoCell label="PAN Verified"  value={p.ownerKyc?.panVerified ? '✅ Yes' : '❌ No'} />
-                <InfoCell label="Experience"    value={`${p.ownerKyc?.yearsOfExperience ?? 0} yrs`} />
-                <InfoCell label="Languages"     value={p.ownerKyc?.languagesSpoken?.join(', ')} />
-                <InfoCell label="Rejection"     value={p.ownerKyc?.kycRejectionReason} />
-              </div>
-              {/* Doc links */}
-              <div className="flex flex-wrap gap-3">
-                {[
-                  ['Aadhaar Front',   p.ownerKyc?.aadhaarFrontUrl],
-                  ['Aadhaar Back',    p.ownerKyc?.aadhaarBackUrl],
-                  ['PAN Card',        p.ownerKyc?.panCardUrl],
-                  ['Driving Licence', p.ownerKyc?.drivingLicenseUrl],
-                ].filter(([, url]) => url).map(([label, url]) => (
-                  <a key={label} href={url} target="_blank" rel="noreferrer"
-                    className="flex items-center gap-1.5 text-xs text-primary hover:underline px-3 py-2 bg-primary/8 rounded-lg transition-colors">
-                    <ExternalLink size={12} /> {label}
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Vehicles */}
-          {activeTab === 'vehicles' && (
-            <div className="glass-card p-5 space-y-4">
-              <h3 className="text-sm font-black">Fleet Vehicles ({p.vehicles?.length ?? 0})</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {(p.vehicles || []).map((v) => (
-                  <div key={v._id} className="p-4 bg-base-200/50 rounded-xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="font-black text-sm">{v.registrationNumber}</p>
-                      <StatusBadge status={v.verificationStatus} />
-                    </div>
-                    <p className="text-xs text-base-content/60">
-                      {v.make} {v.model} · {v.vehicleType} · {v.year} · {v.color}
-                    </p>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {v.isWheelchairAccessible && <span className="badge badge-info text-[10px]">♿ Accessible</span>}
-                      {v.hasAC                  && <span className="badge badge-primary text-[10px]">❄ AC</span>}
-                      {v.hasMedicalKit          && <span className="badge badge-success text-[10px]">🏥 Medical</span>}
-                      {v.hasOxygenSupport       && <span className="badge badge-warning text-[10px]">🫁 O₂</span>}
-                      {v.hasStretcherSupport    && <span className="badge badge-error text-[10px]">🛏 Stretcher</span>}
-                    </div>
-                    {v.insuranceExpiry && new Date(v.insuranceExpiry) < new Date() && (
-                      <p className="text-[10px] text-error font-bold flex items-center gap-1">
-                        <AlertTriangle size={10} /> Insurance expired
-                      </p>
-                    )}
-                    {['pending', 'under-review'].includes(v.verificationStatus) && (
-                      <div className="flex gap-2">
-                        <button onClick={() => dispatch(adminVerifyVehicle({ partnerId: p._id, vehicleId: v._id, verificationStatus: 'verified' })).then(refresh)}
-                          className="btn-secondary text-[10px] px-3 py-1.5 flex items-center gap-1 text-success border-success flex-1 justify-center">
-                          <CheckCircle2 size={11} /> Verify
-                        </button>
-                        <button onClick={() => dispatch(adminVerifyVehicle({ partnerId: p._id, vehicleId: v._id, verificationStatus: 'rejected', rejectionReason: 'Docs invalid' })).then(refresh)}
-                          className="text-[10px] px-3 py-1.5 flex items-center gap-1 rounded-lg border border-error text-error hover:bg-error/10 font-bold flex-1 justify-center">
-                          <XCircle size={11} /> Reject
-                        </button>
+              {/* ── INFO ── */}
+              {sec === 'info' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                    {[
+                      ['Business Name',    p.businessName],
+                      ['Owner Name',       p.ownerName],
+                      ['Owner Email',      p.ownerEmail],
+                      ['Owner Phone',      p.ownerPhone],
+                      ['Business Type',    p.businessType],
+                      ['GST Number',       p.gstNumber     ?? '—'],
+                      ['MSME / Udyam',     p.msmeUdyamNumber ?? '—'],
+                      ['Partner Since',    p.partnerSince  ? new Date(p.partnerSince).toLocaleDateString('en-IN')  : '—'],
+                      ['Verified At',      p.verifiedAt    ? new Date(p.verifiedAt).toLocaleDateString('en-IN')    : '—'],
+                      ['Settlement Cycle', p.settlementCycle ?? '—'],
+                      ['Total Vehicles',   p.totalVehicles ?? p.vehicles?.length ?? 0],
+                      ['Active Vehicles',  p.activeVehicles ?? '—'],
+                      ['Total Drivers',    p.drivers?.length ?? 0],
+                      ['Dispatch Ready',   p.isDispatchReady ? 'Yes ✓' : 'No'],
+                      ['Pref. Settlement', p.bankDetails?.preferredSettlementMethod ?? '—'],
+                    ].map(([l, v]) => (
+                      <div key={l} className="bg-base-200 rounded-lg p-3">
+                        <p className="text-xs text-base-content/50 font-semibold uppercase tracking-wide">{l}</p>
+                        <p className="font-semibold text-base-content mt-0.5 break-all">{String(v)}</p>
                       </div>
-                    )}
+                    ))}
+                    <div className="bg-base-200 rounded-lg p-3">
+                      <p className="text-xs text-base-content/50 font-semibold uppercase tracking-wide">Partnership Status</p>
+                      <StatusBadge status={p.partnershipStatus} className="mt-1.5" />
+                    </div>
+                    <div className="bg-base-200 rounded-lg p-3">
+                      <p className="text-xs text-base-content/50 font-semibold uppercase tracking-wide">KYC Status</p>
+                      <KycBadge status={p.ownerKyc?.kycStatus} className="mt-1.5" />
+                    </div>
+                    <div className="bg-base-200 rounded-lg p-3">
+                      <p className="text-xs text-base-content/50 font-semibold uppercase tracking-wide">Owner Age</p>
+                      <p className="font-semibold text-base-content mt-0.5">{p.ownerAge ? `${p.ownerAge} yrs` : '—'}</p>
+                    </div>
                   </div>
-                ))}
-                {!p.vehicles?.length && (
-                  <p className="text-sm text-base-content/40 col-span-2">No vehicles registered yet.</p>
-                )}
-              </div>
-            </div>
-          )}
 
-          {/* Drivers */}
-          {activeTab === 'drivers' && (
-            <div className="glass-card p-5 space-y-4">
-              <h3 className="text-sm font-black">Linked Drivers ({p.drivers?.length ?? 0})</h3>
-              <div className="space-y-2">
-                {(p.drivers || []).map((d) => (
-                  <div key={d._id || String(d)} className="flex items-center justify-between p-3 bg-base-200/50 rounded-xl">
+                  {/* Vehicles summary */}
+                  {p.vehicles?.length > 0 && (
                     <div>
-                      <p className="font-semibold text-sm">{d.legalName || (typeof d === 'string' ? d : d._id)}</p>
-                      <p className="text-xs text-base-content/40">{d.driverCode} · KYC: {d.kyc?.verificationStatus || '—'}</p>
-                    </div>
-                    {d.status && <StatusBadge status={d.status} />}
-                  </div>
-                ))}
-                {!p.drivers?.length && <p className="text-sm text-base-content/40">No drivers linked to this agency.</p>}
-              </div>
-            </div>
-          )}
-
-          {/* Bank */}
-          {activeTab === 'bank' && (
-            <div className="glass-card p-5 space-y-5">
-              <h3 className="text-sm font-black">Bank & Settlement Details</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 bg-warning/8 border border-warning/20 rounded-xl">
-                  <p className="text-[10px] font-black text-warning/80 uppercase tracking-widest">Pending Settlement</p>
-                  <p className="text-2xl font-black text-warning">{inr(p.bankDetails?.pendingSettlementAmount)}</p>
-                </div>
-                <div className="p-4 bg-success/8 border border-success/20 rounded-xl">
-                  <p className="text-[10px] font-black text-success/80 uppercase tracking-widest">Total Settled</p>
-                  <p className="text-2xl font-black text-success">{inr(p.bankDetails?.totalSettledAmount)}</p>
-                </div>
-                <div className="p-4 bg-base-200/60 rounded-xl">
-                  <p className="text-[10px] font-black text-base-content/40 uppercase tracking-widest">Preferred Method</p>
-                  <p className="text-sm font-black">{p.bankDetails?.preferredSettlementMethod || '—'}</p>
-                </div>
-              </div>
-
-              {/* Bank Accounts */}
-              {(p.bankDetails?.bankAccounts || []).length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-black text-base-content/50 uppercase tracking-widest">Bank Accounts</h4>
-                  {p.bankDetails.bankAccounts.map((a) => (
-                    <div key={a._id} className="flex items-center justify-between p-3 bg-base-200/50 rounded-xl">
-                      <div>
-                        <p className="font-semibold text-sm">{a.accountHolderName}</p>
-                        <p className="text-xs text-base-content/40">{a.bankName} · ****{a.accountLast4} · {a.accountType}</p>
-                        {a.ifscCode && <p className="text-[10px] text-base-content/30">IFSC: {a.ifscCode}</p>}
-                      </div>
-                      <div className="flex gap-2">
-                        {a.isPrimary  && <span className="badge badge-primary text-[10px]">Primary</span>}
-                        {a.isVerified && <span className="badge badge-success text-[10px]">Verified</span>}
+                      <p className="text-xs font-bold uppercase tracking-widest text-base-content/40 mb-2">Vehicles ({p.vehicles.length})</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {p.vehicles.map((v) => (
+                          <div key={v._id} className="flex items-center gap-3 bg-base-200 rounded-lg p-3 text-xs">
+                            <Car size={16} className="text-primary shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold font-mono tracking-wider">{v.registrationNumber}</p>
+                              <p className="text-base-content/60">{v.make} {v.model} · {v.vehicleType}</p>
+                            </div>
+                            <span className={`badge badge-xs ${v.verificationStatus === 'verified' ? 'badge-success' : v.verificationStatus === 'rejected' ? 'badge-error' : 'badge-warning'}`}>
+                              {v.verificationStatus}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {/* UPI */}
-              {(p.bankDetails?.upiHandles || []).length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-black text-base-content/50 uppercase tracking-widest">UPI Handles</h4>
-                  {p.bankDetails.upiHandles.map((u) => (
-                    <div key={u._id} className="flex items-center justify-between p-3 bg-base-200/50 rounded-xl">
-                      <div>
-                        <p className="font-semibold text-sm">{u.upiId}</p>
-                        <p className="text-xs text-base-content/40">{u.upiName}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        {u.isPrimary  && <span className="badge badge-primary text-[10px]">Primary</span>}
-                        {u.isVerified && <span className="badge badge-success text-[10px]">Verified</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Pricing */}
-          {activeTab === 'pricing' && (
-            <div className="glass-card p-5 space-y-5">
-              <h3 className="text-sm font-black">Partner Pricing Configuration</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  ['Base Fare',    inr(p.pricing?.baseFare ?? 0)],
-                  ['Per KM',       inr(p.pricing?.baseFarePerKm ?? 0)],
-                  ['Min Fare',     inr(p.pricing?.minimumFare ?? 0)],
-                  ['Wait/min',     inr(p.pricing?.waitingChargePerMin ?? 0)],
-                  ['Free Wait',    `${p.pricing?.freeWaitingMinutes ?? 0} min`],
-                  ['Night Sur.',   `${p.pricing?.nightSurchargePercent ?? 0}%`],
-                  ['WC Sur.',      inr(p.pricing?.wheelchairSurcharge ?? 0)],
-                  ['Currency',     String(p.pricing?.currency || 'INR')],
-                ].map(([k, v]) => (
-                  <div key={k} className="p-3 bg-base-200/50 rounded-xl">
-                    <p className="text-[10px] font-black text-base-content/40 uppercase tracking-wider">{k}</p>
-                    <p className="text-sm font-black mt-1">{String(v)}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Platform Fee Override */}
-              <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-black text-primary/70 uppercase tracking-widest mb-1">Platform Fee Override</p>
-                  <p className="text-lg font-black text-base-content">{formatFee(p.platformFeeOverride)}</p>
-                  {p.platformFeeOverride && (
-                    <p className="text-[10px] text-base-content/40 mt-0.5">
-                      Type: {String(p.platformFeeOverride.type)} · Value: {String(p.platformFeeOverride.value)}
-                    </p>
                   )}
                 </div>
-                <button onClick={() => setFeeModal(true)} className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5 flex-shrink-0">
-                  <Edit3 size={12} /> Change
-                </button>
-              </div>
-
-              {p.effectivePlatformFee && (
-                <div className="p-3 bg-success/8 border border-success/20 rounded-xl">
-                  <p className="text-xs font-bold text-success/80">Effective Platform Fee (applied to all rides)</p>
-                  <p className="text-sm font-black text-success">{formatFee(p.effectivePlatformFee)}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Logs */}
-          {activeTab === 'logs' && (
-            <div className="glass-card p-5 space-y-3">
-              <h3 className="text-sm font-black">Recent Activity Logs</h3>
-              {adminPartnerLogs.length === 0 ? (
-                <p className="text-sm text-base-content/40 py-6 text-center">No logs found for this partner.</p>
-              ) : adminPartnerLogs.map((log) => (
-                <div key={log._id} className="flex items-start gap-3 p-3 bg-base-200/50 rounded-xl">
-                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                    log.level === 'success' ? 'bg-success' :
-                    log.level === 'warning' ? 'bg-warning' :
-                    log.level === 'error'   ? 'bg-error'   : 'bg-info'
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold">{log.message}</p>
-                    <p className="text-[10px] text-base-content/40 mt-0.5">
-                      {log.category} · {new Date(log.createdAt).toLocaleString('en-IN')}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
-
-      {/* ── Modals ── */}
-      <Modal open={statusModal} onClose={() => setStatusModal(false)} title="Change Partnership Status" size="sm">
-        <div className="space-y-4">
-          <Field label="New Status" required note="Changing to 'active' triggers email notification to partner">
-            <select value={statusForm.status} onChange={(e) => setStatusForm((f) => ({ ...f, status: e.target.value }))} className="input-field text-sm">
-              <option value="">Select a status...</option>
-              {['pending', 'under-review', 'active', 'suspended', 'rejected'].map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Reason" note="Required for suspend / reject — included in notification email">
-            <input type="text" value={statusForm.reason}
-              onChange={(e) => setStatusForm((f) => ({ ...f, reason: e.target.value }))}
-              placeholder="e.g. Document mismatch found" className="input-field text-sm" />
-          </Field>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setStatusModal(false)} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-            <button onClick={async () => {
-              await dispatch(adminUpdatePartnerStatus({ partnerId: p._id, ...statusForm }));
-              refresh(); setStatusModal(false);
-            }} className="btn-primary-cta text-xs px-4 py-2">Update Status</button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal open={kycModal} onClose={() => setKycModal(false)} title="Update Owner KYC" size="sm">
-        <div className="space-y-4">
-          <Field label="KYC Status" note="Set to 'verified' to activate document approval">
-            <select value={kycForm.kycStatus} onChange={(e) => setKycForm((f) => ({ ...f, kycStatus: e.target.value }))} className="input-field text-sm">
-              <option value="">Select...</option>
-              {['not-submitted', 'pending', 'under-review', 'verified', 'rejected'].map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </Field>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={kycForm.aadhaarVerified} onChange={(e) => setKycForm((f) => ({ ...f, aadhaarVerified: e.target.checked }))} className="w-4 h-4 accent-primary" />
-              Aadhaar Verified
-            </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={kycForm.panVerified} onChange={(e) => setKycForm((f) => ({ ...f, panVerified: e.target.checked }))} className="w-4 h-4 accent-primary" />
-              PAN Verified
-            </label>
-          </div>
-          {kycForm.kycStatus === 'rejected' && (
-            <Field label="Rejection Reason" required note="This will be shown to the partner">
-              <input type="text" value={kycForm.rejectionReason}
-                onChange={(e) => setKycForm((f) => ({ ...f, rejectionReason: e.target.value }))}
-                placeholder="e.g. Blurry document, name mismatch" className="input-field text-sm" />
-            </Field>
-          )}
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setKycModal(false)} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-            <button onClick={async () => {
-              await dispatch(adminUpdatePartnerKyc({ partnerId: p._id, ...kycForm }));
-              refresh(); setKycModal(false);
-            }} className="btn-primary-cta text-xs px-4 py-2">Update KYC</button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal open={editModal} onClose={() => setEditModal(false)} title="Edit Partner Details" size="md">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Business Name" required note="Legal / registered trade name">
-            <input type="text" value={editForm.businessName || ''} onChange={(e) => setEditForm((f) => ({ ...f, businessName: e.target.value }))}
-              placeholder="Kumar Fleet Services Pvt Ltd" className="input-field text-sm" />
-          </Field>
-          <Field label="Owner Name" note="Proprietor or authorised signatory">
-            <input type="text" value={editForm.ownerName || ''} onChange={(e) => setEditForm((f) => ({ ...f, ownerName: e.target.value }))}
-              placeholder="Rajesh Kumar" className="input-field text-sm" />
-          </Field>
-          <Field label="Owner Phone" note="Primary contact number">
-            <input type="tel" value={editForm.ownerPhone || ''} onChange={(e) => setEditForm((f) => ({ ...f, ownerPhone: e.target.value }))}
-              placeholder="9876543210" className="input-field text-sm" />
-          </Field>
-          <Field label="Owner Email" note="Business contact email">
-            <input type="email" value={editForm.ownerEmail || ''} onChange={(e) => setEditForm((f) => ({ ...f, ownerEmail: e.target.value }))}
-              placeholder="business@fleet.in" className="input-field text-sm" />
-          </Field>
-          <Field label="GST Number" note="15-digit GSTIN, leave blank if exempt">
-            <input type="text" value={editForm.gstNumber || ''} onChange={(e) => setEditForm((f) => ({ ...f, gstNumber: e.target.value }))}
-              placeholder="29AAACC1234C1Z5" className="input-field text-sm" />
-          </Field>
-          <Field label="Available for Rides" note="Toggle partner availability on platform">
-            <select value={editForm.isAvailable ? 'true' : 'false'}
-              onChange={(e) => setEditForm((f) => ({ ...f, isAvailable: e.target.value === 'true' }))} className="input-field text-sm">
-              <option value="true">Yes — accepting rides</option>
-              <option value="false">No — paused</option>
-            </select>
-          </Field>
-        </div>
-        <div className="flex justify-end gap-3 mt-6">
-          <button onClick={() => setEditModal(false)} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-          <button onClick={async () => {
-            await dispatch(adminUpdatePartner({ partnerId: p._id, data: editForm }));
-            refresh(); setEditModal(false);
-          }} className="btn-primary-cta text-xs px-4 py-2">Save Changes</button>
-        </div>
-      </Modal>
-
-      <Modal open={feeModal} onClose={() => setFeeModal(false)} title="Platform Fee Override" size="sm">
-        <div className="space-y-4">
-          <div className="p-3 bg-info/8 border border-info/20 rounded-xl text-xs text-base-content/70">
-            <p className="font-bold mb-1">Current fee</p>
-            <p>{formatFee(p.platformFeeOverride)}</p>
-          </div>
-          <label className="flex items-center gap-2 cursor-pointer text-sm">
-            <input type="checkbox" checked={feeForm.clear}
-              onChange={(e) => setFeeForm((f) => ({ ...f, clear: e.target.checked }))} className="w-4 h-4 accent-primary" />
-            Clear override — revert to global platform default
-          </label>
-          {!feeForm.clear && (
-            <>
-              <Field label="Fee Type" note="Percentage of fare or flat rupee amount per ride">
-                <select value={feeForm.type} onChange={(e) => setFeeForm((f) => ({ ...f, type: e.target.value }))} className="input-field text-sm">
-                  <option value="percentage">Percentage (%)</option>
-                  <option value="fixed">Fixed Amount (₹)</option>
-                </select>
-              </Field>
-              <Field label="Value" required note={feeForm.type === 'percentage' ? 'Enter a % value e.g. 12 for 12%' : 'Enter rupee amount e.g. 50 for ₹50 flat'}>
-                <input type="number" min={0} value={feeForm.value}
-                  onChange={(e) => setFeeForm((f) => ({ ...f, value: +e.target.value }))}
-                  placeholder={feeForm.type === 'percentage' ? '12' : '50'} className="input-field text-sm" />
-              </Field>
-            </>
-          )}
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setFeeModal(false)} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-            <button onClick={async () => {
-              await dispatch(adminSetPartnerPlatformFee({ partnerId: p._id, ...feeForm }));
-              refresh(); setFeeModal(false);
-            }} className="btn-primary-cta text-xs px-4 py-2">Apply Override</button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal open={settleModal} onClose={() => setSettleModal(false)} title="Process Settlement" size="sm">
-        <div className="space-y-4">
-          <div className="p-4 bg-warning/8 border border-warning/20 rounded-xl">
-            <p className="text-xs text-base-content/60">Pending settlement balance</p>
-            <p className="text-2xl font-black text-warning">{inr(p.bankDetails?.pendingSettlementAmount)}</p>
-          </div>
-          <Field label="Amount to Settle (₹)" required note="Cannot exceed pending balance. Will be transferred to primary bank account.">
-            <input type="number" min={1} max={p.bankDetails?.pendingSettlementAmount || 0}
-              value={settleAmt} onChange={(e) => setSettleAmt(e.target.value)}
-              placeholder="Enter amount in ₹" className="input-field text-sm" />
-          </Field>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setSettleModal(false)} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-            <button onClick={async () => {
-              await dispatch(adminProcessPartnerSettlement({ partnerId: p._id, amount: +settleAmt }));
-              refresh(); setSettleModal(false); setSettleAmt('');
-            }} className="btn-success text-xs px-4 py-2">Process Payment</button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal open={notesModal} onClose={() => setNotesModal(false)} title="Internal Notes" size="sm">
-        <Field label="Admin Notes" note="Visible only to admins — not shown to the partner">
-          <textarea rows={5} value={notes} onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. Partner onboarded via referral. Pending GST certificate upload as of Mar 2025."
-            className="input-field text-sm resize-none" />
-        </Field>
-        <div className="flex justify-end gap-3 mt-4">
-          <button onClick={() => setNotesModal(false)} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-          <button onClick={async () => {
-            await dispatch(adminUpdatePartnerNotes({ partnerId: p._id, notes }));
-            setNotesModal(false);
-          }} className="btn-primary-cta text-xs px-4 py-2">Save Notes</button>
-        </div>
-      </Modal>
-    </motion.div>
-  );
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-// §J  Pending Vehicles
-// ═════════════════════════════════════════════════════════════════════════════
-const PendingVehicles = () => {
-  const dispatch = useDispatch();
-  const { pendingVehicles, loading } = useSelector((s) => s.transportPartner);
-  const [rejectModal,  setRejectModal]  = useState(null);
-  const [rejectReason, setRejectReason] = useState('');
-
-  // FIX: stable fetch on mount only
-  useEffect(() => { dispatch(adminFetchPendingVehicles()); }, [dispatch]);
-
-  const doVerify = (item, status, reason) =>
-    dispatch(adminVerifyVehicle({ partnerId: item._id, vehicleId: item.vehicle?._id, verificationStatus: status, rejectionReason: reason }))
-      .then(() => dispatch(adminFetchPendingVehicles()));
-
-  return (
-    <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-5">
-      <SectionHeader icon={Car} title="Pending Vehicle Verification"
-        subtitle={`${pendingVehicles.length} vehicles awaiting review`}
-        actions={
-          <button onClick={() => dispatch(adminFetchPendingVehicles())} className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5">
-            <RefreshCw size={13} /> Refresh
-          </button>
-        }
-      />
-
-      {loading && !pendingVehicles.length ? (
-        <div className="flex justify-center py-20"><span className="spinner" /></div>
-      ) : pendingVehicles.length === 0 ? (
-        <motion.div variants={fadeUp} className="glass-card p-16 text-center">
-          <CheckCircle2 size={44} className="mx-auto mb-3 text-success" />
-          <p className="font-black text-base-content mb-1">All clear!</p>
-          <p className="text-sm text-base-content/40">No vehicles pending verification.</p>
-        </motion.div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {pendingVehicles.map((item, i) => (
-            <motion.div key={i} variants={fadeUp} className="glass-card p-5 space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-black text-sm">{item.vehicle?.registrationNumber}</p>
-                  <p className="text-xs text-base-content/50">{item.businessName}</p>
-                  <p className="text-[10px] text-base-content/40">{item.ownerPhone}</p>
-                </div>
-                <StatusBadge status={item.vehicle?.verificationStatus} />
-              </div>
-              <div className="text-xs text-base-content/60 space-y-1">
-                <p><strong>{item.vehicle?.make} {item.vehicle?.model}</strong> · {item.vehicle?.vehicleType}</p>
-                <p>Year: {item.vehicle?.year || '—'} · Color: {item.vehicle?.color || '—'} · Seats: {item.vehicle?.seatingCapacity}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {[['RC Book', item.vehicle?.rcBookUrl], ['Insurance', item.vehicle?.insurancePolicyUrl], ['Fitness Cert', item.vehicle?.fitnessCertUrl]]
-                  .filter(([, u]) => u).map(([label, url]) => (
-                  <a key={label} href={url} target="_blank" rel="noreferrer"
-                    className="text-[10px] px-2.5 py-1 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 flex items-center gap-1">
-                    <ExternalLink size={10} /> {label}
-                  </a>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => doVerify(item, 'verified', '')}
-                  className="btn-secondary text-[10px] px-3 py-2 flex-1 flex items-center justify-center gap-1 text-success border-success">
-                  <CheckCircle2 size={12} /> Approve
-                </button>
-                <button onClick={() => setRejectModal(item)}
-                  className="text-[10px] px-3 py-2 flex-1 rounded-lg border border-error text-error hover:bg-error/10 flex items-center justify-center gap-1 font-bold">
-                  <XCircle size={12} /> Reject
-                </button>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      )}
-
-      <Modal open={!!rejectModal} onClose={() => { setRejectModal(null); setRejectReason(''); }} title="Reject Vehicle" size="sm">
-        <Field label="Rejection Reason" required note="This message will be visible to the transport partner">
-          <textarea rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="e.g. RC document expired. Please upload a valid RC book." className="input-field text-sm resize-none" />
-        </Field>
-        <div className="flex justify-end gap-3 mt-4">
-          <button onClick={() => { setRejectModal(null); setRejectReason(''); }} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-          <button onClick={() => { doVerify(rejectModal, 'rejected', rejectReason); setRejectModal(null); setRejectReason(''); }}
-            style={{ background: 'var(--error)' }} className="btn-primary-cta text-xs px-4 py-2">Reject Vehicle</button>
-        </div>
-      </Modal>
-    </motion.div>
-  );
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-// §K  Platform Drivers
-// FIX: fetchAllDrivers keyed by deps; detail panel stays when switching rows
-// ═════════════════════════════════════════════════════════════════════════════
-const PlatformDrivers = () => {
-  const dispatch = useDispatch();
-  const {
-    adminDrivers, adminDriversTotal, adminDriverDetail,
-    adminAvailableDrivers, adminDriverLogs, loading,
-  } = useSelector((s) => s.transportPartner);
-
-  const [search,      setSearch]     = useState('');
-  const [kycStatus,   setKycStatus]  = useState('');
-  const [page,        setPage]       = useState(1);
-  const [selectedId,  setSelectedId] = useState(null);
-
-  // Modals
-  const [coinsModal,  setCoinsModal]  = useState(false);
-  const [notesModal,  setNotesModal]  = useState(false);
-  const [blockModal,  setBlockModal]  = useState(false);
-  const [kycModal,    setKycModal]    = useState(false);
-  const [geoModal,    setGeoModal]    = useState(false);
-
-  const [coinsForm,   setCoinsForm]   = useState({ type: 'ADMIN_CREDIT', amount: '', description: '' });
-  const [notesVal,    setNotesVal]    = useState('');
-  const [blockReason, setBlockReason] = useState('');
-  const [kycForm,     setKycForm]     = useState({ verificationStatus: '', rejectionReason: '' });
-  const [geoForm,     setGeoForm]     = useState({ lng: '', lat: '', radius: 10000 });
-
-  const load = useCallback(() => {
-    dispatch(adminFetchAllDrivers({ page, limit: 15, search, kycStatus }));
-  }, [dispatch, page, search, kycStatus]);
-
-  // FIX: stable dep-keyed fetch
-  useEffect(() => { load(); }, [load]);
-
-  const openDetail = useCallback((id) => {
-    setSelectedId(id);
-    dispatch(adminFetchDriverById(id));
-    dispatch(adminFetchDriverLogs({ driverId: id, params: { limit: 10 } }));
-  }, [dispatch]);
-
-  const refreshDetail = () => selectedId && dispatch(adminFetchDriverById(selectedId));
-  const d = adminDriverDetail;
-
-  return (
-    <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-5">
-      <SectionHeader icon={Users} title="All Drivers"
-        subtitle={`${adminDriversTotal} drivers registered platform-wide`}
-        actions={
-          <button onClick={() => setGeoModal(true)} className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5">
-            <Navigation size={13} /> Find Nearby
-          </button>
-        }
-      />
-
-      <motion.div variants={fadeUp} className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-48">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" />
-          <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search by name, code, email, phone..." className="input-field w-full pl-9 text-sm" />
-        </div>
-        <select value={kycStatus} onChange={(e) => { setKycStatus(e.target.value); setPage(1); }} className="input-field text-sm">
-          <option value="">All KYC Status</option>
-          {['Pending', 'Under-Review', 'Verified', 'Rejected'].map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-        <button onClick={load} className="btn-secondary text-xs px-3 py-2"><RefreshCw size={13} /></button>
-      </motion.div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Driver table */}
-        <motion.div variants={fadeUp} className="lg:col-span-2 glass-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-base-300 bg-base-200/40">
-                  {['Driver', 'Agency', 'Status', 'KYC', 'Rating', 'Actions'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-[10px] font-black text-base-content/50 uppercase tracking-widest">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading && !adminDrivers.length ? (
-                  <tr><td colSpan={6} className="py-12 text-center"><span className="spinner mx-auto" /></td></tr>
-                ) : adminDrivers.length === 0 ? (
-                  <tr><td colSpan={6} className="py-12 text-center text-base-content/40 text-sm">No drivers found</td></tr>
-                ) : adminDrivers.map((dr) => (
-                  <tr key={dr._id}
-                    className={`border-b border-base-300/40 hover:bg-base-200/50 cursor-pointer transition-colors ${selectedId === dr._id ? 'bg-primary/5 border-l-2 border-l-primary' : ''}`}
-                    onClick={() => openDetail(dr._id)}>
-                    <td className="px-4 py-3">
-                      <p className="font-bold text-sm">{dr.legalName}</p>
-                      <p className="text-[10px] text-base-content/40 font-mono">{dr.driverCode}</p>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-base-content/60">{dr.ownerAgency?.businessName || 'Solo'}</td>
-                    <td className="px-4 py-3"><StatusBadge status={dr.status} /></td>
-                    <td className="px-4 py-3"><StatusBadge status={dr.kyc?.verificationStatus} /></td>
-                    <td className="px-4 py-3 font-mono text-sm">⭐ {dr.performance?.rating ? dr.performance.rating.toFixed(1) : '—'}</td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-1">
-                        <button onClick={() => openDetail(dr._id)} className="p-1.5 hover:bg-primary/10 rounded-lg text-primary"><Eye size={13} /></button>
-                        {dr.isBlocked
-                          ? <button onClick={() => dispatch(adminUnblockDriver(dr._id)).then(load)} className="p-1.5 hover:bg-success/10 rounded-lg text-success"><UserCheck size={13} /></button>
-                          : <button onClick={() => { openDetail(dr._id); setBlockModal(true); }} className="p-1.5 hover:bg-error/10 rounded-lg text-error"><UserX size={13} /></button>
-                        }
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {adminDriversTotal > 15 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-base-300">
-              <p className="text-xs text-base-content/50">
-                {Math.min((page - 1) * 15 + 1, adminDriversTotal)}–{Math.min(page * 15, adminDriversTotal)} of {adminDriversTotal}
-              </p>
-              <div className="flex gap-2">
-                <button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-40">← Prev</button>
-                <button disabled={page * 15 >= adminDriversTotal} onClick={() => setPage((p) => p + 1)} className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-40">Next →</button>
-              </div>
-            </div>
-          )}
-        </motion.div>
-
-        {/* Detail panel */}
-        <AnimatePresence>
-          {d && selectedId && (
-            <motion.div variants={scaleIn} initial="hidden" animate="visible" exit="hidden"
-              className="glass-card p-5 space-y-4 self-start lg:sticky lg:top-4">
-              <div className="flex items-center gap-3">
-                {d.user?.avatar
-                  ? <img src={d.user.avatar} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-primary/20" />
-                  : <div className="w-12 h-12 rounded-full bg-base-300 flex items-center justify-center text-lg font-black">{(d.legalName || 'D')[0]}</div>
-                }
-                <div>
-                  <p className="font-black text-sm">{d.legalName}</p>
-                  <p className="text-[10px] text-base-content/40 font-mono">{d.driverCode}</p>
-                  <p className="text-[10px] text-base-content/40">{d.phone}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {[
-                  ['Status',  null, <StatusBadge key="s" status={d.status} />],
-                  ['KYC',     null, <StatusBadge key="k" status={d.kyc?.verificationStatus} />],
-                  ['Rides',   (d.performance?.totalRidesCompleted ?? 0).toLocaleString()],
-                  ['Rating',  `⭐ ${d.performance?.rating ? d.performance.rating.toFixed(1) : '—'}`],
-                  ['Coins',   d.rewards?.coinBalance ?? 0],
-                  ['Tier',    d.rewards?.tier ?? '—'],
-                ].map(([k, v, node]) => (
-                  <div key={k} className="p-2 bg-base-200/50 rounded-lg">
-                    <p className="text-[9px] text-base-content/40 uppercase tracking-wide font-bold">{k}</p>
-                    {node ?? <p className="font-bold">{safeVal(v)}</p>}
-                  </div>
-                ))}
-              </div>
-
-              {d.isBlocked && (
-                <div className="p-2 bg-error/10 border border-error/20 rounded-lg">
-                  <p className="text-xs text-error font-bold">🚫 Blocked</p>
-                  <p className="text-[10px] text-error/70">{d.blockReason}</p>
-                </div>
               )}
 
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => setKycModal(true)} className="btn-secondary text-[10px] px-3 py-1.5 flex items-center gap-1"><ShieldCheck size={11} /> KYC</button>
-                <button onClick={() => setCoinsModal(true)} className="btn-secondary text-[10px] px-3 py-1.5 flex items-center gap-1"><Coins size={11} /> Coins</button>
-                <button onClick={() => setNotesModal(true)} className="btn-secondary text-[10px] px-3 py-1.5 flex items-center gap-1"><FileText size={11} /> Notes</button>
-                {d.isBlocked
-                  ? <button onClick={() => dispatch(adminUnblockDriver(d._id)).then(refreshDetail)}
-                      className="btn-secondary text-[10px] px-3 py-1.5 flex items-center gap-1 text-success"><UserCheck size={11} /> Unblock</button>
-                  : <button onClick={() => setBlockModal(true)}
-                      className="text-[10px] px-3 py-1.5 flex items-center gap-1 rounded-lg border border-error text-error hover:bg-error/10 font-bold"><Ban size={11} /> Block</button>
-                }
-              </div>
+              {/* ── KYC & DOCS ── */}
+              {sec === 'kyc' && (
+                <div className="space-y-5">
+                  <CurrentValueRow label="Current KYC Status">
+                    <KycBadge status={kyc.kycStatus} />
+                    {kyc.aadhaarVerified && <span className="badge badge-success badge-xs ml-2">Aadhaar ✓</span>}
+                    {kyc.panVerified     && <span className="badge badge-success badge-xs ml-1">PAN ✓</span>}
+                  </CurrentValueRow>
 
-              {adminDriverLogs.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-black text-base-content/40 uppercase tracking-widest mb-2">Recent Activity</p>
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {adminDriverLogs.map((log) => (
-                      <div key={log._id} className="text-[11px] p-2 bg-base-200/50 rounded-lg">
-                        <p className="font-semibold leading-tight">{log.message}</p>
-                        <p className="text-base-content/40 mt-0.5">{new Date(log.createdAt).toLocaleString('en-IN')}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    {[
+                      ['Full Name',    kyc.fullName ?? '—'],
+                      ['Date of Birth', kyc.dateOfBirth ? new Date(kyc.dateOfBirth).toLocaleDateString('en-IN') : '—'],
+                      ['Gender',       kyc.gender ?? '—'],
+                      ['DL Number',    kyc.drivingLicenseNumber ?? '—'],
+                      ['DL Expiry',    kyc.drivingLicenseExpiry ? new Date(kyc.drivingLicenseExpiry).toLocaleDateString('en-IN') : '—'],
+                      ['KYC Verified At', kyc.kycVerifiedAt ? new Date(kyc.kycVerifiedAt).toLocaleDateString('en-IN') : '—'],
+                    ].map(([l, v]) => (
+                      <div key={l} className="bg-base-200 rounded-lg p-2.5">
+                        <p className="text-base-content/50 font-semibold uppercase tracking-wide text-[10px]">{l}</p>
+                        <p className="font-semibold text-base-content mt-0.5">{v}</p>
                       </div>
                     ))}
                   </div>
+
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-base-content/40 mb-3">Uploaded Documents</p>
+                    <div className="flex flex-wrap gap-3">
+                      <DocThumb url={kyc.aadhaarFrontUrl}  label="Aadhaar Front" />
+                      <DocThumb url={kyc.aadhaarBackUrl}   label="Aadhaar Back" />
+                      <DocThumb url={kyc.drivingLicenseUrl} label="Driving Licence" />
+                      <DocThumb url={kyc.panCardUrl}       label="PAN Card" />
+                      {kyc.profilePhotoUrl && <DocThumb url={kyc.profilePhotoUrl} label="Profile Photo" />}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-base-300 pt-4 space-y-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-base-content/40">Update KYC Decision</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FieldNote label="KYC Status Decision" note="'verified' sets kycVerifiedAt + kycVerifiedBy automatically">
+                        <select className="input-field w-full" value={kycForm.kycStatus} onChange={(e) => setKycForm((p) => ({ ...p, kycStatus: e.target.value }))}>
+                          <option value="">— Select —</option>
+                          {['not-submitted', 'pending', 'under-review', 'verified', 'rejected'].map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </FieldNote>
+                      <FieldNote label="Rejection Reason" note="Required when rejecting — shown to partner in email">
+                        <input className="input-field w-full" value={kycForm.rejectionReason} onChange={(e) => setKycForm((p) => ({ ...p, rejectionReason: e.target.value }))} placeholder="Document quality poor, details mismatch..." />
+                      </FieldNote>
+                    </div>
+                    <div className="flex flex-wrap gap-6">
+                      <label className="label cursor-pointer gap-2">
+                        <input type="checkbox" className="checkbox checkbox-success checkbox-sm" checked={kycForm.aadhaarVerified} onChange={(e) => setKycForm((p) => ({ ...p, aadhaarVerified: e.target.checked }))} />
+                        <span className="label-text">Aadhaar Manually Verified</span>
+                      </label>
+                      <label className="label cursor-pointer gap-2">
+                        <input type="checkbox" className="checkbox checkbox-success checkbox-sm" checked={kycForm.panVerified} onChange={(e) => setKycForm((p) => ({ ...p, panVerified: e.target.checked }))} />
+                        <span className="label-text">PAN Manually Verified</span>
+                      </label>
+                    </div>
+                    <div className="flex justify-end">
+                      <button className="btn btn-primary btn-sm" onClick={handleKycSave} disabled={loading}>
+                        {loading ? <Loader2 size={13} className="animate-spin" /> : <BadgeCheck size={13} />}
+                        Save KYC Decision
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
 
-      {/* Nearby drivers result */}
-      {adminAvailableDrivers.length > 0 && (
-        <motion.div variants={fadeUp} className="glass-card p-5 space-y-3">
-          <h3 className="text-sm font-black">Nearest Available Drivers ({adminAvailableDrivers.length})</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {adminAvailableDrivers.map((dr) => (
-              <div key={dr._id} className="flex items-center justify-between p-3 bg-base-200/50 rounded-xl">
-                <div>
-                  <p className="font-semibold text-sm">{dr.legalName}</p>
-                  <p className="text-xs text-base-content/40">{dr.driverCode}</p>
+              {/* ── STATUS ── */}
+              {sec === 'status' && (
+                <div className="space-y-4">
+                  <CurrentValueRow label="Current Status">
+                    <StatusBadge status={p.partnershipStatus} />
+                    {p.verifiedAt && (
+                      <span className="text-xs text-base-content/50 ml-2">
+                        since {new Date(p.verifiedAt).toLocaleDateString('en-IN')}
+                      </span>
+                    )}
+                  </CurrentValueRow>
+
+                  {p.rejectionReason && (
+                    <div className="alert alert-error text-sm py-2">
+                      <AlertTriangle size={14} />
+                      <span>Rejection Reason: <strong>{p.rejectionReason}</strong></span>
+                    </div>
+                  )}
+
+                  <div className="alert alert-warning text-sm">
+                    <AlertTriangle size={15} />
+                    <span>Changing to <strong>suspended</strong> or <strong>rejected</strong> will send automated email to partner.</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FieldNote label="New Partnership Status" note="'active' auto-populates verifiedAt, verifiedBy, partnerSince">
+                      <select className="input-field w-full" value={statusForm.status} onChange={(e) => setStatusForm((p) => ({ ...p, status: e.target.value }))}>
+                        <option value="">— Select new status —</option>
+                        {PARTNERSHIP_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </FieldNote>
+                    <FieldNote label="Reason / Note" note="Required for suspension or rejection — stored in audit log">
+                      <input className="input-field w-full" value={statusForm.reason} onChange={(e) => setStatusForm((p) => ({ ...p, reason: e.target.value }))} placeholder="Administrative review, fraud detected..." />
+                    </FieldNote>
+                  </div>
+                  <div className="flex justify-end">
+                    <button className="btn btn-primary btn-sm" onClick={handleStatus} disabled={loading || !statusForm.status}>
+                      {loading ? <Loader2 size={13} className="animate-spin" /> : <Activity size={13} />}
+                      Update Status
+                    </button>
+                  </div>
                 </div>
-                <StatusBadge status={dr.status} />
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
+              )}
 
-      {/* Modals */}
-      <Modal open={geoModal} onClose={() => setGeoModal(false)} title="Find Nearest Available Drivers" size="sm">
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Longitude" required note="e.g. 80.2707 for Chennai">
-              <input type="number" step="0.0001" value={geoForm.lng} onChange={(e) => setGeoForm((f) => ({ ...f, lng: e.target.value }))}
-                placeholder="80.2707" className="input-field text-sm" />
-            </Field>
-            <Field label="Latitude" required note="e.g. 13.0827 for Chennai">
-              <input type="number" step="0.0001" value={geoForm.lat} onChange={(e) => setGeoForm((f) => ({ ...f, lat: e.target.value }))}
-                placeholder="13.0827" className="input-field text-sm" />
-            </Field>
-          </div>
-          <Field label="Search Radius (meters)" note="Default 10 km = 10000 meters">
-            <input type="number" value={geoForm.radius} onChange={(e) => setGeoForm((f) => ({ ...f, radius: +e.target.value }))}
-              placeholder="10000" className="input-field text-sm" />
-          </Field>
-          <button onClick={() => { dispatch(adminFetchAvailableDrivers({ lng: +geoForm.lng, lat: +geoForm.lat, radius: geoForm.radius })); setGeoModal(false); }}
-            className="btn-primary-cta text-xs px-6 py-2 w-full">Search Nearby Drivers</button>
-        </div>
-      </Modal>
+              {/* ── FEE ── */}
+              {sec === 'fee' && (
+                <div className="space-y-4">
+                  <CurrentValueRow label="Current Override">
+                    {p.platformFeeOverride
+                      ? <span>{p.platformFeeOverride.value} ({p.platformFeeOverride.type})</span>
+                      : <span className="text-base-content/50 italic">Using global default</span>}
+                  </CurrentValueRow>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <FieldNote label="Fee Type" note="'percentage' = % of fare; 'fixed' = flat ₹ amount">
+                      <select className="input-field w-full" value={feeForm.type} onChange={(e) => setFeeForm((p) => ({ ...p, type: e.target.value }))}>
+                        <option value="percentage">Percentage (%)</option>
+                        <option value="fixed">Flat Amount (₹)</option>
+                      </select>
+                    </FieldNote>
+                    <FieldNote label="Override Value" note="e.g. 8 for 8% or 50 for ₹50 flat">
+                      <input className="input-field w-full" type="number" value={feeForm.value} onChange={(e) => setFeeForm((p) => ({ ...p, value: e.target.value }))} placeholder="e.g. 8" min={0} disabled={feeForm.clear} />
+                    </FieldNote>
+                    <div className="flex flex-col justify-end pb-1">
+                      <label className="label cursor-pointer gap-2">
+                        <input type="checkbox" className="checkbox checkbox-sm" checked={feeForm.clear} onChange={(e) => setFeeForm((p) => ({ ...p, clear: e.target.checked }))} />
+                        <span className="label-text text-xs">Clear override — revert to global</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <button className="btn btn-primary btn-sm" onClick={handleFeeSave} disabled={loading}>
+                      {loading ? <Loader2 size={13} className="animate-spin" /> : <DollarSign size={13} />}
+                      {feeForm.clear ? 'Clear Override' : 'Apply Override'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
-      <Modal open={blockModal} onClose={() => { setBlockModal(false); setBlockReason(''); }} title="Block Driver" size="sm">
-        <Field label="Block Reason" required note="Driver will be notified. They cannot accept rides while blocked.">
-          <textarea rows={3} value={blockReason} onChange={(e) => setBlockReason(e.target.value)}
-            placeholder="e.g. Multiple passenger complaints — pending investigation." className="input-field text-sm resize-none" />
-        </Field>
-        <div className="flex justify-end gap-3 mt-4">
-          <button onClick={() => { setBlockModal(false); setBlockReason(''); }} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-          <button onClick={async () => {
-            await dispatch(adminBlockDriver({ driverId: selectedId, blockReason }));
-            refreshDetail(); load(); setBlockModal(false); setBlockReason('');
-          }} style={{ background: 'var(--error)' }} className="btn-primary-cta text-xs px-4 py-2">Block Driver</button>
-        </div>
-      </Modal>
+              {/* ── SETTLEMENT ── */}
+              {sec === 'settlement' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-success/10 border border-success/30 rounded-xl p-4 text-center">
+                      <p className="text-xs text-success font-semibold uppercase tracking-wide">Pending Settlement</p>
+                      <p className="text-3xl font-black text-success mt-1.5">₹{inr(p.bankDetails?.pendingSettlementAmount)}</p>
+                    </div>
+                    <div className="bg-base-200 rounded-xl p-4 text-center">
+                      <p className="text-xs text-base-content/50 font-semibold uppercase tracking-wide">Total Settled (All Time)</p>
+                      <p className="text-3xl font-black text-base-content mt-1.5">₹{inr(p.bankDetails?.totalSettledAmount)}</p>
+                    </div>
+                  </div>
+                  {p.bankDetails?.lastSettledAt && (
+                    <p className="text-xs text-base-content/50">Last settled: {new Date(p.bankDetails.lastSettledAt).toLocaleDateString('en-IN')}</p>
+                  )}
+                  <FieldNote label="Settlement Amount (₹)" note="Must not exceed pending balance">
+                    <input className="input-field w-full" type="number" value={settlementAmt} onChange={(e) => setSettlementAmt(e.target.value)} placeholder="Enter amount to process" min={1} max={p.bankDetails?.pendingSettlementAmount} />
+                  </FieldNote>
+                  <div className="flex justify-end">
+                    <button className="btn btn-success btn-sm" onClick={handleSettlement} disabled={loading || !settlementAmt}>
+                      {loading ? <Loader2 size={13} className="animate-spin" /> : <Receipt size={13} />}
+                      Process Settlement
+                    </button>
+                  </div>
+                </div>
+              )}
 
-      <Modal open={coinsModal} onClose={() => setCoinsModal(false)} title="Adjust Driver Coin Balance" size="sm">
-        <div className="space-y-4">
-          <div className="p-3 bg-base-200/60 rounded-xl text-sm">
-            Current balance: <strong>{d?.rewards?.coinBalance ?? 0} coins</strong>
-          </div>
-          <Field label="Transaction Type" note="Credits add coins, debits remove them">
-            <select value={coinsForm.type} onChange={(e) => setCoinsForm((f) => ({ ...f, type: e.target.value }))} className="input-field text-sm">
-              <option value="ADMIN_CREDIT">Credit — Add coins</option>
-              <option value="ADMIN_DEBIT">Debit — Remove coins</option>
-            </select>
-          </Field>
-          <Field label="Amount (coins)" required note="Must be a positive whole number">
-            <input type="number" min={1} value={coinsForm.amount}
-              onChange={(e) => setCoinsForm((f) => ({ ...f, amount: +e.target.value }))}
-              placeholder="e.g. 100" className="input-field text-sm" />
-          </Field>
-          <Field label="Description" note="Shown in driver's transaction history">
-            <input type="text" value={coinsForm.description}
-              onChange={(e) => setCoinsForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="e.g. Monthly performance bonus" className="input-field text-sm" />
-          </Field>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setCoinsModal(false)} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-            <button onClick={async () => {
-              await dispatch(adminAdjustDriverCoins({ driverId: selectedId, ...coinsForm }));
-              refreshDetail(); setCoinsModal(false);
-            }} className="btn-primary-cta text-xs px-4 py-2">Apply</button>
-          </div>
-        </div>
-      </Modal>
+              {/* ── NOTES ── */}
+              {sec === 'notes' && (
+                <div className="space-y-3">
+                  <FieldNote label="Internal Admin Notes" note="Strictly internal — never visible to partner or driver">
+                    <textarea className="input-field w-full min-h-[130px] resize-y" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Document compliance observations, fraud flags..." maxLength={1000} />
+                  </FieldNote>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-base-content/40">{notes.length}/1000</p>
+                    <button className="btn btn-primary btn-sm" onClick={handleNotesSave} disabled={loading}>
+                      {loading ? <Loader2 size={13} className="animate-spin" /> : <StickyNote size={13} />}
+                      Save Notes
+                    </button>
+                  </div>
+                </div>
+              )}
 
-      <Modal open={kycModal} onClose={() => setKycModal(false)} title="Verify Driver KYC" size="sm">
-        <div className="space-y-4">
-          <Field label="Verification Status" note="Set to 'Verified' to activate the driver account">
-            <select value={kycForm.verificationStatus} onChange={(e) => setKycForm((f) => ({ ...f, verificationStatus: e.target.value }))} className="input-field text-sm">
-              <option value="">Select...</option>
-              {['Pending', 'Under-Review', 'Verified', 'Rejected'].map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </Field>
-          {kycForm.verificationStatus === 'Rejected' && (
-            <Field label="Rejection Reason" required note="Driver will see this reason">
-              <input type="text" value={kycForm.rejectionReason}
-                onChange={(e) => setKycForm((f) => ({ ...f, rejectionReason: e.target.value }))}
-                placeholder="e.g. Expired driving licence. Please upload a valid copy." className="input-field text-sm" />
-            </Field>
-          )}
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setKycModal(false)} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-            <button onClick={async () => {
-              await dispatch(adminVerifyDriverKyc({ driverId: selectedId, ...kycForm }));
-              refreshDetail(); setKycModal(false);
-            }} className="btn-primary-cta text-xs px-4 py-2">Update KYC</button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal open={notesModal} onClose={() => setNotesModal(false)} title="Admin Notes for Driver" size="sm">
-        <Field label="Notes" note="Internal only — not visible to driver or transport partner">
-          <textarea rows={4} value={notesVal} onChange={(e) => setNotesVal(e.target.value)}
-            placeholder="e.g. Driver flagged for late check-in on 3 occasions. Monitor for 30 days." className="input-field text-sm resize-none" />
-        </Field>
-        <div className="flex justify-end gap-3 mt-4">
-          <button onClick={() => setNotesModal(false)} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-          <button onClick={async () => {
-            await dispatch(adminUpdateDriverNotes({ driverId: selectedId, notes: notesVal }));
-            setNotesModal(false);
-          }} className="btn-primary-cta text-xs px-4 py-2">Save Notes</button>
-        </div>
-      </Modal>
-    </motion.div>
+              {/* ── LOGS ── */}
+              {sec === 'logs' && (
+                <div className="space-y-2 max-h-96 overflow-y-auto scrollbar-thin">
+                  {(adminPartnerLogs ?? []).length === 0
+                    ? <p className="text-center text-base-content/40 py-10 text-sm">No logs recorded yet.</p>
+                    : (adminPartnerLogs ?? []).map((log) => (
+                      <div key={log._id} className="bg-base-200 rounded-lg p-3 text-xs flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className={`badge badge-xs ${log.level === 'error' ? 'badge-error' : log.level === 'success' ? 'badge-success' : log.level === 'warning' ? 'badge-warning' : 'badge-info'}`}>{log.level}</span>
+                          <span className="text-base-content/40">{new Date(log.createdAt).toLocaleString('en-IN')}</span>
+                        </div>
+                        <p className="text-base-content leading-snug">{log.message}</p>
+                      </div>
+                    ))
+                  }
+                </div>
+              )}
+            </>
+          )
+      }
+    </Modal>
   );
-};
+});
+PartnerDetailModal.displayName = 'PartnerDetailModal';
 
-// ═════════════════════════════════════════════════════════════════════════════
-// §L  Global Pricing
-// FIX: platformFee is object — flattened for form, re-composed on save
-// ═════════════════════════════════════════════════════════════════════════════
-const GlobalPricing = () => {
+// ─────────────────────────────────────────────────────────────────────────────
+// PARTNERS TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PartnersTab = memo(() => {
   const dispatch = useDispatch();
-  const { globalPricing, loading } = useSelector((s) => s.transportPartner);
-  const [edit, setEdit] = useState(false);
-  const [form, setForm] = useState({});
-  const [note, setNote] = useState('');
+  const { adminPartners, adminPartnersTotal, loading } = useSelector((s) => s.transportPartner);
+  const [page, setPage]       = useState(1);
+  const [search, setSearch]   = useState('');
+  const [status, setStatus]   = useState('');
+  const [kycStatus, setKycStatus] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [editPartner, setEditPartner] = useState(null);
+  const [detailId, setDetailId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const LIMIT = 15;
 
-  // FIX: fetch only on mount
-  useEffect(() => { dispatch(adminFetchGlobalPricing()); }, [dispatch]);
+  const params = useMemo(() => ({
+    page, limit: LIMIT,
+    ...(search    && { search }),
+    ...(status    && { status }),
+    ...(kycStatus && { kycStatus }),
+  }), [page, search, status, kycStatus]);
 
-  useEffect(() => {
-    if (globalPricing) {
-      setForm({
-        baseFare:                 globalPricing.baseFare                ?? 0,
-        defaultRatePerKm:         globalPricing.defaultRatePerKm        ?? 0,
-        nightSurchargeMultiplier: globalPricing.nightSurchargeMultiplier ?? 1,
-        nightStartHour:           globalPricing.nightStartHour           ?? 22,
-        nightEndHour:             globalPricing.nightEndHour             ?? 6,
-        waitingFreeMinutes:       globalPricing.waitingFreeMinutes       ?? 5,
-        waitingChargePerMinute:   globalPricing.waitingChargePerMinute   ?? 2,
-        cancellationFeePercent:   globalPricing.cancellationFeePercent   ?? 50,
-        platformFeeType:  globalPricing.platformFee?.type  ?? 'percentage',
-        platformFeeValue: globalPricing.platformFee?.value ?? 0,
-      });
-    }
-  }, [globalPricing]);
+  useEffect(() => { dispatch(adminFetchPartners(params)); }, [dispatch, params]);
 
-  const handleSave = async () => {
-    const { platformFeeType, platformFeeValue, ...rest } = form;
-    const payload = { ...rest, platformFee: { type: platformFeeType, value: Number(platformFeeValue) }, note };
-    await dispatch(adminUpdateGlobalPricing(payload));
-    setEdit(false);
-  };
-
-  const scalarFields = [
-    ['baseFare',                 'Base Fare',              '₹',  'Starting fare for every ride'],
-    ['defaultRatePerKm',         'Rate / KM',              '₹',  'Per-kilometre charge'],
-    ['nightSurchargeMultiplier', 'Night Multiplier',        'x',  'Multiplied onto base fare during night hours'],
-    ['nightStartHour',           'Night Start (24h)',       'hr', 'Hour from which night rates apply'],
-    ['nightEndHour',             'Night End (24h)',         'hr', 'Hour at which night rates end'],
-    ['waitingFreeMinutes',       'Free Waiting',            'min','Driver waits this long before charging'],
-    ['waitingChargePerMinute',   'Waiting Charge / min',   '₹',  'Per-minute charge after free waiting period'],
-    ['cancellationFeePercent',   'Cancellation Fee',        '%',  'Percentage of base fare charged on cancel'],
-  ];
-
-  const planRates = globalPricing?.planRateOverrides
-    ? Object.entries(globalPricing.planRateOverrides)
-    : [];
+  const handleDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    await dispatch(adminDeletePartner(deleteTarget._id));
+    setDeleteTarget(null);
+  }, [dispatch, deleteTarget]);
 
   return (
-    <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-5">
-      <SectionHeader icon={DollarSign} title="Global Pricing Configuration"
-        subtitle="Superadmin only — defaults applied to all partners without a fee override"
-        actions={
-          !edit
-            ? <button onClick={() => setEdit(true)} className="btn-primary-cta text-xs px-4 py-2 flex items-center gap-1.5"><Edit3 size={13} /> Edit Config</button>
-            : <div className="flex gap-2">
-                <button onClick={() => setEdit(false)} className="btn-secondary text-xs px-4 py-2">Cancel</button>
-                <button onClick={handleSave} disabled={loading} className="btn-primary-cta text-xs px-4 py-2 flex items-center gap-1.5">
-                  {loading ? <span className="spinner w-4 h-4" /> : <Check size={13} />} Save Config
-                </button>
-              </div>
-        }
+    <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-4">
+      <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <div className="flex   gap-2 flex-1">
+          <div className=" flex-1 relative w-full   ">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40 pointer-events-none" />
+            <input className="input-field w-full  pl-8 pr-3 py-2 text-sm  " placeholder="Search by name, email..." value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }} aria-label="Search partners" />
+          </div>
+          <select className="input-field w-fit py-2 text-sm" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+            <option value="">All Status</option>
+            {PARTNERSHIP_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select className="input-field w-fit py-2 text-sm" value={kycStatus} onChange={(e) => { setKycStatus(e.target.value); setPage(1); }}>
+            <option value="">All KYC</option>
+            {['not-submitted', 'pending', 'under-review', 'verified', 'rejected'].map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <button className="btn btn-ghost btn-sm btn-circle" onClick={() => dispatch(adminFetchPartners(params))} aria-label="Refresh">
+            <RefreshCw size={14} />
+          </button>
+        </div>
+        <button className="btn btn-primary btn-sm gap-1.5 shrink-0" onClick={() => setShowCreate(true)}>
+          <Plus size={13} /> Add Partner
+        </button>
+      </motion.div>
+
+      <motion.div variants={fadeUp} className="card overflow-hidden">
+        <div className="overflow-x-auto" role="region" aria-label="Partners table">
+          <table className="table" aria-label="Transport partners list">
+            <thead>
+              <tr>
+                <th>Business</th>
+                <th>Owner</th>
+                <th>Status</th>
+                <th>KYC</th>
+                <th className="text-center">Vehicles</th>
+                <th className="text-center">Drivers</th>
+                <th className="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && adminPartners.length === 0
+                ? Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
+                : adminPartners.length === 0
+                  ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-14">
+                        <Building2 size={36} className="mx-auto mb-3 text-base-content/20" />
+                        <p className="text-sm text-base-content/40">No transport partners found.</p>
+                      </td>
+                    </tr>
+                  )
+                  : adminPartners.map((p) => (
+                    <tr key={p._id}>
+                      <td>
+                        <p className="font-semibold text-sm text-base-content">{p.businessName}</p>
+                        <p className="text-xs text-base-content/50 mt-0.5">{p.ownerEmail}</p>
+                      </td>
+                      <td className="text-sm">{p.ownerName}</td>
+                      <td><StatusBadge status={p.partnershipStatus} /></td>
+                      <td><KycBadge status={p.ownerKyc?.kycStatus} /></td>
+                      <td className="text-sm text-center">{p.totalVehicles ?? p.vehicles?.length ?? 0}</td>
+                      <td className="text-sm text-center">{p.drivers?.length ?? 0}</td>
+                      <td>
+                        <div className="flex items-center justify-end gap-1">
+                          <button className="btn btn-ghost btn-xs btn-circle" onClick={() => setDetailId(p._id)} aria-label={`View ${p.businessName}`}><Eye size={13} /></button>
+                          <button className="btn btn-ghost btn-xs btn-circle" onClick={() => setEditPartner(p)} aria-label={`Edit ${p.businessName}`}><Pencil size={13} /></button>
+                          <button className="btn btn-ghost btn-xs btn-circle text-error" onClick={() => setDeleteTarget(p)} aria-label={`Delete ${p.businessName}`}><Trash2 size={13} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+              }
+            </tbody>
+          </table>
+        </div>
+        <Pagination page={page} total={adminPartnersTotal} limit={LIMIT} onPageChange={setPage} />
+      </motion.div>
+
+      <PartnerFormModal open={showCreate || !!editPartner} onClose={() => { setShowCreate(false); setEditPartner(null); }} editData={editPartner} />
+      <PartnerDetailModal open={!!detailId} onClose={() => setDetailId(null)} partnerId={detailId} />
+      <ConfirmDialog
+        open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
+        title="Delete Transport Partner"
+        message={`Permanently delete "${deleteTarget?.businessName}"? All linked drivers will be unlinked. This is irreversible.`}
+        danger loading={loading}
       />
+    </motion.div>
+  );
+});
+PartnersTab.displayName = 'PartnersTab';
 
-      <motion.div variants={fadeUp} className="glass-card p-6 space-y-8">
-        {loading && !globalPricing ? (
-          <div className="flex justify-center py-16"><span className="spinner" /></div>
-        ) : (
-          <>
-            {/* Platform Fee — special object render */}
-            <div>
-              <p className="text-xs font-black text-base-content/50 uppercase tracking-widest mb-4 pb-2 border-b border-base-300">
-                Platform Fee
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-primary/5 border border-primary/20 rounded-xl">
-                <Field label="Fee Type" note="How the platform fee is calculated per ride">
-                  {edit ? (
-                    <select value={form.platformFeeType || 'percentage'}
-                      onChange={(e) => setForm((f) => ({ ...f, platformFeeType: e.target.value }))}
-                      className="input-field text-sm">
-                      <option value="percentage">Percentage (%)</option>
-                      <option value="fixed">Fixed Amount (₹)</option>
-                    </select>
-                  ) : (
-                    <p className="text-2xl font-black text-base-content">
-                      {String(globalPricing?.platformFee?.type ?? '—')}
-                    </p>
-                  )}
-                </Field>
-                <Field label={`Fee Value (${form.platformFeeType === 'percentage' ? '%' : '₹'})`}
-                  note={form.platformFeeType === 'percentage' ? 'e.g. 12 = 12% of fare' : 'e.g. 50 = ₹50 per ride'}>
-                  {edit ? (
-                    <input type="number" step="0.01" value={form.platformFeeValue ?? ''}
-                      onChange={(e) => setForm((f) => ({ ...f, platformFeeValue: e.target.value }))}
-                      placeholder={form.platformFeeType === 'percentage' ? '12' : '50'}
-                      className="input-field text-sm" />
-                  ) : (
-                    <p className="text-2xl font-black text-primary">
-                      {globalPricing?.platformFee?.type === 'percentage'
-                        ? `${globalPricing?.platformFee?.value ?? 0}%`
-                        : `₹${globalPricing?.platformFee?.value ?? 0}`}
-                    </p>
-                  )}
-                </Field>
-              </div>
+// ─────────────────────────────────────────────────────────────────────────────
+// VEHICLES TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
+const VehicleDetailModal = memo(({ open, onClose, v, onVerify }) => {
+  const { loading } = useSelector((s) => s.transportPartner);
+  const [vForm, setVForm] = useState({ verificationStatus: 'verified', rejectionReason: '' });
+
+  useEffect(() => {
+    if (v) setVForm({ verificationStatus: v.verificationStatus === 'pending' ? 'under-review' : 'verified', rejectionReason: '' });
+  }, [v]);
+
+  if (!v) return null;
+
+  return (
+    <Modal open={open} onClose={onClose} title={`Vehicle Review — ${v.registrationNumber}`} width="max-w-2xl">
+      <div className="space-y-5">
+        <CurrentValueRow label="Current Status">
+          <span className={`badge badge-xs ${v.verificationStatus === 'verified' ? 'badge-success' : v.verificationStatus === 'rejected' ? 'badge-error' : 'badge-warning'}`}>
+            {v.verificationStatus}
+          </span>
+        </CurrentValueRow>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+          {[
+            ['Make', v.make],
+            ['Model', v.model],
+            ['Type', v.vehicleType],
+            ['Year', v.year ?? '—'],
+            ['Color', v.color ?? '—'],
+            ['Seating', v.seatingCapacity ?? '—'],
+            ['Permit Type', v.permitType ?? '—'],
+            ['Permit Expiry', v.permitExpiry ? new Date(v.permitExpiry).toLocaleDateString('en-IN') : '—'],
+            ['Insurance Expiry', v.insuranceExpiry ? new Date(v.insuranceExpiry).toLocaleDateString('en-IN') : '—'],
+            ['Fitness Cert Expiry', v.fitnessCertExpiry ? new Date(v.fitnessCertExpiry).toLocaleDateString('en-IN') : '—'],
+            ['Pollution Cert Expiry', v.pollutionCertExpiry ? new Date(v.pollutionCertExpiry).toLocaleDateString('en-IN') : '—'],
+            ['GPS Device', v.gpsDeviceId ?? '—'],
+          ].map(([l, val]) => (
+            <div key={l} className="bg-base-200 rounded-lg p-2.5">
+              <p className="text-base-content/50 font-semibold uppercase tracking-wide text-[10px]">{l}</p>
+              <p className="font-semibold text-base-content mt-0.5">{String(val)}</p>
             </div>
+          ))}
+        </div>
 
-            {/* Scalar fare fields */}
-            <div>
-              <p className="text-xs font-black text-base-content/50 uppercase tracking-widest mb-4 pb-2 border-b border-base-300">
-                Fare Configuration
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {scalarFields.map(([key, label, unit, hint]) => (
-                  <div key={key}>
-                    <Field label={`${label} (${unit})`} note={hint}>
-                      {edit ? (
-                        <input type="number" step="0.01" value={form[key] ?? ''}
-                          onChange={(e) => setForm((f) => ({ ...f, [key]: +e.target.value }))}
-                          placeholder={String(globalPricing?.[key] ?? '')}
-                          className="input-field text-sm" />
-                      ) : (
-                        <p className="text-2xl font-black text-base-content">{safeVal(globalPricing?.[key])}</p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            ['AC', v.hasAC],
+            ['Medical Kit', v.hasMedicalKit],
+            ['Stretcher', v.hasStretcherSupport],
+            ['Oxygen', v.hasOxygenSupport],
+            ['Wheelchair Access', v.isWheelchairAccessible],
+          ].map(([label, val]) => (
+            <span key={label} className={`badge badge-sm ${val ? 'badge-success' : 'badge-ghost opacity-50'}`}>
+              {val ? '✓' : '✗'} {label}
+            </span>
+          ))}
+        </div>
+
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-base-content/40 mb-3">Documents</p>
+          <div className="flex flex-wrap gap-3">
+            <DocThumb url={v.rcBookUrl}          label="RC Book" />
+            <DocThumb url={v.insurancePolicyUrl} label="Insurance Policy" />
+            <DocThumb url={v.pollutionCertUrl}   label="Pollution Cert" />
+            <DocThumb url={v.fitnessCertUrl}     label="Fitness Cert" />
+          </div>
+        </div>
+
+        {v.photos?.length > 0 && (
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-base-content/40 mb-3">Vehicle Photos</p>
+            <div className="flex flex-wrap gap-2">
+              {v.photos.map((ph, i) => <DocThumb key={i} url={ph} label={`Photo ${i + 1}`} />)}
+            </div>
+          </div>
+        )}
+
+        <div className="bg-base-200 rounded-lg p-3 text-xs">
+          <p className="text-base-content/50 font-semibold uppercase tracking-wide">Owner / Agency</p>
+          <p className="font-semibold text-base-content mt-0.5">
+            {v.ownerId?.businessName || v.ownerId?.name || 'Unknown'} — {v.ownerId?.ownerPhone || v.ownerId?.phone || '—'}
+          </p>
+        </div>
+
+        <div className="border-t border-base-300 pt-4 space-y-3">
+          <p className="text-xs font-bold uppercase tracking-widest text-base-content/40">Verification Decision</p>
+          <FieldNote label="New Status" note="'verified' makes vehicle available for assignments">
+            <select className="input-field w-full" value={vForm.verificationStatus} onChange={(e) => setVForm((p) => ({ ...p, verificationStatus: e.target.value }))}>
+              {VEHICLE_VERIFY_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </FieldNote>
+          {vForm.verificationStatus === 'rejected' && (
+            <FieldNote label="Rejection Reason" note="Clearly explain what is deficient" required>
+              <textarea className="input-field w-full min-h-[80px]" value={vForm.rejectionReason} onChange={(e) => setVForm((p) => ({ ...p, rejectionReason: e.target.value }))} placeholder="RC expired, insurance document missing..." />
+            </FieldNote>
+          )}
+          <div className="flex gap-3 justify-end">
+            <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary btn-sm" onClick={() => onVerify(v, vForm)} disabled={loading}>
+              {loading ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+              Submit Decision
+            </button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+});
+VehicleDetailModal.displayName = 'VehicleDetailModal';
+
+const VehiclesTab = memo(() => {
+  const dispatch = useDispatch();
+  const { pendingVehicles, pendingVehiclesTotal, loading } = useSelector((s) => s.transportPartner);
+  const [page, setPage]           = useState(1);
+  const [reviewItem, setReviewItem] = useState(null);
+  const LIMIT = 15;
+
+  useEffect(() => { dispatch(adminFetchPendingVehicles({ page, limit: LIMIT })); }, [dispatch, page]);
+
+  const handleVerify = useCallback(async (v, vForm) => {
+    await dispatch(adminVerifyVehicle({
+      vehicleId:          v._id,
+      verificationStatus: vForm.verificationStatus,
+      rejectionReason:    vForm.rejectionReason,
+    }));
+    setReviewItem(null);
+  }, [dispatch]);
+
+  return (
+    <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-4">
+      <motion.div variants={fadeUp} className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h3 className="font-bold text-base-content">Pending Vehicle Verifications</h3>
+          <p className="text-xs text-base-content/50 mt-0.5">{pendingVehiclesTotal} vehicle(s) awaiting review</p>
+        </div>
+        <button className="btn btn-ghost btn-sm btn-circle" onClick={() => dispatch(adminFetchPendingVehicles({ page, limit: LIMIT }))} aria-label="Refresh">
+          <RefreshCw size={14} />
+        </button>
+      </motion.div>
+
+      <motion.div variants={fadeUp} className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="table" aria-label="Pending vehicles">
+            <thead>
+              <tr>
+                <th>Agency / Owner</th>
+                <th>Registration No.</th>
+                <th>Type</th>
+                <th>Make / Model</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th className="text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && pendingVehicles.length === 0
+                ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
+                : pendingVehicles.length === 0
+                  ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-14">
+                        <Truck size={36} className="mx-auto mb-3 text-base-content/20" />
+                        <p className="text-sm text-base-content/40">All vehicles reviewed. Nothing pending.</p>
+                      </td>
+                    </tr>
+                  )
+                  : pendingVehicles.map((v) => (
+                    <tr key={v._id}>
+                      <td>
+                        <p className="font-semibold text-sm">{v.ownerId?.businessName || v.ownerId?.name || 'Unknown'}</p>
+                        <p className="text-xs text-base-content/50">{v.ownerId?.ownerPhone || v.ownerId?.phone || '—'}</p>
+                      </td>
+                      <td className="font-mono text-sm font-bold tracking-wider">{v.registrationNumber}</td>
+                      <td className="text-sm">{v.vehicleType}</td>
+                      <td className="text-sm">{[v.make, v.model].filter(Boolean).join(' ') || '—'}</td>
+                      <td>
+                        <span className={`badge badge-xs ${v.verificationStatus === 'verified' ? 'badge-success' : v.verificationStatus === 'rejected' ? 'badge-error' : 'badge-warning'}`}>
+                          {v.verificationStatus}
+                        </span>
+                      </td>
+                      <td className="text-xs text-base-content/50">
+                        {v.createdAt ? new Date(v.createdAt).toLocaleDateString('en-IN') : '—'}
+                      </td>
+                      <td className="text-right">
+                        <button className="btn btn-primary btn-xs gap-1" onClick={() => setReviewItem(v)}>
+                          <Eye size={11} /> Review
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+              }
+            </tbody>
+          </table>
+        </div>
+        <Pagination page={page} total={pendingVehiclesTotal} limit={LIMIT} onPageChange={setPage} />
+      </motion.div>
+
+      <VehicleDetailModal open={!!reviewItem} onClose={() => setReviewItem(null)} v={reviewItem} onVerify={handleVerify} />
+    </motion.div>
+  );
+});
+VehiclesTab.displayName = 'VehiclesTab';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DRIVER DETAIL MODAL
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DRIVER_SECTIONS = [
+  { id: 'info',  label: 'Info',  icon: Info },
+  { id: 'kyc',   label: 'KYC & Docs', icon: BadgeCheck },
+  { id: 'block', label: 'Block', icon: Ban },
+  { id: 'coins', label: 'Coins', icon: Coins },
+  { id: 'notes', label: 'Notes', icon: StickyNote },
+  { id: 'logs',  label: 'Logs',  icon: FileText },
+];
+
+const DriverDetailModal = memo(({ open, onClose, driverId }) => {
+  const dispatch = useDispatch();
+  const { adminDriverDetail: d, adminDriverLogs, loading } = useSelector((s) => s.transportPartner);
+  const [sec, setSec]           = useState('info');
+  const [kycForm, setKycForm]   = useState({ verificationStatus: '', rejectionReason: '' });
+  const [blockReason, setBlockReason] = useState('');
+  const [notes, setNotes]       = useState('');
+  const [coinForm, setCoinForm] = useState({ type: 'ADMIN_CREDIT', amount: '', description: '' });
+
+  useEffect(() => {
+    if (!open || !driverId) return;
+    dispatch(adminFetchDriverById(driverId));
+    dispatch(adminFetchDriverLogs({ driverId }));
+  }, [open, driverId, dispatch]);
+
+  useEffect(() => {
+    if (d) {
+      setNotes(d.adminNotes ?? '');
+      setKycForm((p) => ({ ...p, verificationStatus: d.kyc?.verificationStatus ?? '' }));
+    }
+  }, [d]);
+
+  const kyc = d?.kyc ?? {};
+
+  return (
+    <Modal open={open} onClose={onClose} title={d?.legalName ?? 'Driver Details'} width="max-w-3xl">
+      {!d && loading
+        ? <div className="flex justify-center py-14"><Loader2 size={28} className="animate-spin text-primary" /></div>
+        : !d ? null
+          : (
+            <>
+              <SectionTabs sections={DRIVER_SECTIONS} active={sec} onChange={setSec} />
+
+              {/* INFO */}
+              {sec === 'info' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                  {[
+                    ['Driver Code',   d.driverCode],
+                    ['Legal Name',    d.legalName],
+                    ['Phone',         d.phone     ?? '—'],
+                    ['Email',         d.email     ?? '—'],
+                    ['Gender',        d.gender    ?? '—'],
+                    ['Date of Birth', d.dateOfBirth ? new Date(d.dateOfBirth).toLocaleDateString('en-IN') : '—'],
+                    ['Agency',        d.ownerAgency?.businessName ?? '—'],
+                    ['Vehicle',       d.assignedVehicleSnapshot?.registrationNumber ?? '—'],
+                    ['Shift',         d.shift?.shiftType ?? '—'],
+                    ['Experience',    d.yearsOfExperience ? `${d.yearsOfExperience} yrs` : '—'],
+                    ['Current Status', d.status],
+                    ['Active',        d.isActive  ? 'Yes' : 'No'],
+                    ['Verified',      d.isVerified ? 'Yes' : 'No'],
+                    ['Blocked',       d.isBlocked  ? 'Yes' : 'No'],
+                    ['Rating',        `${d.performance?.rating?.toFixed(1) ?? 0} / 5`],
+                    ['Total Rides',   d.performance?.totalRidesCompleted ?? 0],
+                    ['Coin Balance',  `${inr(d.rewards?.coinBalance)} coins`],
+                    ['Reward Tier',   d.rewards?.tier ?? '—'],
+                    ['Profile Complete', `${d.profileCompletionPercent ?? 0}%`],
+                    ['Blood Group',   d.medicalFitness?.bloodGroup ?? '—'],
+                  ].map(([l, v]) => (
+                    <div key={l} className="bg-base-200 rounded-lg p-3">
+                      <p className="text-xs text-base-content/50 font-semibold uppercase tracking-wide">{l}</p>
+                      <p className="font-semibold text-base-content mt-0.5">{String(v)}</p>
+                    </div>
+                  ))}
+                  <div className="bg-base-200 rounded-lg p-3">
+                    <p className="text-xs text-base-content/50 font-semibold uppercase tracking-wide">KYC Status</p>
+                    <DriverKycBadge status={kyc.verificationStatus} className="mt-1.5" />
+                  </div>
+                </div>
+              )}
+
+              {/* KYC & DOCS */}
+              {sec === 'kyc' && (
+                <div className="space-y-5">
+                  <CurrentValueRow label="Current KYC Status">
+                    <DriverKycBadge status={kyc.verificationStatus} />
+                    {kyc.isVerified && <span className="badge badge-success badge-xs ml-2">Verified ✓</span>}
+                  </CurrentValueRow>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                    {[
+                      ['DL Number',      kyc.drivingLicenceNumber ?? '—'],
+                      ['DL Expiry',      kyc.drivingLicenceExpiry ? new Date(kyc.drivingLicenceExpiry).toLocaleDateString('en-IN') : '—'],
+                      ['DL Classes',     kyc.licenceClass?.join(', ') || '—'],
+                      ['PSV Badge',      kyc.psvBadgeNumber ?? '—'],
+                      ['PSV Expiry',     kyc.psvBadgeExpiry ? new Date(kyc.psvBadgeExpiry).toLocaleDateString('en-IN') : '—'],
+                      ['PAN Number',     kyc.panNumber ?? '—'],
+                      ['Aadhaar Last4',  kyc.aadhaarLast4 ? `XXXX XXXX ${kyc.aadhaarLast4}` : '—'],
+                      ['Submitted At',   kyc.submittedAt ? new Date(kyc.submittedAt).toLocaleDateString('en-IN') : '—'],
+                      ['Verified At',    kyc.verifiedAt ? new Date(kyc.verifiedAt).toLocaleDateString('en-IN') : '—'],
+                    ].map(([l, v]) => (
+                      <div key={l} className="bg-base-200 rounded-lg p-2.5">
+                        <p className="text-base-content/50 font-semibold uppercase tracking-wide text-[10px]">{l}</p>
+                        <p className="font-semibold text-base-content mt-0.5">{v}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-base-content/40 mb-3">Uploaded Documents</p>
+                    <div className="flex flex-wrap gap-3">
+                      <DocThumb url={kyc.aadhaarDocUrl}        label="Aadhaar" />
+                      <DocThumb url={kyc.drivingLicenceDocUrl} label="Driving Licence" />
+                      <DocThumb url={kyc.psvBadgeDocUrl}       label="PSV Badge" />
+                      <DocThumb url={kyc.panDocUrl}            label="PAN Card" />
+                      {d.photoUrl && <DocThumb url={d.photoUrl} label="Driver Photo" />}
+                    </div>
+                  </div>
+
+                  {d.medicalFitness?.documentUrl && (
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-widest text-base-content/40 mb-3">Medical Fitness</p>
+                      <div className="flex flex-wrap gap-3">
+                        <DocThumb url={d.medicalFitness.documentUrl} label="Fitness Certificate" />
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 text-xs">
+                        {[
+                          ['Cert No.', d.medicalFitness.certificateNumber ?? '—'],
+                          ['Blood Group', d.medicalFitness.bloodGroup ?? '—'],
+                          ['Expiry', d.medicalFitness.expiryDate ? new Date(d.medicalFitness.expiryDate).toLocaleDateString('en-IN') : '—'],
+                        ].map(([l, v]) => (
+                          <div key={l} className="bg-base-200 rounded-lg p-2.5">
+                            <p className="text-base-content/50 font-semibold uppercase tracking-wide text-[10px]">{l}</p>
+                            <p className="font-semibold text-base-content mt-0.5">{v}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="border-t border-base-300 pt-4 space-y-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-base-content/40">Update KYC Decision</p>
+                    {kyc.rejectionReason && (
+                      <div className="alert alert-error text-xs py-2">
+                        <AlertTriangle size={12} />
+                        <span>Previous rejection: {kyc.rejectionReason}</span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FieldNote label="KYC Verification Decision" note="'Verified' sets isVerified=true and activates driver account">
+                        <select className="input-field w-full" value={kycForm.verificationStatus} onChange={(e) => setKycForm((p) => ({ ...p, verificationStatus: e.target.value }))}>
+                          <option value="">— Select decision —</option>
+                          {DRIVER_KYC_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </FieldNote>
+                      <FieldNote label="Rejection Reason" note="Required when rejecting — driver will see this in-app">
+                        <input className="input-field w-full" value={kycForm.rejectionReason} onChange={(e) => setKycForm((p) => ({ ...p, rejectionReason: e.target.value }))} placeholder="DL expired, photo mismatch..." />
+                      </FieldNote>
+                    </div>
+                    <div className="flex justify-end">
+                      <button className="btn btn-primary btn-sm" onClick={() => dispatch(adminVerifyDriverKyc({ driverId, ...kycForm }))} disabled={loading || !kycForm.verificationStatus}>
+                        {loading ? <Loader2 size={13} className="animate-spin" /> : <BadgeCheck size={13} />}
+                        Submit KYC Decision
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* BLOCK */}
+              {sec === 'block' && (
+                <div className="space-y-4">
+                  <CurrentValueRow label="Block Status">
+                    {d.isBlocked
+                      ? <span className="badge badge-error">Blocked</span>
+                      : <span className="badge badge-success">Active / Clear</span>}
+                  </CurrentValueRow>
+
+                  {d.isBlocked && (
+                    <div className="bg-error/10 border border-error/30 rounded-lg p-4 text-sm space-y-1">
+                      <div className="flex items-center gap-2 text-error font-bold">
+                        <ShieldX size={15} />
+                        <span>Driver is currently BLOCKED</span>
+                      </div>
+                      {d.blockReason && (
+                        <p className="text-base-content/70 pl-5">
+                          <strong>Reason:</strong> {d.blockReason}
+                        </p>
                       )}
-                    </Field>
+                    </div>
+                  )}
+
+                  {!d.isBlocked && (
+                    <>
+                      <div className="alert alert-warning text-sm">
+                        <AlertTriangle size={15} />
+                        <span>Blocking will suspend driver's ability to receive trips. All active trips will be flagged.</span>
+                      </div>
+                      <FieldNote label="Block Reason" note="Mandatory — stored in audit log and shown to driver" required>
+                        <textarea className="input-field w-full min-h-[90px]" value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Policy violation, trip fraud, unsafe driving..." />
+                      </FieldNote>
+                    </>
+                  )}
+
+                  <div className="flex justify-end">
+                    {d.isBlocked
+                      ? (
+                        <button className="btn btn-success btn-sm gap-1" onClick={() => dispatch(adminUnblockDriver(driverId))} disabled={loading}>
+                          {loading ? <Loader2 size={13} className="animate-spin" /> : <Unlock size={13} />}
+                          Unblock Driver
+                        </button>
+                      ) : (
+                        <button className="btn btn-error btn-sm gap-1" onClick={() => dispatch(adminBlockDriver({ driverId, blockReason }))} disabled={loading || !blockReason}>
+                          {loading ? <Loader2 size={13} className="animate-spin" /> : <Lock size={13} />}
+                          Block Driver
+                        </button>
+                      )
+                    }
+                  </div>
+                </div>
+              )}
+
+              {/* COINS */}
+              {sec === 'coins' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="bg-accent/10 border border-accent/30 rounded-xl p-4 text-center">
+                      <p className="text-xs text-accent font-semibold uppercase tracking-wide">Coin Balance</p>
+                      <p className="text-3xl font-black text-accent mt-1">{inr(d.rewards?.coinBalance)}</p>
+                    </div>
+                    <div className="bg-base-200 rounded-xl p-4 text-center">
+                      <p className="text-xs text-base-content/50 font-semibold uppercase tracking-wide">Total Earned</p>
+                      <p className="text-2xl font-black text-base-content mt-1">{inr(d.rewards?.totalCoinsEarned)}</p>
+                    </div>
+                    <div className="bg-base-200 rounded-xl p-4 text-center">
+                      <p className="text-xs text-base-content/50 font-semibold uppercase tracking-wide">Total Redeemed</p>
+                      <p className="text-2xl font-black text-base-content mt-1">{inr(d.rewards?.totalCoinsRedeemed)}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-base-content/40 text-center">Reward Tier: <strong>{d.rewards?.tier ?? '—'}</strong></p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <FieldNote label="Transaction Type" note="CREDIT adds; DEBIT subtracts">
+                      <select className="input-field w-full" value={coinForm.type} onChange={(e) => setCoinForm((p) => ({ ...p, type: e.target.value }))}>
+                        <option value="ADMIN_CREDIT">Admin Credit (+)</option>
+                        <option value="ADMIN_DEBIT">Admin Debit (−)</option>
+                      </select>
+                    </FieldNote>
+                    <FieldNote label="Amount (coins)" note="Positive integer">
+                      <input className="input-field w-full" type="number" min={1} value={coinForm.amount} onChange={(e) => setCoinForm((p) => ({ ...p, amount: e.target.value }))} placeholder="e.g. 500" />
+                    </FieldNote>
+                    <FieldNote label="Description" note="Shown in driver's coin history">
+                      <input className="input-field w-full" value={coinForm.description} onChange={(e) => setCoinForm((p) => ({ ...p, description: e.target.value }))} placeholder="Performance bonus, correction..." />
+                    </FieldNote>
+                  </div>
+                  <div className="flex justify-end">
+                    <button className="btn btn-primary btn-sm" onClick={() => dispatch(adminAdjustDriverCoins({ driverId, ...coinForm, amount: +coinForm.amount }))} disabled={loading || !coinForm.amount || +coinForm.amount <= 0}>
+                      {loading ? <Loader2 size={13} className="animate-spin" /> : <Coins size={13} />}
+                      Apply Adjustment
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* NOTES */}
+              {sec === 'notes' && (
+                <div className="space-y-3">
+                  <FieldNote label="Admin-Only Notes" note="Never visible to driver">
+                    <textarea className="input-field w-full min-h-[120px] resize-y" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Incident reports, fraud flags, warnings issued..." maxLength={1000} />
+                  </FieldNote>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-base-content/40">{notes.length}/1000</p>
+                    <button className="btn btn-primary btn-sm" onClick={() => dispatch(adminUpdateDriverNotes({ driverId, notes }))} disabled={loading}>
+                      <StickyNote size={13} /> Save Notes
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* LOGS */}
+              {sec === 'logs' && (
+                <div className="space-y-2 max-h-96 overflow-y-auto scrollbar-thin">
+                  {(adminDriverLogs ?? []).length === 0
+                    ? <p className="text-center text-base-content/40 py-10 text-sm">No logs yet.</p>
+                    : (adminDriverLogs ?? []).map((log) => (
+                      <div key={log._id} className="bg-base-200 rounded-lg p-3 text-xs flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className={`badge badge-xs ${log.level === 'error' ? 'badge-error' : log.level === 'success' ? 'badge-success' : log.level === 'warning' ? 'badge-warning' : 'badge-info'}`}>{log.level}</span>
+                          <span className="text-base-content/40">{new Date(log.createdAt).toLocaleString('en-IN')}</span>
+                        </div>
+                        <p className="text-base-content leading-snug">{log.message}</p>
+                      </div>
+                    ))
+                  }
+                </div>
+              )}
+            </>
+          )
+      }
+    </Modal>
+  );
+});
+DriverDetailModal.displayName = 'DriverDetailModal';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DRIVERS TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DriversTab = memo(() => {
+  const dispatch = useDispatch();
+  const { adminDrivers, adminDriversTotal, adminAvailableDrivers, loading } = useSelector((s) => s.transportPartner);
+  const [page, setPage]       = useState(1);
+  const [search, setSearch]   = useState('');
+  const [status, setStatus]   = useState('');
+  const [kycStatus, setKycStatus] = useState('');
+  const [detailId, setDetailId] = useState(null);
+  const [showGeo, setShowGeo] = useState(false);
+  const [geo, setGeo]         = useState({ lng: '', lat: '', radius: '10000' });
+  const LIMIT = 15;
+
+  const params = useMemo(() => ({
+    page, limit: LIMIT,
+    ...(search    && { search }),
+    ...(status    && { status }),
+    ...(kycStatus && { kycStatus }),
+  }), [page, search, status, kycStatus]);
+
+  useEffect(() => { dispatch(adminFetchAllDrivers(params)); }, [dispatch, params]);
+
+  const handleGeoSearch = useCallback(() => {
+    if (!geo.lng || !geo.lat) return;
+    dispatch(adminFetchAvailableDrivers({ lng: +geo.lng, lat: +geo.lat, radius: +geo.radius }));
+  }, [dispatch, geo]);
+
+  return (
+    <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-4">
+      <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <div className="flex flex-wrap gap-2 flex-1">
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40 pointer-events-none" />
+            <input className="input-field pl-8 pr-3 py-2 text-sm w-48" placeholder="Search drivers..." value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }} aria-label="Search drivers" />
+          </div>
+          <select className="input-field py-2 text-sm" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+            <option value="">All Status</option>
+            {['Available', 'On-Trip', 'Offline', 'On-Break', 'Suspended'].map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select className="input-field py-2 text-sm" value={kycStatus} onChange={(e) => { setKycStatus(e.target.value); setPage(1); }}>
+            <option value="">All KYC</option>
+            {DRIVER_KYC_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <button className="btn btn-ghost btn-sm btn-circle" onClick={() => dispatch(adminFetchAllDrivers(params))} aria-label="Refresh"><RefreshCw size={14} /></button>
+        </div>
+        <button className="btn btn-outline btn-sm gap-1.5 shrink-0" onClick={() => setShowGeo((v) => !v)}>
+          <MapPin size={13} /> Geo Search
+        </button>
+      </motion.div>
+
+      <AnimatePresence>
+        {showGeo && (
+          <motion.div variants={fadeUp} initial="hidden" animate="visible" exit="hidden" className="card p-4 space-y-3">
+            <p className="text-sm font-bold text-base-content">Find Available Drivers by Location</p>
+            <div className="flex flex-wrap gap-3 items-end">
+              <FieldNote label="Longitude" note="e.g. 80.648 (Vijayawada)">
+                <input className="input-field w-36" value={geo.lng} onChange={(e) => setGeo((p) => ({ ...p, lng: e.target.value }))} placeholder="80.648" />
+              </FieldNote>
+              <FieldNote label="Latitude" note="e.g. 16.506">
+                <input className="input-field w-36" value={geo.lat} onChange={(e) => setGeo((p) => ({ ...p, lat: e.target.value }))} placeholder="16.506" />
+              </FieldNote>
+              <FieldNote label="Radius (metres)" note="Default 10km">
+                <input className="input-field w-32" value={geo.radius} onChange={(e) => setGeo((p) => ({ ...p, radius: e.target.value }))} placeholder="10000" />
+              </FieldNote>
+              <button className="btn btn-primary btn-sm" onClick={handleGeoSearch} disabled={!geo.lng || !geo.lat}>
+                <Search size={13} /> Find
+              </button>
+            </div>
+            {adminAvailableDrivers.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {adminAvailableDrivers.map((dr) => (
+                  <div key={dr._id} className="bg-success/10 border border-success/30 rounded-lg px-3 py-2 text-xs">
+                    <p className="font-semibold text-base-content">{dr.legalName}</p>
+                    <p className="text-base-content/50 font-mono">{dr.driverCode}</p>
                   </div>
                 ))}
               </div>
-            </div>
-
-            {/* Plan Rate Overrides */}
-            {planRates.length > 0 && (
-              <div>
-                <p className="text-xs font-black text-base-content/50 uppercase tracking-widest mb-4 pb-2 border-b border-base-300">
-                  Plan Rate Overrides (₹/km)
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {planRates.map(([plan, rate]) => (
-                    <div key={plan} className="p-3 bg-base-200/50 rounded-xl">
-                      <p className="text-[10px] font-black text-base-content/40 uppercase truncate">{plan}</p>
-                      <p className="text-xl font-black text-base-content">
-                        {rate === null || rate === undefined ? '—' : `₹${String(rate)}`}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
             )}
-
-            {/* Change note (edit mode) */}
-            {edit && (
-              <div className="pt-2 border-t border-base-300">
-                <Field label="Change Note (audit trail)" note="This note is stored in the pricing audit log — be specific">
-                  <input type="text" value={note} onChange={(e) => setNote(e.target.value)}
-                    placeholder="e.g. Q2 2025 pricing revision — increased base fare by ₹5" className="input-field text-sm" />
-                </Field>
-              </div>
-            )}
-          </>
-        )}
-      </motion.div>
-    </motion.div>
-  );
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-// §M  System Logs
-// FIX: filters object stable, no infinite re-fetch
-// ═════════════════════════════════════════════════════════════════════════════
-const SystemLogs = () => {
-  const dispatch = useDispatch();
-  const { adminLogs, adminLogsTotal, loading } = useSelector((s) => s.transportPartner);
-  const [level,    setLevel]    = useState('');
-  const [category, setCategory] = useState('');
-  const [page,     setPage]     = useState(1);
-
-  // FIX: stable dep-keyed fetch
-  useEffect(() => {
-    dispatch(adminFetchTransportLogs({ level, category, page, limit: 25 }));
-  }, [dispatch, level, category, page]);
-
-  const levelConfig = {
-    success: { dot: 'bg-success', text: 'text-success' },
-    warning: { dot: 'bg-warning', text: 'text-warning' },
-    error:   { dot: 'bg-error',   text: 'text-error'   },
-    info:    { dot: 'bg-info',    text: 'text-info'     },
-  };
-
-  return (
-    <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-5">
-      <SectionHeader icon={FileText} title="System Logs"
-        subtitle={`${adminLogsTotal} total events recorded`}
-        actions={
-          <button onClick={() => dispatch(adminFetchTransportLogs({ level, category, page, limit: 25 }))}
-            className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5">
-            <RefreshCw size={13} /> Refresh
-          </button>
-        }
-      />
-
-      <motion.div variants={fadeUp} className="flex flex-wrap gap-3">
-        <select value={level} onChange={(e) => { setLevel(e.target.value); setPage(1); }} className="input-field text-sm">
-          <option value="">All Levels</option>
-          {['success', 'info', 'warning', 'error'].map((l) => <option key={l} value={l}>{l}</option>)}
-        </select>
-        <select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }} className="input-field text-sm">
-          <option value="">All Categories</option>
-          {['user', 'kyc', 'payment', 'security', 'system'].map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </motion.div>
-
-      <motion.div variants={fadeUp} className="glass-card overflow-hidden">
-        {loading && !adminLogs.length ? (
-          <div className="flex justify-center py-12"><span className="spinner" /></div>
-        ) : (
-          <div className="divide-y divide-base-300/40">
-            {adminLogs.map((log) => {
-              const cfg = levelConfig[log.level] || { dot: 'bg-base-300', text: '' };
-              return (
-                <div key={log._id} className="flex items-start gap-4 px-4 py-3.5 hover:bg-base-200/30 transition-colors">
-                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${cfg.dot}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className={`text-[10px] font-black uppercase tracking-widest ${cfg.text}`}>
-                        {String(log.level || '').toUpperCase()}
-                      </span>
-                      <span className="text-[10px] text-base-content/30 font-semibold">{log.category}</span>
-                    </div>
-                    <p className="text-sm text-base-content leading-snug">{log.message}</p>
-                    <p className="text-[11px] text-base-content/40 mt-0.5">
-                      {log.actor?.name || 'System'} · {log.request?.method} {log.request?.path} · {new Date(log.createdAt).toLocaleString('en-IN')}
-                    </p>
-                  </div>
-                  {log.request?.statusCode != null && (
-                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-full flex-shrink-0 ${
-                      log.request.statusCode >= 400 ? 'bg-error/10 text-error' : 'bg-success/10 text-success'
-                    }`}>
-                      {log.request.statusCode}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-            {!adminLogs.length && (
-              <p className="py-12 text-center text-sm text-base-content/40">No logs found matching current filters.</p>
-            )}
-          </div>
-        )}
-        {adminLogsTotal > 25 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-base-300">
-            <p className="text-xs text-base-content/50">
-              {Math.min((page - 1) * 25 + 1, adminLogsTotal)}–{Math.min(page * 25, adminLogsTotal)} of {adminLogsTotal}
-            </p>
-            <div className="flex gap-2">
-              <button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-40">← Prev</button>
-              <button disabled={page * 25 >= adminLogsTotal} onClick={() => setPage((p) => p + 1)} className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-40">Next →</button>
-            </div>
-          </div>
-        )}
-      </motion.div>
-    </motion.div>
-  );
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-// ROOT PAGE
-// ═════════════════════════════════════════════════════════════════════════════
-export default function TransportPartnerManagement() {
-  const dispatch = useDispatch();
-  const user     = useSelector((s) => s.user?.user) ?? null;
-  const { error } = useSelector((s) => s.transportPartner);
-
-  const [activeSection,     setActiveSection]     = useState('stats');
-  const [selectedPartnerId, setSelectedPartnerId] = useState(null);
-
-  useEffect(() => () => { dispatch(clearTPError()); }, [dispatch]);
-
-  const nav = [
-    { id: 'stats',    label: 'Overview', icon: BarChart2  },
-    { id: 'partners', label: 'Partners', icon: Building2  },
-    { id: 'vehicles', label: 'Vehicles', icon: Car        },
-    { id: 'drivers',  label: 'Drivers',  icon: Users      },
-    { id: 'pricing',  label: 'Pricing',  icon: DollarSign },
-    { id: 'logs',     label: 'Logs',     icon: FileText   },
-  ];
-
-  const handleSelectPartner = useCallback((id) => {
-    setSelectedPartnerId(id);
-    setActiveSection('partner-detail');
-  }, []);
-
-  const handleBackFromPartner = useCallback(() => {
-    setSelectedPartnerId(null);
-    setActiveSection('partners');
-  }, []);
-
-  const changeSection = useCallback((id) => {
-    setActiveSection(id);
-    if (id !== 'partner-detail') setSelectedPartnerId(null);
-  }, []);
-
-  return (
-    <div className="min-h-screen" style={{ background: 'var(--base-100)' }}>
-      {/* Global error banner */}
-      <AnimatePresence>
-        {error && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            className="bg-error/10 border-b border-error/20 px-6 py-2 flex items-center justify-between">
-            <p className="text-xs text-error font-semibold flex items-center gap-2">
-              <AlertTriangle size={13} /> {error}
-            </p>
-            <button onClick={() => dispatch(clearTPError())} className="text-error hover:bg-error/10 p-1 rounded-lg transition-colors">
-              <X size={14} />
-            </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Top navigation bar */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-40 border-b border-base-300"
-        style={{ background: 'color-mix(in srgb, var(--base-100), transparent 8%)', backdropFilter: 'blur(20px)' }}>
-        <div className="container-custom py-2.5 flex items-center gap-3">
-          <div className="flex items-center gap-2.5 flex-shrink-0">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--bg-gradient-primary)' }}>
-              <Truck size={15} className="text-white" />
-            </div>
-            <div className="hidden sm:block">
-              <p className="text-xs font-black text-base-content leading-none">Transport</p>
-              <p className="text-[9px] text-base-content/40 leading-none tracking-wider">MANAGEMENT</p>
-            </div>
-          </div>
-
-          <div className="flex-1 flex items-center gap-0.5 overflow-x-auto">
-            {nav.map(({ id, label, icon: Icon }) => {
-              const isActive = activeSection === id || (id === 'partners' && activeSection === 'partner-detail');
-              return (
-                <button key={id} onClick={() => changeSection(id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-black whitespace-nowrap transition-all ${
-                    isActive ? 'text-primary-content' : 'text-base-content/55 hover:bg-base-200'
-                  }`}
-                  style={isActive ? { background: 'var(--primary)' } : {}}>
-                  <Icon size={13} /> {label}
-                </button>
-              );
-            })}
-          </div>
-
-          {user && (
-            <div className="flex items-center gap-2 ml-auto flex-shrink-0">
-              {user.avatar
-                ? <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover border-2 border-primary/20" />
-                : <div className="w-8 h-8 rounded-full bg-base-300 flex items-center justify-center font-black text-xs">{(user.name || 'A')[0]}</div>
+      <motion.div variants={fadeUp} className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="table" aria-label="Drivers list">
+            <thead>
+              <tr>
+                <th>Driver</th>
+                <th>Agency</th>
+                <th>Status</th>
+                <th>KYC</th>
+                <th>Block</th>
+                <th>Rating</th>
+                <th className="text-center">Coins</th>
+                <th className="text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && adminDrivers.length === 0
+                ? Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} cols={8} />)
+                : adminDrivers.length === 0
+                  ? (
+                    <tr>
+                      <td colSpan={8} className="text-center py-14">
+                        <Users size={36} className="mx-auto mb-3 text-base-content/20" />
+                        <p className="text-sm text-base-content/40">No drivers found.</p>
+                      </td>
+                    </tr>
+                  )
+                  : adminDrivers.map((dr) => (
+                    <tr key={dr._id}>
+                      <td>
+                        <p className="font-semibold text-sm text-base-content">{dr.legalName}</p>
+                        <p className="text-xs text-base-content/50 font-mono">{dr.driverCode}</p>
+                      </td>
+                      <td className="text-sm">{dr.ownerAgency?.businessName ?? '—'}</td>
+                      <td>
+                        <span className={`badge badge-xs ${dr.status === 'Available' ? 'badge-success' : dr.status === 'On-Trip' ? 'badge-info' : dr.status === 'Suspended' ? 'badge-error' : ''}`}>
+                          {dr.status}
+                        </span>
+                      </td>
+                      <td><DriverKycBadge status={dr.kyc?.verificationStatus} /></td>
+                      <td>
+                        {dr.isBlocked
+                          ? <span className="badge badge-error badge-xs">Blocked</span>
+                          : <span className="badge badge-success badge-xs">Clear</span>}
+                      </td>
+                      <td className="text-sm">
+                        <span className="flex items-center gap-1">
+                          <Star size={11} className="text-warning fill-warning" />
+                          {dr.performance?.rating?.toFixed(1) ?? '—'}
+                        </span>
+                      </td>
+                      <td className="text-sm text-center">{inr(dr.rewards?.coinBalance)}</td>
+                      <td className="text-right">
+                        <button className="btn btn-ghost btn-xs btn-circle" onClick={() => setDetailId(dr._id)} aria-label={`View ${dr.legalName}`}>
+                          <Eye size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
               }
-              <div className="hidden sm:block">
-                <p className="text-xs font-black text-base-content leading-tight">{user.name}</p>
-                <p className="text-[9px] text-base-content/40 uppercase tracking-wider">{user.role}</p>
-              </div>
+            </tbody>
+          </table>
+        </div>
+        <Pagination page={page} total={adminDriversTotal} limit={LIMIT} onPageChange={setPage} />
+      </motion.div>
+
+      <DriverDetailModal open={!!detailId} onClose={() => setDetailId(null)} driverId={detailId} />
+    </motion.div>
+  );
+});
+DriversTab.displayName = 'DriversTab';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRICING TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PRICING_FIELDS = [
+  { key: 'platformFee',           label: 'Platform Fee (%)',       note: 'Default % deducted from partner earnings per completed ride' },
+  { key: 'baseFare',              label: 'Base Fare (₹)',          note: 'Flat amount charged for any ride regardless of distance' },
+  { key: 'baseFarePerKm',         label: 'Fare Per KM (₹)',        note: 'Additional amount charged per kilometre' },
+  { key: 'minimumFare',           label: 'Minimum Fare (₹)',       note: 'Floor price — rider always pays at least this' },
+  { key: 'waitingChargePerMin',   label: 'Waiting Charge/Min (₹)', note: 'Rate applied after free waiting window expires' },
+  { key: 'freeWaitingMinutes',    label: 'Free Waiting (min)',     note: 'Grace period before waiting charges begin' },
+  { key: 'nightSurchargePercent', label: 'Night Surcharge (%)',    note: 'Extra percentage added during night hours' },
+];
+
+const PricingTab = memo(() => {
+  const dispatch = useDispatch();
+  const { globalPricing, loading } = useSelector((s) => s.transportPartner);
+  const [form, setForm] = useState({});
+  const [note, setNote] = useState('');
+
+  useEffect(() => { dispatch(adminFetchGlobalPricing()); }, [dispatch]);
+  useEffect(() => { if (globalPricing) setForm({ ...globalPricing }); }, [globalPricing]);
+
+  const set = useCallback((k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value === '' ? '' : +e.target.value })), []);
+
+  return (
+    <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-6">
+      <motion.div variants={fadeUp} className="card p-6 space-y-6">
+        <div className="flex items-start gap-4">
+          <Globe size={18} className="text-primary mt-0.5" />
+          <div>
+            <h3 className="font-bold text-base-content">Global Transport Pricing</h3>
+            <p className="text-xs text-base-content/50 mt-0.5">Platform-wide defaults — individual partners may override via Partner Detail → Platform Fee.</p>
+          </div>
+        </div>
+
+        {!globalPricing && loading
+          ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {PRICING_FIELDS.map((_, i) => <div key={i} className="skeleton h-20 rounded-lg animate-pulse bg-base-300" />)}
             </div>
-          )}
+          )
+          : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {PRICING_FIELDS.map(({ key, label, note: fieldNote }) => (
+                <FieldNote key={key} label={label} note={fieldNote}>
+                  <input className="input-field w-full" type="number" value={form[key] ?? ''} onChange={set(key)} min={0} step="0.01" placeholder="0" />
+                </FieldNote>
+              ))}
+            </div>
+          )
+        }
+
+        <div className="space-y-3 pt-2 border-t border-base-300">
+          <FieldNote label="Change Audit Note" note="Reason for this pricing update — stored in audit log">
+            <input className="input-field w-full" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Q2 2025 pricing review — adjusted base fare..." />
+          </FieldNote>
+          <div className="flex justify-end">
+            <button className="btn btn-primary btn-sm" onClick={() => dispatch(adminUpdateGlobalPricing({ ...form, note: note || undefined }))} disabled={loading || !globalPricing}>
+              {loading ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+              Save Global Pricing
+            </button>
+          </div>
         </div>
       </motion.div>
 
-      {/* Content */}
-      <div className="container-custom py-6">
-        {/* Partner detail breadcrumb */}
-        {activeSection === 'partner-detail' && (
-          <div className="flex items-center gap-2 text-xs text-base-content/40 mb-4">
-            <button onClick={() => changeSection('partners')} className="hover:text-primary transition-colors">Partners</button>
-            <ChevronRight size={12} />
-            <span className="text-base-content font-semibold">Partner Detail</span>
-          </div>
-        )}
+      <motion.div variants={fadeUp} className="alert alert-info text-sm">
+        <Info size={15} />
+        <div>
+          <p className="font-semibold">Per-Partner Fee Overrides</p>
+          <p className="text-base-content/70 text-xs mt-0.5">To apply a custom platform fee, go to Partners → View Partner → Platform Fee tab.</p>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+});
+PricingTab.displayName = 'PricingTab';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LOGS TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
+const LEVEL_BADGE = { error: 'badge-error', warning: 'badge-warning', success: 'badge-success', info: 'badge-info' };
+
+const LogsTab = memo(() => {
+  const dispatch = useDispatch();
+  const { adminLogs, adminLogsTotal, loading } = useSelector((s) => s.transportPartner);
+  const [page, setPage]         = useState(1);
+  const [level, setLevel]       = useState('');
+  const [category, setCategory] = useState('');
+  const LIMIT = 20;
+
+  const params = useMemo(() => ({ page, limit: LIMIT, ...(level && { level }), ...(category && { category }) }), [page, level, category]);
+  useEffect(() => { dispatch(adminFetchTransportLogs(params)); }, [dispatch, params]);
+
+  return (
+    <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-4">
+      <motion.div variants={fadeUp} className="flex flex-wrap gap-2 items-center">
+        <select className="input-field py-2 text-sm" value={level} onChange={(e) => { setLevel(e.target.value); setPage(1); }}>
+          <option value="">All Levels</option>
+          {['info', 'success', 'warning', 'error'].map((l) => <option key={l} value={l}>{l}</option>)}
+        </select>
+        <select className="input-field py-2 text-sm" value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}>
+          <option value="">All Categories</option>
+          {['user', 'kyc', 'security', 'system', 'payment'].map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <button className="btn btn-ghost btn-sm btn-circle" onClick={() => dispatch(adminFetchTransportLogs(params))} aria-label="Refresh logs"><RefreshCw size={14} /></button>
+        <span className="text-xs text-base-content/40 ml-auto">{(adminLogsTotal ?? 0).toLocaleString('en-IN')} total entries</span>
+      </motion.div>
+
+      <motion.div variants={fadeUp} className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="table" aria-label="System logs">
+            <thead>
+              <tr>
+                <th className="w-40">Timestamp</th>
+                <th className="w-20">Level</th>
+                <th className="w-24">Category</th>
+                <th>Actor</th>
+                <th>Message</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (adminLogs ?? []).length === 0
+                ? Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} cols={5} />)
+                : (adminLogs ?? []).length === 0
+                  ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-14">
+                        <FileText size={36} className="mx-auto mb-3 text-base-content/20" />
+                        <p className="text-sm text-base-content/40">No logs match the current filters.</p>
+                      </td>
+                    </tr>
+                  )
+                  : (adminLogs ?? []).map((log) => (
+                    <tr key={log._id}>
+                      <td className="text-xs text-base-content/50 whitespace-nowrap font-mono">
+                        {new Date(log.createdAt).toLocaleString('en-IN', { hour12: false, dateStyle: 'short', timeStyle: 'medium' })}
+                      </td>
+                      <td><span className={`badge badge-xs ${LEVEL_BADGE[log.level] ?? ''}`}>{log.level}</span></td>
+                      <td><span className="badge badge-xs">{log.category}</span></td>
+                      <td className="text-xs text-base-content/70">{log.actor?.name ?? '—'}</td>
+                      <td className="text-sm max-w-xs" title={log.message}><p className="truncate">{log.message}</p></td>
+                    </tr>
+                  ))
+              }
+            </tbody>
+          </table>
+        </div>
+        <Pagination page={page} total={adminLogsTotal ?? 0} limit={LIMIT} onPageChange={setPage} />
+      </motion.div>
+    </motion.div>
+  );
+});
+LogsTab.displayName = 'LogsTab';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROOT PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function TransportPartnersManagement() {
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const renderTab = useMemo(() => {
+    switch (activeTab) {
+      case 'overview': return <OverviewTab />;
+      case 'partners': return <PartnersTab />;
+      case 'vehicles': return <VehiclesTab />;
+      case 'drivers':  return <DriversTab />;
+      case 'pricing':  return <PricingTab />;
+      case 'logs':     return <LogsTab />;
+      default:         return null;
+    }
+  }, [activeTab]);
+
+  return (
+    <main className="min-h-screen bg-base-100" data-theme="admin">
+      <header className="sticky top-0 z-30 bg-base-100/95 border-b border-base-300" style={{ backdropFilter: 'blur(12px)' }}>
+        <div className="container-custom">
+          <div className="flex items-center justify-between py-4 gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-primary/10 rounded-xl">
+                <Truck size={20} className="text-primary" />
+              </div>
+              <div>
+                <h1 className="text-lg font-black text-base-content leading-tight">Transport Management</h1>
+                <p className="text-xs text-base-content/50">Superadmin — Partners · Vehicles · Drivers · Pricing</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="badge badge-primary text-xs">Superadmin</span>
+              <span className="flex items-center gap-1 text-xs text-base-content/40">
+                <span className="status-dot status-dot-success" aria-hidden="true" />
+                Live
+              </span>
+            </div>
+          </div>
+
+          <nav className="flex gap-0.5 overflow-x-auto scrollbar-thin pb-0" role="tablist" aria-label="Management sections">
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button key={id} role="tab" aria-selected={activeTab === id}
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${activeTab === id ? 'border-primary text-primary' : 'border-transparent text-base-content/55 hover:text-base-content hover:border-base-300'}`}
+                onClick={() => setActiveTab(id)}>
+                <Icon size={14} aria-hidden="true" />
+                {label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </header>
+
+      <section className="container-custom py-6">
         <AnimatePresence mode="wait">
-          <motion.div key={activeSection + (selectedPartnerId || '')}
-            variants={fadeIn} initial="hidden" animate="visible" exit="hidden">
-            {activeSection === 'stats'           && <PlatformStats />}
-            {activeSection === 'partners'         && <PartnerList onSelectPartner={handleSelectPartner} />}
-            {activeSection === 'partner-detail'   && <PartnerDetail partnerId={selectedPartnerId} onBack={handleBackFromPartner} />}
-            {activeSection === 'vehicles'         && <PendingVehicles />}
-            {activeSection === 'drivers'          && <PlatformDrivers />}
-            {activeSection === 'pricing'          && <GlobalPricing />}
-            {activeSection === 'logs'             && <SystemLogs />}
+          <motion.div key={activeTab} variants={slideIn} initial="hidden" animate="visible" exit="exit" role="tabpanel" aria-label={`${activeTab} panel`}>
+            {renderTab}
           </motion.div>
         </AnimatePresence>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

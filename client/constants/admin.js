@@ -96,9 +96,6 @@ export const ADMIN_DASHBOARD_LINKS = [
       { name: "Transport Partners",    href: "/admin/partners/transport",       icon: <Truck size={18} />      },
       { name: "Care Assistants (Gig)", href: "/admin/partners/care-assistants", icon: <Users2 size={18} />     },
       { name: "Diagnostic Labs",       href: "/admin/partners/labs",            icon: <Microscope size={18} /> },
-      { name: "B2B / Institutional",   href: "/admin/partners/institutional",   icon: <Handshake size={18} />  },
-      { name: "Member Directory",      href: "/admin/members/directory",        icon: <Users size={18} />      },
-      { name: "Loyalty & Rewards",     href: "/admin/members/loyalty",          icon: <Star size={18} />       },
     ],
   },
 
@@ -110,7 +107,6 @@ export const ADMIN_DASHBOARD_LINKS = [
     icon: <Hospital size={20} />,
     links: [
       { name: "All Hospitals",      href: "/admin/hospitals",    icon: <Hospital size={18} />     },
-      { name: "Departments",        href: "/admin/departments",  icon: <Building2 size={18} />    },
       { name: "Doctor Registry",    href: "/admin/doctors",      icon: <Stethoscope size={18} />  },
       { name: "Pharmacy Stores",    href: "/admin/pharmacies",   icon: <Store size={18} />        },
       { name: "Medicine Database",  href: "/admin/medicines",    icon: <Package size={18} />      },

@@ -1937,7 +1937,7 @@ export default function TransportPartnersManagement() {
   }, [activeTab]);
 
   return (
-    <main className="min-h-screen bg-base-100" data-theme="admin">
+    <main className="min-h-screen bg-base-100" data-theme="superadmin">
       <header className="sticky top-0 z-30 bg-base-100/95 border-b border-base-300" style={{ backdropFilter: 'blur(12px)' }}>
         <div className="container-custom">
           <div className="flex items-center justify-between py-4 gap-3 flex-wrap">
