@@ -2,20 +2,7 @@ import mongoose from 'mongoose';
 import Notification from '../models/Notification.js'; // adjust path
 import { TicketActivity, TicketAuditLog, ADMIN_ROLES, PARTNER_ROLES, CUSTOMER_ROLE } from '../models/ticket.model.js';
 
-// ─── Auth & Role Guards ───────────────────────────────────────────────────────
-// REMOVED: requireAuth / requireRoles were a placeholder auth layer that
-// duplicated the real JWT + session-aware middleware in authMiddleware.js.
-// Routes now import { protect, authorize } from '../../middlewares/authMiddleware.js'
-// directly — see updated route files.
-//
-// REMOVED: isAdmin / isSuperAdmin as exported predicates. They were only
-// ever called in one real spot across the whole support module (the GET
-// /tickets list-scoping branch) — that call now uses ADMIN_ROLES.includes()
-// inline instead of a wrapper function. isPartner / isCustomer / isFinance
-// stay, since route handlers genuinely branch business logic on them
-// (e.g. "is this ticket owned by a customer or a partner?") — those are
-// plain role predicates, not auth gates, so they're unaffected by the
-// requireAuth/requireRoles → protect/authorize swap.
+ 
 
 export const isPartner  = (role) => PARTNER_ROLES.includes(role);
 export const isCustomer = (role) => role === CUSTOMER_ROLE;

@@ -546,6 +546,35 @@ rideSchema.pre("save", async function () {
     this.vehicleClass = this.vehicleSnapshot.vehicleClass;
   }
 
+// CHANGE (fix): Booking.driver/transportPartner/solodriverpartner are
+  // documented as "denormalized cache of current active leg, kept in sync
+  // by a post-save hook" — that hook never actually existed. Booking.driver
+  // was permanently stale. This closes the gap: only writes through when
+  // THIS ride is the booking's primaryRide (the active leg), matching the
+  // documented contract exactly.
+  if (
+    (this.isModified("driver") ||
+      this.isModified("transportPartner") ||
+      this.isModified("soloPartner")) &&
+    this.booking
+  ) {
+    try {
+      const Booking = mongoose.model("Booking");
+      const b = await Booking.findById(this.booking).select("primaryRide").lean();
+      if (b && String(b.primaryRide) === String(this._id)) {
+        await Booking.findByIdAndUpdate(this.booking, {
+          $set: {
+            driver: this.driver || null,
+            transportPartner: this.transportPartner || null,
+            solodriverpartner: this.soloPartner || null,
+          },
+        });
+      }
+    } catch (err) {
+      console.error("[Ride.pre-save] booking driver-cache sync failed:", err.message);
+    }
+  }
+
   // Driver snapshot on first assignment
   if (
     this.isModified("driver") &&

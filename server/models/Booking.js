@@ -749,7 +749,8 @@ bookingSchema.pre("save", async function () {
     this.bookingCode = code;
   }
 
-  // statusLog fromStatus + cap
+// statusLog fromStatus + cap (bounded UI cache — see BookingStatusEvent
+  // for the permanent, uncapped record of the same transition)
   if (this.isModified("status") && !this.isNew) {
     const lastLog = this.statusLog?.[this.statusLog.length - 1];
     const fromStatus = lastLog?.toStatus ?? null;
@@ -759,6 +760,15 @@ bookingSchema.pre("save", async function () {
       changedBy: this.updatedBy || null,
       changedAt: new Date(),
     });
+
+    // CHANGE (fix): statusLog is capped at MAX_INLINE_STATUS_LOG — every
+    // transition beyond that was silently lost, contradicting the spec's
+    // "Historical data must never be lost." Mirror every transition into
+    // the uncapped BookingStatusEvent collection too. Fire-and-forget via
+    // queueMicrotask-style post-save would be cleaner, but this schema's
+    // other pre-save hooks are already async/await, so a direct await here
+    // keeps ordering guarantees simple and matches the existing pattern.
+    this._pendingStatusEvent = { fromStatus, toStatus: this.status, changedBy: this.updatedBy || null };
   }
 
   // CHANGE: cap inline statusLog — keeps the hot document bounded regardless
@@ -806,7 +816,7 @@ bookingSchema.pre("save", async function () {
     }
   }
 
-  // Care assistant snapshot on first assignment
+// Care assistant snapshot on first assignment
   if (
     this.isModified("careAssistant") &&
     this.careAssistant &&
@@ -822,6 +832,44 @@ bookingSchema.pre("save", async function () {
         photoUrl: ca.photoUrl,
         phone: ca.phone,
       };
+    }
+  }
+});
+
+// CHANGE (fix): write the permanent, uncapped audit record. Post-save
+// (not pre-save) so it only fires once the document is actually persisted —
+// no orphaned event if the save itself fails validation later in the chain.
+bookingSchema.post("save", async function () {
+  if (!this._pendingStatusEvent) return;
+  const pending = this._pendingStatusEvent;
+  try {
+    const BookingStatusEvent = mongoose.model("BookingStatusEvent");
+    await BookingStatusEvent.create({
+      booking: this._id,
+      ...pending,
+      changedAt: new Date(),
+    });
+  } catch (err) {
+    console.error("[Booking.post-save] BookingStatusEvent write failed:", err.message);
+  } finally {
+    this._pendingStatusEvent = null;
+  }
+
+  // Instant earning display — create BookingPartnerAllocation the moment
+  // booking completes. NOT a wallet credit; settlement cron still gates
+  // actual withdrawable money. See allocationEngine.service.js.
+if (pending.toStatus === "completed") {
+    try {
+      const { createAllocationsForBooking } = await import("../services/allocationEngine.service.js");
+      await createAllocationsForBooking(this._id);
+    } catch (err) {
+      console.error("[Booking.post-save] allocation creation failed:", err.message);
+    }
+    try {
+      const { incrementCompletionStats } = await import("../services/partnerStatsService.js");
+      await incrementCompletionStats(this);
+    } catch (err) {
+      console.error("[Booking.post-save] partner stats increment failed:", err.message);
     }
   }
 });

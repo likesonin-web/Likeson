@@ -37,7 +37,6 @@ import platformPricingReducer from "./slices/platformPricingSlice";
 import promotionReducer from "./slices/promotionSlice";
 import referralReducer from "./slices/referralSlice";
 import rideRequestReducer from "./slices/rideRequestSlice";
-import searchReducer from "./slices/searchSlice";
 import soloDriverReducer from "./slices/soloDriverSlice";
 import subscriptionPlansReducer from "./slices/subscriptionPlanSlice";
 import usersubscriptionPlansReducer from "./slices/subscriptionSlice";
@@ -47,8 +46,8 @@ import uploadReducer from "./slices/uploadSlice";
 import userManagementReducer from "./slices/userManagementSlice";
 import userReducer from "./slices/userSlice";
 import walletReducer from "./slices/walletSlice";
-import chatReducer from './slices/chatSlice'
-import supportReducer from './slices/supportSlice'
+
+import earningsReducer from './slices/earningsSlice'
 // ─────────────────────────────────────────────────────────────────────────────
 // STORE CONFIGURATION
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,10 +62,10 @@ export const store = configureStore({
     bloodBank: bloodbankReducer,
     booking: bookingReducer,
     careAssistant: careAssistantReducer,
-    chat:chatReducer,
+
     clinical: clinicalReducer,
     consultation: consulationReducer,
-    support: supportReducer,
+
     customerProfile: customerProfileReducer,
     driver: driverReducer,
     faq: faqReducer,
@@ -89,7 +88,6 @@ export const store = configureStore({
     promotion: promotionReducer,
     referral: referralReducer,
     rideRequest: rideRequestReducer,
-    search: searchReducer,
     soloDriver: soloDriverReducer,
     subscriptionPlan: subscriptionPlansReducer,
     subscriptions: usersubscriptionPlansReducer,
@@ -100,6 +98,7 @@ export const store = configureStore({
     userManagement: userManagementReducer,
     wallet: walletReducer,
     partnerWallet:partnerWalletReducer,
+    earnings: earningsReducer,
   },
  
 });

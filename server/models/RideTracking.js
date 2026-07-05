@@ -454,6 +454,12 @@ rideTrackingSchema.statics.attachParticipant = async function (
   rideId,
   { participantId, role },
 ) {
+  // Spec: family members are never tracked. Refuse at the write boundary,
+  // not just at the UI — prevents any caller (admin panel, future script,
+  // API client) from silently violating the rule.
+  if (role === "FAMILY") {
+    throw new Error("FAMILY participants are not trackable per spec — no GPS, no live location");
+  }
   return this.findOneAndUpdate(
     { ride: rideId },
     {
@@ -500,6 +506,13 @@ rideTrackingSchema.statics.updateParticipantLocation = async function (
   const { coordinates, heading, speedKmh, accuracyM, source } = pingData;
   if (!coordinates || coordinates.length !== 2) {
     throw new Error("updateParticipantLocation: coordinates [lng, lat] required");
+  }
+  const existing = await this.findOne(
+    { ride: rideId, "participants.participantId": participantId },
+    { "participants.$": 1 },
+  ).lean();
+  if (existing?.participants?.[0]?.role === "FAMILY") {
+    throw new Error("FAMILY participants are not trackable per spec");
   }
 
   const breadcrumb = {

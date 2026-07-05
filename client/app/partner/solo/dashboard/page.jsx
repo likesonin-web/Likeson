@@ -38,7 +38,7 @@ import {
   Menu, X, UserRound, FileCheck2, HeartPulse,
   FileText, Wrench, ReceiptIndianRupee,
   Tag, CircleDollarSign, ShieldAlert,
-  CalendarClock, FileMinus,Route,Key,PlayCircle,PauseCircle,RefreshCw,CheckSquare
+  CalendarClock, FileMinus, Route, Key, PlayCircle, PauseCircle, RefreshCw, CheckSquare
 } from 'lucide-react';
 
 // ── User selector (auth slice) ────────────────────────────────────────────────
@@ -62,16 +62,13 @@ const SIDEBAR_GROUPS = [
       { name: 'Performance', href: '/partner/solo/performance', icon: <TrendingUp size={14} />      },
     ],
   },
-  // ── Added: My Rides (State Machine) ──────────────────────────────────────
   {
     title: 'My Rides',
     icon: <ClipboardList size={16} />,
     links: [
-      { name: 'Assigned Rides',         href: '/partner/solo/rides',             icon: <ClipboardList size={14} /> },
+      { name: 'Assigned Rides', href: '/partner/solo/rides', icon: <ClipboardList size={14} /> },
     ],
   },
- ,
-   
   {
     title: 'My Profile',
     icon: <UserRound size={16} />,
@@ -133,8 +130,7 @@ const SIDEBAR_GROUPS = [
     title: 'Compliance',
     icon: <ClipboardList size={16} />,
     links: [
-      { name: 'Document Expiry', href: '/partner/solo/compliance',        icon: <ClipboardList size={14} /> },
-      { name: 'Expiry Alerts',   href: '/partner/solo/compliance/alerts', icon: <AlertTriangle size={14} /> },
+      { name: 'Document Expiry', href: '/partner/solo/compliance', icon: <ClipboardList size={14} /> },
     ],
   },
   {
@@ -166,7 +162,7 @@ const QUICK_ACTIONS = [
   { label: 'Earnings',      href: '/partner/solo/settlement',         icon: ReceiptIndianRupee,color: 'accent'  },
 ];
 
-// ── Compliance status config (matches /compliance route response) ──────────────
+// ── Compliance status config ───────────────────────────────────────────────────
 const COMPLIANCE_STATUS_CFG = {
   valid:    { dot: 'bg-[var(--success)]', cls: 'badge-success', label: 'Valid'    },
   expiring: { dot: 'bg-[var(--warning)]', cls: 'badge-warning', label: 'Expiring' },
@@ -200,14 +196,28 @@ function OnlineToggle({ isOnline, loading, onToggle }) {
 
 // ── Stats row — real performance data ─────────────────────────────────────────
 function StatsRow({ performance, settlement }) {
+  const pData = performance?.data || performance;
+  const sData = settlement?.data || settlement;
+
+  const completed = pData?.stats?.totalRidesCompleted ?? 0;
+  const cancelled = pData?.stats?.totalRidesCancelled ?? 0;
+  const disputed  = pData?.stats?.totalRidesDisputed ?? 0;
+  
+  const totalRides = completed + cancelled + disputed;
+  const completionRate = totalRides > 0 ? ((completed / totalRides) * 100).toFixed(1) : 0;
+  
+  // Earnings can be pulled from either settlement or performance stats
+  const totalEarnings = sData?.summary?.totalEarnings ?? pData?.stats?.totalEarnings;
+  
+  const avgRating = pData?.rating?.averageRating;
+  const totalRatings = pData?.rating?.totalRatings;
+
   const stats = [
     {
       key:   'rides',
       label: 'Total Rides',
-      value: performance?.performance?.totalRidesCompleted?.toLocaleString('en-IN') ?? '—',
-      delta: performance?.performance?.monthlyRides != null
-        ? `${performance.performance.monthlyRides} this month`
-        : null,
+      value: completed || '—',
+      delta: null,
       up:   true,
       icon: Car,
       color: 'primary',
@@ -215,12 +225,8 @@ function StatsRow({ performance, settlement }) {
     {
       key:   'earnings',
       label: 'Total Earnings',
-      value: settlement?.totalEarnings != null
-        ? `₹${Number(settlement.totalEarnings).toLocaleString('en-IN')}`
-        : '—',
-      delta: settlement?.netEarnings != null
-        ? `₹${Number(settlement.netEarnings).toLocaleString('en-IN')} net`
-        : null,
+      value: totalEarnings != null ? `₹${Number(totalEarnings).toLocaleString('en-IN')}` : '—',
+      delta: null,
       up:   true,
       icon: IndianRupee,
       color: 'success',
@@ -228,12 +234,8 @@ function StatsRow({ performance, settlement }) {
     {
       key:   'rating',
       label: 'Avg. Rating',
-      value: performance?.performance?.rating != null
-        ? Number(performance.performance.rating).toFixed(2)
-        : '—',
-      delta: performance?.performance?.ratingCount != null
-        ? `${performance.performance.ratingCount} reviews`
-        : null,
+      value: avgRating != null ? Number(avgRating).toFixed(1) : '—',
+      delta: totalRatings ? `${totalRatings} ratings` : null,
       up:   true,
       icon: Star,
       color: 'warning',
@@ -241,16 +243,8 @@ function StatsRow({ performance, settlement }) {
     {
       key:   'completion',
       label: 'Completion Rate',
-      value: (() => {
-        const p = performance?.performance;
-        if (!p) return '—';
-        const total = (p.totalRidesCompleted ?? 0) + (p.totalRidesCancelled ?? 0);
-        if (!total) return '—';
-        return `${((p.totalRidesCompleted / total) * 100).toFixed(1)}%`;
-      })(),
-      delta: performance?.performance?.cancellationRate != null
-        ? `${performance.performance.cancellationRate.toFixed(1)}% cancel`
-        : null,
+      value: completionRate ? `${completionRate}%` : '—',
+      delta: cancelled > 0 ? `${cancelled} cancelled` : null,
       up:   false,
       icon: CheckCircle2,
       color: 'info',
@@ -273,7 +267,7 @@ function StatsRow({ performance, settlement }) {
               </div>
               {s.delta && (
                 <span
-                  className="flex items-center gap-0.5 text-xs font-bold"
+                  className="flex items-center gap-0.5 text-[0.65rem] font-bold"
                   style={{ color: s.up ? 'var(--success)' : 'var(--error)' }}
                 >
                   {s.up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
@@ -295,8 +289,14 @@ function StatsRow({ performance, settlement }) {
 }
 
 // ── Profile card — real data ───────────────────────────────────────────────────
-function ProfileCard({ user, profile }) {
-  const pct = profile?.profileCompletionPercent ?? 0;
+function ProfileCard({ user, profile, performance }) {
+  const pData = performance?.data || performance;
+  
+  const pct = pData?.profileCompletion ?? profile?.profileCompletionPercent ?? 0;
+  const tier = pData?.tier ?? 'Silver';
+  const pSinceDate = pData?.partnerSince ? new Date(pData.partnerSince) : null;
+  const pSinceYear = pSinceDate ? pSinceDate.getFullYear() : '';
+
   return (
     <motion.div variants={fadeUp} className="glass-card p-5">
       <div className="flex items-center gap-3.5">
@@ -316,7 +316,7 @@ function ProfileCard({ user, profile }) {
             {user?.email || '—'}
           </p>
           <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-            <span className="badge badge-primary text-[0.6rem] py-0.5">Solo Driver</span>
+            <span className="badge badge-primary text-[0.6rem] py-0.5">{tier} Tier</span>
             <span
               className={`badge text-[0.6rem] py-0.5 ${
                 profile?.partnershipStatus === 'active' ? 'badge-success' :
@@ -324,7 +324,7 @@ function ProfileCard({ user, profile }) {
                 'badge-error'
               }`}
             >
-              {profile?.partnershipStatus ?? 'pending'}
+              {profile?.partnershipStatus ?? 'active'}
             </span>
           </div>
         </div>
@@ -337,6 +337,7 @@ function ProfileCard({ user, profile }) {
             Profile Completion
           </p>
           <p className="text-sm font-black text-[var(--primary)] mt-0.5">{pct}% done</p>
+          {pSinceYear && <p className="text-[0.6rem] opacity-45 mt-0.5">Partner since {pSinceYear}</p>}
         </div>
         <div className="relative w-14 h-14 flex items-center justify-center flex-shrink-0">
           <svg width="56" height="56" className="-rotate-90">
@@ -406,42 +407,41 @@ function QuickActions() {
 }
 
 // ── Earnings summary — real settlement data ────────────────────────────────────
-function EarningsSummary({ settlement, rewards }) {
-  // day labels with unique keys (index-based)
+function EarningsSummary({ settlement, rewards, performance }) {
+  const sData = settlement?.data || settlement;
+  const rData = rewards?.data || rewards;
+  const pData = performance?.data || performance;
+
   const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  // placeholder bars — real ride-per-day data not in slice yet
-  const bars = [40, 65, 52, 80, 70, 90, 75];
+  const bars = [40, 65, 52, 80, 70, 90, 75]; // Visual representation
+
+  const totalEarnings = sData?.summary?.totalEarnings ?? pData?.stats?.totalEarnings;
+  const platformFee = pData?.stats?.totalPlatformFeePaid;
 
   const earningItems = [
     {
-      key:   'thisWeek',
-      label: 'This Week',
-      value: settlement?.netEarnings != null
-        ? `₹${Number(settlement.netEarnings).toLocaleString('en-IN')}`
-        : '—',
-      color: 'var(--primary)',
-    },
-    {
       key:   'platform',
-      label: 'Platform Fee',
-      value: settlement?.totalPlatformFeePaid != null
-        ? `₹${Number(settlement.totalPlatformFeePaid).toLocaleString('en-IN')}`
-        : '—',
+      label: 'Platform Fee Paid',
+      value: platformFee != null ? `₹${Number(platformFee).toLocaleString('en-IN')}` : '—',
       color: 'var(--error)',
     },
     {
       key:   'totalEarnings',
       label: 'Total Earned',
-      value: settlement?.totalEarnings != null
-        ? `₹${Number(settlement.totalEarnings).toLocaleString('en-IN')}`
-        : '—',
+      value: totalEarnings != null ? `₹${Number(totalEarnings).toLocaleString('en-IN')}` : '—',
       color: 'var(--success)',
     },
     {
       key:   'coins',
       label: 'Coin Balance',
-      value: rewards?.coinBalance != null ? `${rewards.coinBalance} pts` : '—',
+      value: rData?.coinBalance != null ? `${rData.coinBalance} pts` : '—',
       color: 'var(--warning)',
+    },
+    {
+      key:   'tier',
+      label: 'Current Tier',
+      value: rData?.tier || pData?.tier || '—',
+      color: 'var(--primary)',
     },
   ];
 
@@ -454,7 +454,6 @@ function EarningsSummary({ settlement, rewards }) {
         </Link>
       </div>
 
-      {/* Bar chart — visual only, placeholder heights */}
       <div className="flex items-end gap-1.5 h-14 mb-2">
         {bars.map((h, i) => (
           <motion.div
@@ -515,8 +514,9 @@ function RecentRidesPlaceholder() {
 
 // ── Compliance widget — real data from selectCompliance ───────────────────────
 function ComplianceWidget({ compliance }) {
-  const docs    = compliance?.documents ?? [];
-  const overall = compliance?.overallStatus ?? null;
+  const cData = compliance?.data || compliance;
+  const docs    = cData?.documents ?? [];
+  const overall = cData?.overallStatus ?? null;
 
   // Show at most 4 most critical docs
   const ORDER  = { expired: 0, missing: 1, expiring: 2, valid: 3 };
@@ -635,9 +635,9 @@ function VehicleCard({ profile }) {
 
 // ── Rating card — real performance data ───────────────────────────────────────
 function RatingCard({ performance }) {
-  const p      = performance?.performance;
-  const rating = p?.rating       ?? 0;
-  const count  = p?.ratingCount  ?? 0;
+  const pData = performance?.data || performance;
+  const rating = pData?.rating?.averageRating ?? 0;
+  const count  = pData?.rating?.totalRatings  ?? 0;
 
   // Fake breakdown distribution (API doesn't return star breakdown)
   const dist = [76, 15, 6, 2, 1];
@@ -648,7 +648,7 @@ function RatingCard({ performance }) {
       <div className="flex items-center gap-4 mb-3">
         <div>
           <p className="text-4xl font-black text-[var(--primary)] leading-none">
-            {rating ? Number(rating).toFixed(2) : '—'}
+            {rating ? Number(rating).toFixed(1) : '—'}
           </p>
           <div className="flex items-center gap-0.5 mt-1">
             {[1, 2, 3, 4, 5].map((s) => (
@@ -777,12 +777,12 @@ export default function SoloPartnerDashboard() {
 
   // Real selectors
   const user        = useSelector(selectUser);
-  const profile     = useSelector(selectProfile);         // SoloDriverPartner doc
-  const performance = useSelector(selectPerformance);     // GET /performance
-  const rewards     = useSelector(selectRewards);         // GET /rewards
-  const settlement  = useSelector(selectSettlementSummary); // GET /settlement
-  const compliance  = useSelector(selectCompliance);      // GET /compliance
-  const dispatch_st = useSelector(selectDispatch);        // GET /dispatch/status
+  const profile     = useSelector(selectProfile);         
+  const performance = useSelector(selectPerformance);     
+  const rewards     = useSelector(selectRewards);         
+  const settlement  = useSelector(selectSettlementSummary); 
+  const compliance  = useSelector(selectCompliance);      
+  const dispatch_st = useSelector(selectDispatch);        
   const statusLoading = useSelector(selectLoading('updateDispatchStatus'));
 
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -803,7 +803,10 @@ export default function SoloPartnerDashboard() {
     dispatch(fetchDispatchStatus());
   }, [dispatch]);
 
-  const isOnline  = dispatch_st?.status === 'Available';
+  // Safely extract status and partner code from dispatch state
+  const isOnline = (dispatch_st?.data?.status || dispatch_st?.status) === 'Available';
+  const displayPartnerCode = (dispatch_st?.data?.partnerCode || dispatch_st?.partnerCode) ?? profile?.partnerCode ?? '—';
+  
   const firstName = profile?.displayName?.split(' ')[0]
     || user?.name?.split(' ')[0]
     || 'Partner';
@@ -837,7 +840,7 @@ export default function SoloPartnerDashboard() {
               {greeting}, <span className="text-[var(--primary)]">{firstName}</span> 👋
             </h1>
             <p className="text-[0.6rem] opacity-45 text-[var(--base-content)] hidden lg:block mt-0.5">
-              {profile?.partnerCode ?? '—'} · Solo Driver Partner
+              {displayPartnerCode} · Solo Driver Partner
             </p>
           </div>
 
@@ -919,9 +922,9 @@ export default function SoloPartnerDashboard() {
           {/* Mobile layout */}
           <motion.div className="lg:hidden space-y-4" initial="hidden" animate="show" variants={stagger}>
             <StatsRow performance={performance} settlement={settlement} />
-            <ProfileCard user={user} profile={profile} />
+            <ProfileCard user={user} profile={profile} performance={performance} />
             <QuickActions />
-            <EarningsSummary settlement={settlement} rewards={rewards} />
+            <EarningsSummary settlement={settlement} rewards={rewards} performance={performance} />
             <RecentRidesPlaceholder />
             <ComplianceWidget compliance={compliance} />
           </motion.div>
@@ -936,11 +939,11 @@ export default function SoloPartnerDashboard() {
             {/* Row 2 — 3-column grid */}
             <div className="grid grid-cols-12 gap-5">
               <div className="col-span-3 space-y-5">
-                <ProfileCard user={user} profile={profile} />
+                <ProfileCard user={user} profile={profile} performance={performance} />
                 <QuickActions />
               </div>
               <div className="col-span-5 space-y-5">
-                <EarningsSummary settlement={settlement} rewards={rewards} />
+                <EarningsSummary settlement={settlement} rewards={rewards} performance={performance} />
                 <RecentRidesPlaceholder />
               </div>
               <div className="col-span-4 space-y-5">

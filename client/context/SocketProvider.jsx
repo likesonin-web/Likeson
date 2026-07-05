@@ -350,6 +350,17 @@ export function SocketProvider({
         ));
       }),
 
+// Vehicle replaced (admin) — update snapshot in booking state.
+      registerListener(SOCKET_EVENTS.VEHICLE_REPLACED, (data) => {
+        setBookingState(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            ride: prev.ride ? { ...prev.ride, vehicleSnapshot: data?.newVehicle } : prev.ride,
+          };
+        });
+      }),
+
       // Destination changed — FIX #3: `newDestination` is a bare
       // [lng, lat] array on the bookingRouter2 path and a full
       // {type, coordinates, address} object on the rideOperationsRouter

@@ -15,7 +15,7 @@ import {
   selectDoctorStats,
   selectHospitalLoading,
 } from '@/store/slices/hospitalSlice';
-
+import Earnings from '../../(partner)/earnings/myEarnings';
 // ─── Animation variants ────────────────────────────────────────────────────
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -217,6 +217,8 @@ export default function DoctorDashboard() {
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto  py-8">
+
+        <Earnings/>
 
         {/* ── Header ── */}
         <motion.div

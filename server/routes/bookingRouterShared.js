@@ -417,8 +417,6 @@ export const buildRidePayload = ({
   scheduledPickupAt,
   isReturnRide = false,
   createdBy,
-  waypoints = [],
-  activeNavigationTarget = "pickup_patient",
   rideStage = "searching_driver",
 }) => ({
   booking: bookingId,
@@ -440,13 +438,23 @@ export const buildRidePayload = ({
   scheduledPickupAt,
   status: "requested",
   createdBy,
-  waypoints,
-  activeNavigationTarget,
   rideStage,
+  // NOTE: no waypoints / activeNavigationTarget — both removed from Ride
+  // schema in the architecture redesign. currentStopId + activeRouteVersionId
+  // are set by the caller AFTER RouteVersion/RideStop docs are created
+  // (see every assign-driver / request-ride route for the pattern).
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // createAndLinkRide
+//
+// FIX: was pre-redesign leftover — wrote `pickupOtp` (field removed from
+// Ride schema; OTP now lives per-stop on RideStop.otp) and never created
+// RouteVersion / RideStop docs, so any ride made through this helper had no
+// currentStopId — the driver app would have nothing to navigate to. Rebuilt
+// to match the pattern used everywhere else (tp/assign-driver,
+// assign/solo-driver, request-ride): RouteVersion → 2 RideStops →
+// currentStopId + activeRouteVersionId set on the Ride.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const createAndLinkRide = async (booking, overrides = {}) => {
@@ -476,18 +484,68 @@ export const createAndLinkRide = async (booking, overrides = {}) => {
     }),
     estimatedDistanceKm: distanceKm,
     estimatedDurationMin: durationMin,
-    pickupOtp: hashOtp(otp),
     ...overrides,
+  });
+
+  const RouteVersion = (await import("../models/RouteVersion.js")).default;
+  const RideStop = (await import("../models/RideStop.js")).default;
+
+  const rv = await RouteVersion.create({
+    ride: ride._id,
+    versionNumber: 1,
+    polyline,
+    totalDistanceKm: distanceKm,
+    totalDurationMin: durationMin,
+    generatedReason: "INITIAL",
+    isActive: true,
+  });
+
+  const patientStop = await RideStop.create({
+    ride: ride._id,
+    booking: booking._id,
+    routeVersion: 1,
+    sequence: 1,
+    stopType: "PATIENT_PICKUP",
+    location: {
+      type: "Point",
+      coordinates: coords.pickupCoords,
+      address: coords.pickupAddress,
+    },
+    status: "PENDING",
+    otp: { code: hashOtp(otp), generatedAt: new Date() },
+  });
+
+  const hospitalStop = await RideStop.create({
+    ride: ride._id,
+    booking: booking._id,
+    routeVersion: 1,
+    sequence: 2,
+    stopType: "HOSPITAL",
+    location: {
+      type: "Point",
+      coordinates: coords.dropoffCoords,
+      address: coords.dropoffAddress,
+    },
+    status: "PENDING",
+  });
+
+  await RouteVersion.findByIdAndUpdate(rv._id, {
+    $set: { stops: [patientStop._id, hospitalStop._id] },
   });
 
   const tracking = await RideTracking.create({
     ride: ride._id,
     booking: booking._id,
     expectedRoutePolyline: polyline,
+    currentStopId: patientStop._id,
   });
 
   await Ride.findByIdAndUpdate(ride._id, {
-    $set: { trackingId: tracking._id },
+    $set: {
+      trackingId: tracking._id,
+      currentStopId: patientStop._id,
+      activeRouteVersionId: rv._id,
+    },
   });
 
   await Booking.findByIdAndUpdate(booking._id, {
@@ -989,7 +1047,11 @@ export const getDoctorsByHospital = async (hospitalId) => {
 
 export const snapshotLimits = async (plan, pricingConfig = null) => {
   let consultationsPerMonth = plan.consultations?.freePerMonth ?? 0;
-  let careAssistantVisitsPerMonth = plan.careAssistant?.visitsPerMonth ?? null;
+  // CA quota exists ONLY for custom plans (customer explicitly added the
+  // careAssistant option block). Fixed plans get null here, always —
+  // SubscriptionPlan.careAssistant.* fields are display/reference only and
+  // must never seed a subscription benefit.
+  let careAssistantVisitsPerMonth = null;
   let transportRatePerKm = plan.transport?.ratePerKm ?? null;
   let transportRidesPerMonth = plan.transport?.ridesPerMonth ?? null;
   let pharmacyDiscountPercent =
@@ -1001,12 +1063,7 @@ export const snapshotLimits = async (plan, pricingConfig = null) => {
   let careAssistantTierLabel = null;
   let careAssistantChargePerVisit = null;
 
-  if (plan.planType === "fixed") {
-    const serviceType = plan.careAssistant?.serviceType ?? "None";
-    if (serviceType !== "None") {
-      careAssistantTierLabel = serviceType;
-    }
-  }
+  // Fixed plans: no tier snapshot either — CA is platform-rate-only, always.
 
   if (plan.planType === "custom" && Array.isArray(plan.customOptions)) {
     const consultOpt = plan.customOptions.find(
@@ -1245,21 +1302,17 @@ export const checkSubscriptionCareAssistant = async (userId) => {
 
   if ((limit == null || limit === 0) && sub.plan) {
     const plan = await SubscriptionPlan.findById(sub.plan)
-      .select("planType customOptions careAssistant")
+      .select("planType customOptions")
       .lean();
     planType = plan?.planType ?? "fixed";
+    // CA quota ONLY for custom plans where the option was explicitly added.
+    // Fixed plans NEVER get a fallback quota — plan.careAssistant.* is
+    // display-only reference data.
     if (plan?.planType === "custom" && Array.isArray(plan.customOptions)) {
       const caOpt = plan.customOptions.find(
         (o) => o.optionKey === "careAssistant",
       );
       if (caOpt?.quantity > 0) limit = caOpt.quantity;
-    } else if (plan?.careAssistant?.isDedicated === true) {
-      // Dedicated plans: unlimited CA for the whole subscription period
-      limit = -1;
-    } else if (plan?.careAssistant?.visitsPerMonth != null) {
-      limit = plan.careAssistant.visitsPerMonth;
-    } else if (plan?.careAssistant?.included === true) {
-      limit = 1;
     }
   }
 
@@ -1433,38 +1486,6 @@ export const markHomeCollectionUsed = async (subscriptionId) => {
     console.log(`[markHomeCollectionUsed] ✅ marked for sub:${subscriptionId}`);
   } catch (e) {
     console.error("[markHomeCollectionUsed] ❌ failed:", e.message);
-  }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// markCaStandardTierUsed — one-time-free standard CA tier (fixed plans only)
-// ─────────────────────────────────────────────────────────────────────────────
-export const markCaStandardTierUsed = async (subscriptionId) => {
-  if (!subscriptionId) return;
-  try {
-    await UserSubscription.findByIdAndUpdate(subscriptionId, {
-      $set: { "limits.caStandardTierUsedOnce": true },
-    });
-    console.log(`[markCaStandardTierUsed] ✅ marked for sub:${subscriptionId}`);
-  } catch (e) {
-    console.error("[markCaStandardTierUsed] ❌ failed:", e.message);
-  }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// recoverCaStandardTierUsage — undo on cancellation if it was the free use
-// ─────────────────────────────────────────────────────────────────────────────
-export const recoverCaStandardTierUsage = async (subscriptionId) => {
-  if (!subscriptionId) return;
-  try {
-    await UserSubscription.findByIdAndUpdate(subscriptionId, {
-      $set: { "limits.caStandardTierUsedOnce": false },
-    });
-    console.log(
-      `[recoverCaStandardTierUsage] ✅ recovered for sub:${subscriptionId}`,
-    );
-  } catch (e) {
-    console.error("[recoverCaStandardTierUsage] ❌ failed:", e.message);
   }
 };
 

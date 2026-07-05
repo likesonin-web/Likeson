@@ -44,7 +44,6 @@ import {
 
 const STATUS_OPTIONS = ['Available', 'On-Break', 'Offline'];
 
-// Refactored to pure Tailwind classes
 const STATUS_META = {
   Available: {
     label: 'Available',
@@ -183,8 +182,8 @@ const NavGroup = ({ group, index, onLinkClick }) => {
     <motion.div custom={index} variants={ITEM_V} initial="hidden" animate="visible" className="mb-0.5">
       <button
         onClick={() => setOpen(p => !p)}
-        className={`w-full flex items-center justify-between  px-3.5 py-3.5 rounded-xl border-none cursor-pointer text-[10px] uppercase tracking-wider font-bold transition-all duration-200 group outline-none ${
-          open ? 'bg-primary/15 text-primary ' : '  text-base-content hover:bg-base-200'
+        className={`w-full flex items-center justify-between px-3.5 py-3.5 rounded-xl border-none cursor-pointer text-[10px] uppercase tracking-wider font-bold transition-all duration-200 group outline-none ${
+          open ? 'bg-primary/15 text-primary ' : 'text-base-content hover:bg-base-200'
         }`}
       >
         <span className="flex items-center gap-2.5">
@@ -313,7 +312,7 @@ export default function DriverDashboard() {
   const weekTotal = MOCK_WEEKLY.reduce((a, b) => a + b.amt, 0);
 
   return (
-    <div data-theme="driver" className="min-h-dvh   font-poppins bg-base-100 relative overflow-x-hidden">
+    <div data-theme="driver" className="min-h-dvh font-poppins bg-base-100 relative overflow-x-hidden">
 
       {/* ─── Sidebar Overlay ─────────────────────────────────────────────── */}
       <AnimatePresence>
@@ -337,7 +336,7 @@ export default function DriverDashboard() {
             className="fixed top-0 left-0 bottom-0 z-[100] flex flex-col overflow-y-auto bg-base-100 border-r border-base-300 w-[min(82vw,288px)]"
           >
             {/* Sidebar header */}
-            <div className="p-4 flex items-center justify-between gap-3 border-b bg-primary  to-base-300   ">
+            <div className="p-4 flex items-center justify-between gap-3 border-b bg-gradient-to-r from-primary to-primary/80">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-11 h-11 rounded-2xl shrink-0 flex items-center justify-center overflow-hidden font-extrabold text-lg bg-white/20 border-2 border-white/35 text-white">
                   {driver?.user?.avatar
@@ -471,77 +470,86 @@ export default function DriverDashboard() {
 
       {/* ─── Page Content ─────────────────────────────────────────────────── */}
       <main className="mx-auto pb-[max(2.5rem,calc(env(safe-area-inset-bottom)+2rem))] max-w-[768px]">
-        {/* ── Hero Card ──────────────────────────────────────────────────── */}
-        <motion.div
-          initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.06, type: 'spring', stiffness: 260, damping: 28 }}
-          className="mx-4 mt-4 rounded-2xl overflow-hidden relative bg-[linear-gradient(135deg,var(--primary),var(--secondary))] shadow-[0_10px_36px_rgba(0,0,0,0.2)] shadow-primary/40"
+        
+       {/* ── Hero Card (Premium Glass & Glow) ──────────────────────────────────────── */}
+<motion.div
+  initial={{ opacity: 0, y: 18 }} 
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.06, type: 'spring', stiffness: 260, damping: 28 }}
+  className="mx-4 mt-4 rounded-[1.5rem] overflow-hidden relative bg-base-100 border border-base-300 shadow-[0_12px_40px_rgba(0,0,0,0.08)] shadow-primary/10"
+>
+  {/* Decorative Glowing Orbs (Creates the corner effect without muddying the middle) */}
+  <div className="absolute -top-16 -left-16 w-52 h-52 bg-primary/25 blur-[60px] rounded-full pointer-events-none" />
+  <div className="absolute -bottom-16 -right-16 w-52 h-52 bg-primary/25 blur-[60px] rounded-full pointer-events-none" />
+  
+  {/* Subtle top-light gradient to give it a premium sheen */}
+  <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+
+  <div className="relative z-10 p-5 sm:p-6">
+    <div className="flex items-start justify-between mb-6">
+      <div>
+        <p className="m-0 text-[0.65rem] font-bold uppercase tracking-widest text-primary mb-1">
+          Welcome Back
+        </p>
+        <h2 className="font-montserrat font-extrabold text-2xl text-base-content m-0">
+          {driver?.legalName || 'Driver'} 👋
+        </h2>
+      </div>
+      
+      {/* KYC chip - Upgraded with deeper contrast */}
+      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full shrink-0 border shadow-sm backdrop-blur-sm ${kycOk ? 'bg-success/10 border-success/25 text-success' : 'bg-warning/10 border-warning/25 text-warning'}`}>
+        {kycOk
+          ? <CheckCircle2 size={14} className="text-success" />
+          : <AlertCircle size={14} className="text-warning" />
+        }
+        <span className="text-[10px] font-extrabold uppercase tracking-wide">
+          {kycOk ? 'Verified' : 'Pending'}
+        </span>
+      </div>
+    </div>
+
+    {/* 3 quick stats - Upgraded to floating inner cards */}
+    <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+      {[
+        {
+          label: 'STATUS',
+          content: (
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className={`w-2.5 h-2.5 rounded-full animate-pulse shadow-sm ${sm.dotClass}`} />
+              <span className="text-base-content font-extrabold text-xs sm:text-sm">{sm.label}</span>
+            </div>
+          ),
+        },
+        {
+          label: 'TODAY EST.',
+          content: (
+            <p className="text-primary font-extrabold text-xs sm:text-sm m-0 mt-1">
+              ₹ {(perf.totalEarnings ? Math.round(perf.totalEarnings / 30) : 0).toLocaleString('en-IN')}
+            </p>
+          ),
+        },
+        {
+          label: 'RIDES',
+          content: (
+            <p className="text-base-content font-extrabold text-xs sm:text-sm m-0 mt-1">
+              {(perf.monthlyRides || 0)} <span className="text-[9px] text-base-content/40 font-medium">this mo.</span>
+            </p>
+          ),
+        },
+      ].map(({ label, content }) => (
+        <div 
+          key={label} 
+          className="rounded-2xl p-3 bg-base-100/60 backdrop-blur-md border border-base-300/60 shadow-sm transition-colors duration-300 hover:bg-base-100 hover:border-primary/30"
         >
-          {/* Decorative circles */}
-          <div className="absolute -top-8 -right-8 w-36 h-36 rounded-full opacity-10 bg-white pointer-events-none" />
-          <div className="absolute -bottom-6 -left-4 w-24 h-24 rounded-full opacity-5 bg-white pointer-events-none" />
-
-          <div className="relative z-10 p-5">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <p className="m-0 text-[0.62rem] font-bold uppercase tracking-widest text-white/60">
-                  Welcome Back
-                </p>
-                <h2 className="font-montserrat font-extrabold text-xl text-white m-0 mt-0.5">
-                  {driver?.legalName || 'Driver'} 👋
-                </h2>
-              </div>
-              {/* KYC chip */}
-              <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full shrink-0 border ${kycOk ? 'bg-white/15 border-white/20' : 'bg-warning/25 border-warning/40'}`}>
-                {kycOk
-                  ? <CheckCircle2 size={13} className="text-white" />
-                  : <AlertCircle size={13} className="text-warning" />
-                }
-                <span className="text-[10px] font-bold text-white">
-                  {kycOk ? 'KYC Verified' : 'KYC Pending'}
-                </span>
-              </div>
-            </div>
-
-            {/* 3 quick stats */}
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                {
-                  label: 'STATUS',
-                  content: (
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`w-2 h-2 rounded-full animate-pulse ${sm.dotClass}`} />
-                      <span className="text-white font-extrabold text-xs">{sm.label}</span>
-                    </div>
-                  ),
-                },
-                {
-                  label: 'TODAY EST.',
-                  content: (
-                    <p className="text-white font-extrabold text-xs m-0 mt-0.5">
-                      ₹ {(perf.totalEarnings ? Math.round(perf.totalEarnings / 30) : 0).toLocaleString('en-IN')}
-                    </p>
-                  ),
-                },
-                {
-                  label: 'RIDES',
-                  content: (
-                    <p className="text-white font-extrabold text-xs m-0 mt-0.5">
-                      {(perf.monthlyRides || 0)} this mo.
-                    </p>
-                  ),
-                },
-              ].map(({ label, content }) => (
-                <div key={label} className="rounded-xl p-2.5 bg-white/10 border border-white/20">
-                  <p className="m-0 text-[0.58rem] font-bold uppercase tracking-wider text-white/55">
-                    {label}
-                  </p>
-                  {content}
-                </div>
-              ))}
-            </div>
-          </div>
-        </motion.div>
+          <p className="m-0 text-[0.6rem] font-bold uppercase tracking-wider text-base-content/50">
+            {label}
+          </p>
+          {content}
+        </div>
+      ))}
+    </div>
+  </div>
+</motion.div>
 
         {/* ── Metrics 2×2 grid ───────────────────────────────────────────── */}
         <div className="px-4 mt-4 grid grid-cols-2 gap-3">

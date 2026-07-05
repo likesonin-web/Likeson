@@ -99,9 +99,11 @@ const initialState = {
   rideJoinPoints: [],
   rideRouteVersions: [],
   activeRouteVersion: null,
-  bookingAssignmentHistory: [],
+bookingAssignmentHistory: [],
   rideAssignmentHistory: [],
   bookingSosEvents: [],
+  bookingStatusHistory: [],
+  vehicleReplacement: null,
 
   // ── Consultation ───────────────────────────────────────────────────────────
   consultation: null,
@@ -1245,6 +1247,36 @@ export const fetchDestinationHistory = mkThunk(
 
 // ── Assignment History ────────────────────────────────────────────────────────
 
+// ── Vehicle Replacement ───────────────────────────────────────────────────
+
+/** PATCH /ride-ops/admin/rides/:rideId/replace-vehicle */
+export const adminReplaceVehicle = mkThunk(
+  "operations/adminReplaceVehicle",
+  async ({ rideId, newVehicleId, reason }) => {
+    const { data } = await API.patch(
+      `${RIDE_OPS}/admin/rides/${rideId}/replace-vehicle`,
+      { newVehicleId, reason }
+    );
+    toast.success("Vehicle replaced");
+    return data.data;
+  }
+);
+
+// ── Booking Status History (permanent, uncapped) ──────────────────────────
+
+/** GET /ride-ops/bookings/:bookingId/status-history */
+export const fetchBookingStatusHistory = mkThunk(
+  "operations/fetchBookingStatusHistory",
+  async ({ bookingId }) => {
+    const { data } = await API.get(
+      `${RIDE_OPS}/bookings/${bookingId}/status-history`
+    );
+    return data.data;
+  }
+);
+
+// ── Assignment History ────────────────────────────────────────────────────
+
 /** GET /ride-ops/rides/:rideId/assignment-history */
 export const fetchRideAssignmentHistory = mkThunk(
   "operations/fetchRideAssignmentHistory",
@@ -2204,12 +2236,24 @@ const operationsSlice = createSlice({
       state.destinationAudit = payload?.history ?? [];
     });
 
-    // Assignment History
+// Assignment History
     wire(fetchRideAssignmentHistory, (state, { payload }) => {
       state.rideAssignmentHistory = payload?.history ?? [];
     });
     wire(fetchBookingAssignmentHistory, (state, { payload }) => {
       state.bookingAssignmentHistory = payload?.history ?? [];
+    });
+    wire(fetchBookingStatusHistory, (state, { payload }) => {
+      state.bookingStatusHistory = payload?.history ?? [];
+    });
+    wire(adminReplaceVehicle, (state, { payload }) => {
+      state.vehicleReplacement = payload ?? null;
+      if (state.selectedBooking?.primaryRide && payload?.ride) {
+        state.selectedBooking.primaryRide = {
+          ...state.selectedBooking.primaryRide,
+          vehicleSnapshot: payload.ride.vehicleSnapshot,
+        };
+      }
     });
 
     // ── Socket Thunks ───────────────────────────────────────────────────────
@@ -2378,6 +2422,8 @@ export const selectRideRouteVersions      = (s) => s.operations.rideRouteVersion
 export const selectActiveRouteVersion     = (s) => s.operations.activeRouteVersion;
 export const selectRideAssignmentHistory  = (s) => s.operations.rideAssignmentHistory;
 export const selectBookingAssignmentHistory = (s) => s.operations.bookingAssignmentHistory;
+export const selectBookingStatusHistory   = (s) => s.operations.bookingStatusHistory;
+export const selectVehicleReplacement     = (s) => s.operations.vehicleReplacement;
 
 // Live state
 export const selectLiveLocation           = (s) => s.operations.liveLocation;

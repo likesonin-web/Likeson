@@ -65,6 +65,7 @@ import {
   buildInvoiceHtml,
 } from "../utils/emailTemplates.js";
 import User from "../models/User.js";
+import { applyBookingRating } from "../services/partnerStatsService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER: processHomeCollectionUsage
@@ -3928,23 +3929,42 @@ router.post(
           .status(400)
           .json({ success: false, message: "overallRating (1-5) required" });
 
-      booking.rating = {
+// Only set sub-ratings when a real 1-5 value given — 0/null/undefined
+      // would otherwise get written and fail schema's min:1 validator.
+      const validRating = (v) => Number.isFinite(v) && v >= 1 && v <= 5;
+
+      const ratingDoc = {
         overallRating,
         overallComment,
-        doctorRating,
-        doctorComment,
-        careAssistantRating,
-        careAssistantComment,
-        driverRating,
-        driverComment,
-        labRating,
-        labComment,
         ratedAt: new Date(),
         isPublic: true,
       };
+      if (validRating(doctorRating)) {
+        ratingDoc.doctorRating = doctorRating;
+        if (doctorComment) ratingDoc.doctorComment = doctorComment;
+      }
+      if (validRating(careAssistantRating)) {
+        ratingDoc.careAssistantRating = careAssistantRating;
+        if (careAssistantComment) ratingDoc.careAssistantComment = careAssistantComment;
+      }
+      if (validRating(driverRating)) {
+        ratingDoc.driverRating = driverRating;
+        if (driverComment) ratingDoc.driverComment = driverComment;
+      }
+      if (validRating(labRating)) {
+        ratingDoc.labRating = labRating;
+        if (labComment) ratingDoc.labComment = labComment;
+      }
+
+      booking.rating = ratingDoc;
       booking.isRated = true;
       booking.updatedBy = req.user._id;
       await booking.save();
+
+      // Push rating into each involved partner's own rating aggregate
+      // (+ review subdoc for labs). Non-fatal — booking save already done.
+      applyBookingRating(booking).catch(e => console.error("[rate] applyBookingRating failed:", e.message));
+
       res.json({ success: true, message: "Rating submitted successfully" });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
@@ -4127,20 +4147,17 @@ router.get(
           .status(404)
           .json({ success: false, message: "No active subscription found." });
 
-      let visitsPerMonth = sub.limits?.careAssistantVisitsPerMonth ?? null;
-      if (visitsPerMonth == null && sub.plan) {
-        if (
-          sub.plan.planType === "custom" &&
-          Array.isArray(sub.plan.customOptions)
-        ) {
+      // CA benefit exists ONLY for custom plans where the customer
+      // explicitly added the careAssistant option block. Fixed plans NEVER
+      // resolve a quota — plan.careAssistant.* is display-only reference data.
+      let visitsPerMonth = null;
+      if (sub.planType === "custom") {
+        visitsPerMonth = sub.limits?.careAssistantVisitsPerMonth ?? null;
+        if (visitsPerMonth == null && Array.isArray(sub.plan?.customOptions)) {
           const caOpt = sub.plan.customOptions.find(
             (o) => o.optionKey === "careAssistant",
           );
           if (caOpt?.quantity > 0) visitsPerMonth = caOpt.quantity;
-        } else if (sub.plan.careAssistant?.visitsPerMonth != null) {
-          visitsPerMonth = sub.plan.careAssistant.visitsPerMonth;
-        } else if (sub.plan.careAssistant?.included === true) {
-          visitsPerMonth = 1;
         }
       }
 
@@ -4151,7 +4168,10 @@ router.get(
             planName: sub.planName,
             planType: sub.planType,
             included: false,
-            message: "Care assistant not included in your plan.",
+            message:
+              sub.planType === "custom"
+                ? "Care assistant not added to your custom plan."
+                : "Care assistant is not a subscription benefit on fixed plans — every booking is charged at the platform rate.",
             careAssistant: null,
           },
         });
@@ -4173,61 +4193,29 @@ router.get(
       let allTiers = [];
       const config = await PlatformPricingConfig.getGlobal();
 
-      if (sub.planType === "custom") {
-        activeTier =
-          sub.limits?.careAssistantTierIndex != null
-            ? {
-                tierIndex: sub.limits.careAssistantTierIndex,
-                label: sub.limits.careAssistantTierLabel ?? "Custom Tier",
-                chargeToUser: sub.limits.careAssistantChargePerVisit ?? null,
-                payoutToAssistant: null,
-                source: "snapshotted",
-              }
-            : null;
-        const customTiers =
-          config?.customPlanOptions?.careAssistant?.pricingTiers ?? [];
-        allTiers = customTiers.map((t, idx) => ({
-          tierIndex: idx,
-          label: t.label,
-          minHours: t.minHours,
-          maxHours: t.maxHours ?? null,
-          chargeToUser: t.chargeToUser,
-          isActive: t.isActive ?? true,
-          isSelected: idx === (sub.limits?.careAssistantTierIndex ?? 0),
-        }));
-      } else {
-        const platformTiers = config?.careAssistant?.pricingTiers ?? [];
-        allTiers = platformTiers
-          .filter((t) => t.isActive)
-          .map((t, idx) => ({
-            tierIndex: idx,
-            label: t.label,
-            minHours: t.minHours,
-            maxHours: t.maxHours ?? null,
-            chargeToUser: t.chargeToUser,
-            isActive: true,
-          }));
-        const serviceType = sub.plan?.careAssistant?.serviceType ?? "Standard";
-        const isDedicated = sub.plan?.careAssistant?.isDedicated === true;
-        activeTier = {
-          label:
-            serviceType === "Dedicated"
-              ? "Dedicated Assistant"
-              : "Standard (Platform Rates Apply)",
-          serviceType,
-          isDedicated,
-          chargeToUser:
-            serviceType === "Dedicated"
-              ? (config?.careAssistant?.dedicatedMonthlyCharge ?? null)
-              : null,
-          source: "fixed_plan",
-          note: isDedicated
-            ? "Dedicated assistant — unlimited free use for entire subscription period"
-            : (sub.limits?.caStandardTierUsedOnce ?? false)
-              ? "Standard tier free-use already used this cycle — platform rate applies"
-              : "First/standard tier free once this cycle. Other tiers charge platform rate (18% GST).",
-        };
-      }
+      // Only custom plans can reach this point (fixed plans already returned
+      // "not included" above) — no fixed-plan tier branch needed.
+      activeTier =
+        sub.limits?.careAssistantTierIndex != null
+          ? {
+              tierIndex: sub.limits.careAssistantTierIndex,
+              label: sub.limits.careAssistantTierLabel ?? "Custom Tier",
+              chargeToUser: sub.limits.careAssistantChargePerVisit ?? null,
+              payoutToAssistant: null,
+              source: "snapshotted",
+            }
+          : null;
+      const customTiers =
+        config?.customPlanOptions?.careAssistant?.pricingTiers ?? [];
+      allTiers = customTiers.map((t, idx) => ({
+        tierIndex: idx,
+        label: t.label,
+        minHours: t.minHours,
+        maxHours: t.maxHours ?? null,
+        chargeToUser: t.chargeToUser,
+        isActive: t.isActive ?? true,
+        isSelected: idx === (sub.limits?.careAssistantTierIndex ?? 0),
+      }));
 
       const platformConfig = {
         punctualityBonusPerVisit:
@@ -4251,8 +4239,6 @@ router.get(
             used,
             remaining,
             percentUsed,
-            isDedicated: sub.plan?.careAssistant?.isDedicated ?? false,
-            caStandardTierUsedOnce: sub.limits?.caStandardTierUsedOnce ?? false,
             activeTier,
             allTiers,
             platformConfig,

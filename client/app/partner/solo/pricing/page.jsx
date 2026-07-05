@@ -8,7 +8,6 @@ import {
   IndianRupee,
   Clock,
   Moon,
-  
   Car,
   Save,
   RefreshCw,
@@ -18,6 +17,7 @@ import {
   TrendingUp,
   Zap,
   Timer,
+  Lock,
 } from 'lucide-react';
 import {
   RadarChart,
@@ -50,6 +50,7 @@ const FIELDS = [
     desc: 'Flat charge at trip start (before per-km billing)',
     min: 0,
     color: 'var(--primary)',
+    adminOnly: true, // Locked by admin
   },
   {
     key: 'baseFarePerKm',
@@ -59,6 +60,7 @@ const FIELDS = [
     desc: 'Amount charged for every kilometre driven',
     min: 0,
     color: 'var(--secondary)',
+    adminOnly: true, // Locked by admin
   },
   {
     key: 'minimumFare',
@@ -68,6 +70,7 @@ const FIELDS = [
     desc: 'Floor price per ride — cannot be below ₹50',
     min: 50,
     color: 'var(--accent)',
+    adminOnly: true, // Locked by admin
   },
   {
     key: 'waitingChargePerMin',
@@ -77,6 +80,7 @@ const FIELDS = [
     desc: 'Charged after the free waiting window expires',
     min: 0,
     color: 'var(--info)',
+    adminOnly: false,
   },
   {
     key: 'freeWaitingMinutes',
@@ -86,6 +90,7 @@ const FIELDS = [
     desc: 'Grace window before waiting charges kick in',
     min: 0,
     color: 'var(--success)',
+    adminOnly: false,
   },
   {
     key: 'nightSurchargePercent',
@@ -95,6 +100,7 @@ const FIELDS = [
     desc: 'Percentage added to fare during night hours',
     min: 0,
     color: 'var(--warning)',
+    adminOnly: false,
   },
   {
     key: 'wheelchairSurcharge',
@@ -104,6 +110,7 @@ const FIELDS = [
     desc: 'Additional charge for wheelchair-accessible service',
     min: 0,
     color: 'var(--error)',
+    adminOnly: false,
   },
 ];
 
@@ -118,12 +125,12 @@ function FieldCard({ field, value, onChange, error }) {
       layout
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-card p-5 flex flex-col gap-3 relative overflow-hidden"
+      className={`glass-card p-5 flex flex-col gap-3 relative overflow-hidden ${field.adminOnly ? 'opacity-80' : ''}`}
     >
       {/* accent line */}
       <span
         className="absolute left-0 top-0 bottom-0 w-1 rounded-l-[var(--r-box)]"
-        style={{ background: field.color }}
+        style={{ background: field.adminOnly ? 'color-mix(in srgb, var(--base-content) 30%, transparent)' : field.color }}
       />
 
       <div className="flex items-start justify-between gap-2">
@@ -135,8 +142,15 @@ function FieldCard({ field, value, onChange, error }) {
             <Icon size={18} style={{ color: field.color }} />
           </span>
           <div>
-            <p className="text-sm font-semibold text-base-content leading-tight">{field.label}</p>
-            <p className="text-xs" style={{ color: 'color-mix(in oklch, var(--base-content) 50%, transparent)' }}>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-base-content leading-tight">{field.label}</p>
+              {field.adminOnly && (
+                <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-base-300/50 text-base-content/60">
+                  <Lock size={9} /> Admin Only
+                </span>
+              )}
+            </div>
+            <p className="text-xs mt-0.5" style={{ color: 'color-mix(in oklch, var(--base-content) 50%, transparent)' }}>
               {field.unit}
             </p>
           </div>
@@ -146,6 +160,11 @@ function FieldCard({ field, value, onChange, error }) {
           <Info size={14} className="text-base-content/40 cursor-help" />
           <div className="absolute right-0 top-6 z-20 w-52 p-3 text-xs rounded-[var(--r-field)] bg-neutral text-neutral-content opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl">
             {field.desc}
+            {field.adminOnly && (
+              <div className="mt-2 pt-2 border-t border-neutral-content/20 text-warning font-semibold flex items-center gap-1">
+                <Lock size={10} /> This field can only be modified by an administrator.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -156,14 +175,23 @@ function FieldCard({ field, value, onChange, error }) {
           min={field.min}
           step="1"
           value={value ?? ''}
-          onChange={(e) => onChange(field.key, e.target.value)}
-          onFocus={() => setFocused(true)}
+          onChange={(e) => {
+            if (!field.adminOnly) onChange(field.key, e.target.value);
+          }}
+          onFocus={() => {
+            if (!field.adminOnly) setFocused(true);
+          }}
           onBlur={() => setFocused(false)}
-          className="input-field w-full pr-16 text-right font-mono text-base font-bold"
-          style={{
+          disabled={field.adminOnly}
+          className={`input-field w-full pr-16 text-right font-mono text-base font-bold transition-all ${
+            field.adminOnly 
+              ? 'bg-base-200/50 text-base-content/60 cursor-not-allowed border-base-300' 
+              : ''
+          }`}
+          style={!field.adminOnly ? {
             borderColor: focused ? field.color : undefined,
             boxShadow: focused ? `0 0 0 3px color-mix(in srgb, ${field.color}, transparent 80%)` : undefined,
-          }}
+          } : undefined}
           placeholder="0"
         />
         <span
@@ -174,7 +202,7 @@ function FieldCard({ field, value, onChange, error }) {
         </span>
       </div>
 
-      {error && (
+      {error && !field.adminOnly && (
         <motion.p
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
@@ -272,6 +300,7 @@ export default function MyPricingConfig() {
   const validate = () => {
     const errs = {};
     for (const f of FIELDS) {
+      if (f.adminOnly) continue; // Skip validation for read-only fields
       const v = Number(form[f.key]);
       if (isNaN(v) || v < f.min) errs[f.key] = `Must be ≥ ${f.min}`;
     }
@@ -282,7 +311,12 @@ export default function MyPricingConfig() {
   const handleSave = async () => {
     if (!validate()) return;
     const payload = {};
-    for (const f of FIELDS) payload[f.key] = Number(form[f.key]);
+    // Only send fields that the driver is allowed to change
+    for (const f of FIELDS) {
+      if (!f.adminOnly) {
+        payload[f.key] = Number(form[f.key]);
+      }
+    }
     const result = await dispatch(updatePricing(payload));
     if (!result.error) {
       setSaved(true);
@@ -333,7 +367,7 @@ export default function MyPricingConfig() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
-            <BackButton className=' my-2 rounded-md px-3' />
+      <BackButton className=' my-2 rounded-md px-3' />
       
       {/* ── header ── */}
       <motion.div
@@ -417,8 +451,11 @@ export default function MyPricingConfig() {
               Current Summary
             </p>
             {FIELDS.map((f) => (
-              <div key={f.key} className="flex justify-between text-sm">
-                <span style={{ color: 'color-mix(in oklch, var(--base-content) 60%, transparent)' }}>{f.label}</span>
+              <div key={f.key} className="flex justify-between text-sm items-center">
+                <span className="flex items-center gap-1.5" style={{ color: 'color-mix(in oklch, var(--base-content) 60%, transparent)' }}>
+                  {f.label}
+                  {f.adminOnly && <Lock size={10} className="opacity-50" />}
+                </span>
                 <span className="font-semibold font-mono">
                   {form[f.key] !== '' && form[f.key] != null
                     ? f.unit.startsWith('₹')
@@ -485,13 +522,21 @@ export default function MyPricingConfig() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.35 }}
-        className="alert alert-info text-sm"
+        className="alert alert-info text-sm flex-col sm:flex-row items-start gap-4"
       >
-        <Info size={16} className="shrink-0 mt-0.5" style={{ color: 'var(--info)' }} />
-        <p>
-          These are <strong>your surcharges</strong> on top of the platform base fare. The final amount billed to the
-          customer = Platform base + your surcharges. The platform fee is deducted from your earnings separately.
-        </p>
+        <div className="flex items-start gap-3">
+          <Info size={16} className="shrink-0 mt-0.5" style={{ color: 'var(--info)' }} />
+          <p>
+            These are <strong>your surcharges</strong> on top of the platform base fare. The final amount billed to the
+            customer = Platform base + your surcharges. The platform fee is deducted from your earnings separately.
+          </p>
+        </div>
+        <div className="flex items-start gap-3 sm:border-l sm:border-info/30 sm:pl-4">
+          <Lock size={16} className="shrink-0 mt-0.5" style={{ color: 'var(--info)' }} />
+          <p>
+            Fields marked with an <strong>Admin Only</strong> badge are locked by platform rules and cannot be manually overridden.
+          </p>
+        </div>
       </motion.div>
     </div>
   );

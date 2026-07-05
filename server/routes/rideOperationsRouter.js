@@ -1123,6 +1123,171 @@ router.get('/admin/bookings/:bookingId/destination-history',
 // ASSIGNMENT HISTORY
 // ═════════════════════════════════════════════════════════════════════════════
 
+
+// ═════════════════════════════════════════════════════════════════════════════
+// VEHICLE REPLACEMENT
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * PATCH /ride-ops/admin/rides/:rideId/replace-vehicle
+ * Spec: "Administrator may: ... Replace Vehicle." — previously the only
+ * admin authority item with zero implementing route anywhere in the codebase.
+ * Body: { newVehicleId, reason }
+ */
+router.patch('/admin/rides/:rideId/replace-vehicle',
+  protect,
+  authorize('admin', 'superadmin'),
+  async (req, res) => {
+    try {
+      const { rideId } = req.params;
+      const { newVehicleId, reason } = req.body;
+
+      if (!isValidId(rideId))
+        return res.status(400).json({ success: false, message: 'Invalid rideId' });
+      if (!newVehicleId || !isValidId(newVehicleId))
+        return res.status(400).json({ success: false, message: 'newVehicleId required' });
+      if (!reason)
+        return res.status(400).json({ success: false, message: 'reason required for vehicle replacement' });
+
+      const ride = await Ride.findById(rideId);
+      if (!ride) return res.status(404).json({ success: false, message: 'Ride not found' });
+      if (['completed', 'cancelled'].includes(ride.status))
+        return res.status(400).json({ success: false, message: `Cannot replace vehicle on ${ride.status} ride` });
+
+      const Vehicle = mongoose.model('Vehicle');
+      const vehicle = await Vehicle.findById(newVehicleId).lean();
+      if (!vehicle) return res.status(404).json({ success: false, message: 'Vehicle not found' });
+      if (vehicle.status !== 'active' || vehicle.verificationStatus !== 'verified')
+        return res.status(400).json({ success: false, message: 'Vehicle not active/verified' });
+
+      const oldVehicleSnapshot = ride.vehicleSnapshot;
+
+      ride.assignedVehicleId = vehicle._id;
+      ride.vehicleSnapshot = {
+        vehicleCode:            vehicle.vehicleCode,
+        registrationNumber:     vehicle.registrationNumber,
+        make:                   vehicle.make,
+        model:                  vehicle.model,
+        color:                  vehicle.color,
+        vehicleType:            vehicle.vehicleType,
+        vehicleClass:           ride.vehicleSnapshot?.vehicleClass,
+        seatingCapacity:        vehicle.seatingCapacity,
+        isWheelchairAccessible: vehicle.isWheelchairAccessible,
+        hasStretcherSupport:    vehicle.hasStretcherSupport,
+        hasOxygenSupport:       vehicle.hasOxygenSupport,
+        hasAC:                  vehicle.hasAC,
+      };
+      ride.updatedBy = req.user._id;
+      await ride.save();
+
+      await AssignmentHistory.create({
+        ride: rideId,
+        booking: ride.booking,
+        assignmentType: 'VEHICLE',
+        entityRefModel: 'Vehicle',
+        entityRefId: newVehicleId,
+        action: 'REPLACED',
+        performedBy: req.user._id,
+        reason,
+        effectiveAt: new Date(),
+      });
+
+      getBookingSocketService()?.emitToRoom(`booking:${ride.booking}`, 'vehicle_replaced', {
+        rideId, bookingId: String(ride.booking),
+        oldVehicle: oldVehicleSnapshot, newVehicle: ride.vehicleSnapshot,
+        reason, timestamp: new Date().toISOString(),
+      });
+
+      return res.json({ success: true, message: 'Vehicle replaced', data: { ride } });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+// ═════════════════════════════════════════════════════════════════════════════
+// VEHICLE REPLACEMENT
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * PATCH /ride-ops/admin/rides/:rideId/replace-vehicle
+ * Spec: "Administrator may: ... Replace Vehicle." — previously the only
+ * admin authority item with zero implementing route anywhere in the codebase.
+ * Body: { newVehicleId, reason }
+ */
+router.patch('/admin/rides/:rideId/replace-vehicle',
+  protect,
+  authorize('admin', 'superadmin'),
+  async (req, res) => {
+    try {
+      const { rideId } = req.params;
+      const { newVehicleId, reason } = req.body;
+
+      if (!isValidId(rideId))
+        return res.status(400).json({ success: false, message: 'Invalid rideId' });
+      if (!newVehicleId || !isValidId(newVehicleId))
+        return res.status(400).json({ success: false, message: 'newVehicleId required' });
+      if (!reason)
+        return res.status(400).json({ success: false, message: 'reason required for vehicle replacement' });
+
+      const ride = await Ride.findById(rideId);
+      if (!ride) return res.status(404).json({ success: false, message: 'Ride not found' });
+      if (['completed', 'cancelled'].includes(ride.status))
+        return res.status(400).json({ success: false, message: `Cannot replace vehicle on ${ride.status} ride` });
+
+      const Vehicle = mongoose.model('Vehicle');
+      const vehicle = await Vehicle.findById(newVehicleId).lean();
+      if (!vehicle) return res.status(404).json({ success: false, message: 'Vehicle not found' });
+      if (vehicle.status !== 'active' || vehicle.verificationStatus !== 'verified')
+        return res.status(400).json({ success: false, message: 'Vehicle not active/verified' });
+
+      const oldVehicleSnapshot = ride.vehicleSnapshot;
+
+      ride.assignedVehicleId = vehicle._id;
+      ride.vehicleSnapshot = {
+        vehicleCode:            vehicle.vehicleCode,
+        registrationNumber:     vehicle.registrationNumber,
+        make:                   vehicle.make,
+        model:                  vehicle.model,
+        color:                  vehicle.color,
+        vehicleType:            vehicle.vehicleType,
+        vehicleClass:           ride.vehicleSnapshot?.vehicleClass,
+        seatingCapacity:        vehicle.seatingCapacity,
+        isWheelchairAccessible: vehicle.isWheelchairAccessible,
+        hasStretcherSupport:    vehicle.hasStretcherSupport,
+        hasOxygenSupport:       vehicle.hasOxygenSupport,
+        hasAC:                  vehicle.hasAC,
+      };
+      ride.updatedBy = req.user._id;
+      await ride.save();
+
+      await AssignmentHistory.create({
+        ride: rideId,
+        booking: ride.booking,
+        assignmentType: 'VEHICLE',
+        entityRefModel: 'Vehicle',
+        entityRefId: newVehicleId,
+        action: 'REPLACED',
+        performedBy: req.user._id,
+        reason,
+        effectiveAt: new Date(),
+      });
+
+      getBookingSocketService()?.emitToRoom(`booking:${ride.booking}`, 'vehicle_replaced', {
+        rideId, bookingId: String(ride.booking),
+        oldVehicle: oldVehicleSnapshot, newVehicle: ride.vehicleSnapshot,
+        reason, timestamp: new Date().toISOString(),
+      });
+
+      return res.json({ success: true, message: 'Vehicle replaced', data: { ride } });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ASSIGNMENT HISTORY
+// ═════════════════════════════════════════════════════════════════════════════
 /**
  * GET /ride-ops/rides/:rideId/assignment-history
  * Full assignment audit trail for a ride.
@@ -1142,6 +1307,34 @@ router.get('/rides/:rideId/assignment-history',
         .lean();
 
       return res.json({ success: true, data: { history } });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
+
+/**
+ * GET /ride-ops/bookings/:bookingId/status-history
+ * Permanent, uncapped status transition log — the source of truth behind
+ * Booking.statusLog's bounded 20-entry UI cache. Closes the read-side gap
+ * for "every important business event must be traceable."
+ */
+router.get('/bookings/:bookingId/status-history',
+  protect,
+  authorize('admin', 'superadmin'),
+  async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+      if (!isValidId(bookingId))
+        return res.status(400).json({ success: false, message: 'Invalid bookingId' });
+
+      const BookingStatusEvent = mongoose.model('BookingStatusEvent');
+      const history = await BookingStatusEvent.find({ booking: bookingId })
+        .populate('changedBy', 'name role')
+        .sort({ changedAt: 1 })
+        .lean();
+
+      return res.json({ success: true, data: { history, total: history.length } });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
     }

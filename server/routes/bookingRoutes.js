@@ -39,6 +39,7 @@ import { generateOpHtml, buildOpZipBuffer } from '../utils/opDocumentGenerator.j
 import { opConfirmationEmailTemplate }       from '../utils/opEmailTemplates.js';
 
 import { protect, authorize } from '../middleware/authMiddleware.js';
+import { createAllocationsForBooking } from '../services/allocationEngine.service.js'; // ADJUST PATH if services/ sits elsewhere relative to this router
 import {
   genOtp,
   hashOtp,
@@ -505,8 +506,17 @@ router.patch('/consultations/:consultationId/end',
         const diffMs = consultation.actualEndTime - consultation.actualStartTime;
         consultation.actualDurationMinutes = Math.round(diffMs / 60000);
       }
-      await consultation.save();
+await consultation.save();
       await Booking.findByIdAndUpdate(consultation.bookingId, { $set: { status: 'completed', updatedBy: req.user._id } });
+
+      // findByIdAndUpdate bypasses Booking.js post-save hook — allocation
+      // creation never fires from that hook here. Call explicitly.
+      try {
+        const created = await createAllocationsForBooking(consultation.bookingId);
+        console.log(`[consultations/end] allocations created: ${created.length} for booking ${consultation.bookingId}`);
+      } catch (allocErr) {
+        console.error('[consultations/end] allocation creation failed:', allocErr.message);
+      }
 
       const booking   = await Booking.findById(consultation.bookingId).lean();
       const patient   = await User.findById(consultation.patient).select('email name phone').lean();
@@ -893,10 +903,18 @@ router.patch('/:id/care/complete',
       if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
       if (booking.status !== 'in_progress') return res.status(400).json({ success: false, message: `Cannot complete in status: ${booking.status}` });
 
-      booking.status = 'completed';
+booking.status = 'completed';
       booking.statusLog.push({ fromStatus: 'in_progress', toStatus: 'completed', changedBy: req.user._id, reason: 'Care assistant completed task' });
       booking.updatedBy = req.user._id;
       await booking.save();
+
+      // Explicit call — don't rely solely on the model hook.
+      try {
+        const created = await createAllocationsForBooking(booking._id);
+        console.log(`[care/complete] allocations created: ${created.length} for booking ${booking._id}`);
+      } catch (allocErr) {
+        console.error('[care/complete] allocation creation failed:', allocErr.message);
+      }
 
       const customer = await User.findById(booking.customer).select('email phone name').lean();
       await createNotification({ recipient: booking.customer, title: 'Care Task Completed', body: 'Care assistant completed the task.', type: 'Care_Task_Completed', bookingId: booking._id });
@@ -1683,7 +1701,7 @@ router.patch('/admin/bookings/:id/status', protect, authorize('admin', 'superadm
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
 
-    const prevStatus  = booking.status;
+const prevStatus  = booking.status;
     booking.status    = status;
     booking.statusLog.push({ fromStatus: prevStatus, toStatus: status, changedBy: req.user._id, reason: note || 'Admin status update' });
     booking.updatedBy = req.user._id;
@@ -1691,6 +1709,15 @@ router.patch('/admin/bookings/:id/status', protect, authorize('admin', 'superadm
 
     if (status === 'cancelled') {
       await recoverSubscriptionUsageOnCancel(booking).catch(e => console.error('[admin/status] recovery failed:', e.message));
+    }
+
+    if (status === 'completed') {
+      try {
+        const created = await createAllocationsForBooking(booking._id);
+        console.log(`[admin/status] allocations created: ${created.length} for booking ${booking._id}`);
+      } catch (allocErr) {
+        console.error('[admin/status] allocation creation failed:', allocErr.message);
+      }
     }
 
     // Auto-create Consultation for doctor_online on confirm

@@ -29,7 +29,6 @@ import {
   registerConsultationSocket,
   setConsultationNamespace
 } from "./sockets/consultationSocket.js";
-import { initSupportSocket } from './sockets/support.socket.js';
 
 // Route Imports
 import userRouter               from "./routes/userRoutes.js";
@@ -62,7 +61,7 @@ import pricingRouter            from './routes/Platformpricingroutes.js';
 import soloDriverRouter         from './routes/solordriverRoutes.js';
 import careAssistantRouter      from './routes/careassistantRoutes.js';
 import driverRouter             from './routes/driverRouter.js';
-import searchRouter             from './routes/searchRouter.js';
+ 
 import labRoutes                from './routes/labRoutes.js';
 import bookingRoutes            from './routes/bookingRoutes.js';
 import customerBookingRouter    from './routes/customerbookingrouter.js';
@@ -70,7 +69,7 @@ import hospitalManagerRouter    from './routes/hospitalManagerRouter.js';
 import availabilityRouter       from './routes/availabilityRouter.js';
 import booking1Routes           from './routes/bookingrouterpaert1.js';
 import rideRequestRouter        from './routes/rideRequestRouter.js';
-import rideOperationsRoutes from './routes/rideOperationsRouter.js'
+import rideOperationsRoutes     from './routes/rideOperationsRouter.js'
 import prescriptionCareRouter   from './routes/prescriptionCareRouter.js';
 import bloodBankRouter          from './routes/bloodbankRouter.js';
 import adminAnalyticsRouter     from './routes/super-admin/adminanalyticsRouter.js';
@@ -81,9 +80,14 @@ import partnerWalletRoutes      from './routes/partnerWalletRouter.js';
 import payoutRouter             from './routes/payoutRouter.js';
 import bookingPayAtServiceRouter from './routes/bookingPayAtServiceRouter.js';
 import accountingRouter         from './routes/accountingRouter.js';
+import earningsRouter from './routes/earningsRouter.js';
+ 
 
-// Support System
-import supportRouter            from './routes/support/index.js';
+import conversationRoutes from './routes/conversationRoutes.js';
+import messageRoutes from './routes/messageRoutes.js';
+import groupRoutes from './routes/groupRoutes.js';
+import complaintRoutes from './routes/complaintRoutes.js';
+import attachmentRoutes from './routes/attachmentRoutes.js';
 
 // ─────────────────────────────────────────────
 // 1. CORE CONFIGURATION
@@ -212,18 +216,18 @@ app.use("/api/pricing",            pricingRouter);
 app.use("/api/solo-driver",        soloDriverRouter);
 app.use("/api/care-assistant",     careAssistantRouter);
 app.use("/api/driver",             driverRouter);
-app.use("/api/search",             searchRouter);
+ 
 app.use("/api/labs",               labRoutes);
 app.use("/api/hospital-manager",   hospitalManagerRouter);
 app.use("/api/availability",       availabilityRouter);
 app.use("/api/ride-requests",      rideRequestRouter);
-app.use("/api/ride-ops",      rideOperationsRoutes);
+app.use("/api/ride-ops",           rideOperationsRoutes);
 app.use("/api/clinical",           prescriptionCareRouter);
 app.use("/api/blood-banks",        bloodBankRouter);
 app.use("/api/admin/analytics",    adminAnalyticsRouter);
 app.use("/api/consultations",      consultationRouter);
 app.use('/api/lab-partner/bookings', protect, authorize('lab_partner'), labPartnerRoutes);
-app.use('/api/partner-wallet',partnerWalletRoutes);
+app.use('/api/partner-wallet',     partnerWalletRoutes);
 
 // ⚠️ Warning: Three separate routers mounted to the exact same path
 // Consider combining these into a single router file in the future to avoid unexpected routing conflicts.
@@ -234,8 +238,17 @@ app.use('/api/bookings',           bookingPayAtServiceRouter);
 app.use('/api/accounting',         accountingRouter);
 app.use('/api/payouts',            payoutRouter);
 
-// ── Support Ticket System ─────────────────────────────────────────────────────
-app.use('/api/support',            supportRouter);
+
+app.use('/api/earnings', earningsRouter);
+
+
+app.use('/conversations', conversationRoutes);
+app.use('/messages', messageRoutes);
+app.use('/groups', groupRoutes);
+app.use('/complaints', complaintRoutes);
+app.use('/attachments', attachmentRoutes);
+
+ 
 
 // ─────────────────────────────────────────────
 // 7. HEALTH CHECK & ERROR HANDLING
@@ -372,9 +385,16 @@ async function startServer() {
     const consultationNs = registerConsultationSocket(io);
     setConsultationNamespace(consultationNs);
 
-    initSupportSocket(io);
-
+ 
+    
     app.set("io", io);
+
+    // ─────────────────────────────────────────────
+    // 7.5 Background Workers & Queues
+    // ─────────────────────────────────────────────
+  
+  
+    console.log("✅ Support workers & SLA sweeps initialized");
 
     // ─────────────────────────────────────────────
     // 8. Start Server

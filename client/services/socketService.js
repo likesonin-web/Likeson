@@ -94,7 +94,8 @@ export const SOCKET_EVENTS = {
   PARTICIPANTS_SNAPSHOT:      'participants_snapshot',
 
   // ── Return ride ─────────────────────────────────────────────────────────────
-  RETURN_RIDE_ACTIVATED:      'return_ride_activated',
+RETURN_RIDE_ACTIVATED:      'return_ride_activated',
+  VEHICLE_REPLACED:           'vehicle_replaced',
 
   // ── Ride completed ──────────────────────────────────────────────────────────
   RIDE_COMPLETED:             'ride_completed',

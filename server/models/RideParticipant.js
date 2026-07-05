@@ -1,7 +1,8 @@
 import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
-const PARTICIPANT_ROLES = ['CARE_ASSISTANT', 'NURSE', 'TECHNICIAN', 'ESCORT', 'FAMILY', 'EQUIPMENT_HANDLER', 'DOCTOR'];
+// RideParticipant.js
+const PARTICIPANT_ROLES = ['CARE_ASSISTANT', 'NURSE', 'TECHNICIAN', 'ESCORT', 'FAMILY', 'EQUIPMENT_HANDLER'];
 const PARTICIPANT_STATUSES = ['PENDING', 'EN_ROUTE', 'AT_JOIN_POINT', 'IN_VEHICLE', 'AT_HOSPITAL', 'DEPARTED', 'REPLACED'];
 const JOIN_MODES = ['IN_VEHICLE_BEFORE_PATIENT', 'IN_VEHICLE_AFTER_PATIENT', 'DIRECT_HOSPITAL', 'REPLACED', 'NOT_JOINED'];
 
@@ -11,6 +12,9 @@ const rideParticipantSchema = new Schema(
     booking: { type: Schema.Types.ObjectId, ref: 'Booking', required: true, index: true },
 
     role: { type: String, enum: PARTICIPANT_ROLES, required: true, index: true },
+    // Spec: "Family member ... No tracking. No Join Point. No OTP. No
+    // independent routing." isTrackable is derived, never hand-set — see
+    // pre-validate below.
 
     // polymorphic — CareAssistantProfile today, anything tomorrow, zero schema change
     refModel: { type: String, enum: ['CareAssistantProfile', 'User', null], default: null },
@@ -35,6 +39,25 @@ const rideParticipantSchema = new Schema(
   },
   { timestamps: true }
 );
+
+// RideParticipant.js pre-validate
+rideParticipantSchema.pre('validate', function () {
+  if (this.role === 'FAMILY' && this.joinMode && this.joinMode !== 'NOT_JOINED') {
+    throw new Error('FAMILY participants cannot have a join mode — boards only at patient pickup');
+  }
+});
+// FAMILY guard: no join mode, no join-point involvement, ever.
+rideParticipantSchema.pre('validate', function () {
+  if (this.role === 'FAMILY') {
+    if (this.joinMode && this.joinMode !== 'NOT_JOINED') {
+      throw new Error('FAMILY participants cannot have a joinMode — they board only at patient pickup, no independent routing');
+    }
+  }
+});
+
+rideParticipantSchema.virtual('isTrackable').get(function () {
+  return this.role !== 'FAMILY';
+});
 
 rideParticipantSchema.index({ ride: 1, role: 1, isActive: 1 });
 rideParticipantSchema.index({ booking: 1 });
