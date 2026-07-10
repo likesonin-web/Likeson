@@ -64,7 +64,7 @@ const partnerBankAccountSchema = new Schema(
 );
 
 // Ensure only one primary account per user
-partnerBankAccountSchema.pre('save', async function (next) {
+partnerBankAccountSchema.pre('save', async function () {
   if (this.isPrimary) {
     await this.constructor.updateMany(
       { partnerUserId: this.partnerUserId, _id: { $ne: this._id } },
@@ -77,7 +77,7 @@ partnerBankAccountSchema.pre('save', async function (next) {
     const rawAccount = decrypt(this.encryptedAccountNumber);
     this.accountLast4 = rawAccount.slice(-4);
   }
-  next();
+ 
 });
 
 const PartnerBankAccount = mongoose.model('PartnerBankAccount', partnerBankAccountSchema);

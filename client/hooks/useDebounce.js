@@ -1,12 +1,13 @@
-'use client';
-// path: hooks/useDebounce.js
+// src/hooks/useDebounce.js
 import { useEffect, useState } from 'react';
 
-export default function useDebounce(value, delayMs = 400) {
+export function useDebounce(value, delayMs = 300) {
   const [debounced, setDebounced] = useState(value);
+
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
   }, [value, delayMs]);
+
   return debounced;
 }

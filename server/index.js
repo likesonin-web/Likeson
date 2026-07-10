@@ -29,6 +29,12 @@ import {
   registerConsultationSocket,
   setConsultationNamespace
 } from "./sockets/consultationSocket.js";
+// 🆕 ADDED: Direct import for Support Sockets
+import { registerSupportSockets } from './sockets/support.socket.js';
+
+// Job Imports
+// 🆕 ADDED: Direct import for Support Jobs
+import { scheduleSLASweep, startSLASweepWorker } from './jobs/slaSweep.job.js';
 
 // Route Imports
 import userRouter               from "./routes/userRoutes.js";
@@ -80,15 +86,14 @@ import partnerWalletRoutes      from './routes/partnerWalletRouter.js';
 import payoutRouter             from './routes/payoutRouter.js';
 import bookingPayAtServiceRouter from './routes/bookingPayAtServiceRouter.js';
 import accountingRouter         from './routes/accountingRouter.js';
-import earningsRouter from './routes/earningsRouter.js';
+import earningsRouter           from './routes/earningsRouter.js';
+
+import ticketRoutes             from './routes/ticket.routes.js';
+import messageRoutes            from './routes/message.routes.js';
+import participantRoutes        from './routes/participant.routes.js';
+// Note: verify if your folder is named `middleware` or `middlewares` and adjust if needed
+import { supportErrorHandler }  from './middleware/errorHandler.middleware.js';
  
-
-import conversationRoutes from './routes/conversationRoutes.js';
-import messageRoutes from './routes/messageRoutes.js';
-import groupRoutes from './routes/groupRoutes.js';
-import complaintRoutes from './routes/complaintRoutes.js';
-import attachmentRoutes from './routes/attachmentRoutes.js';
-
 // ─────────────────────────────────────────────
 // 1. CORE CONFIGURATION
 // ─────────────────────────────────────────────
@@ -237,18 +242,15 @@ app.use("/api/bookings",           booking1Routes);
 app.use('/api/bookings',           bookingPayAtServiceRouter);
 app.use('/api/accounting',         accountingRouter);
 app.use('/api/payouts',            payoutRouter);
+app.use('/api/earnings',           earningsRouter);
 
+// Support Routes explicitly mounted
+app.use('/api/support/tickets', ticketRoutes);
+app.use('/api/support/tickets/:ticketId/messages', messageRoutes);
+app.use('/api/support/tickets/:ticketId/participants', participantRoutes);
 
-app.use('/api/earnings', earningsRouter);
-
-
-app.use('/conversations', conversationRoutes);
-app.use('/messages', messageRoutes);
-app.use('/groups', groupRoutes);
-app.use('/complaints', complaintRoutes);
-app.use('/attachments', attachmentRoutes);
-
- 
+// Mount the module-scoped support error handler specifically to /api/support
+app.use('/api/support', supportErrorHandler);
 
 // ─────────────────────────────────────────────
 // 7. HEALTH CHECK & ERROR HANDLING
@@ -384,16 +386,18 @@ async function startServer() {
 
     const consultationNs = registerConsultationSocket(io);
     setConsultationNamespace(consultationNs);
-
- 
     
     app.set("io", io);
 
     // ─────────────────────────────────────────────
     // 7.5 Background Workers & Queues
     // ─────────────────────────────────────────────
-  
-  
+    
+    // 🆕 FIXED: Call support sockets and jobs directly (No supportModule wrapper)
+    registerSupportSockets(io);
+    await scheduleSLASweep();
+    startSLASweepWorker(io);
+    
     console.log("✅ Support workers & SLA sweeps initialized");
 
     // ─────────────────────────────────────────────

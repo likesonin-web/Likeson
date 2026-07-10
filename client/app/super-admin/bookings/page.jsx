@@ -17,8 +17,7 @@ import {
   fetchAdminBookingById,
   updateAdminBookingStatus,
   adminChangeDestination,
-  clearAdminBookingDetail,
-  clearAdminBookingDetail as clearDetail,
+clearAdminBookingDetail,
 
   // Nearby
   fetchNearbyCareAssistants,
@@ -372,7 +371,7 @@ export default function BookingsManagement() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-base-100 overflow-hidden">
+  <div className="flex flex-col h-full min-h-0 bg-base-100 overflow-hidden">
 
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
       <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-base-300 bg-base-100 z-10">

@@ -24,7 +24,7 @@ import {
   selectDispatch,
   selectLoading,
 } from '@/store/slices/soloDriverSlice';
-
+import Earnings from '../../../(partner)/earnings/myEarnings';
 // ── Icons ─────────────────────────────────────────────────────────────────────
 import {
   LayoutDashboard, BarChart3, Star, TrendingUp,
@@ -918,7 +918,7 @@ export default function SoloPartnerDashboard() {
 
         {/* ── Page body ─────────────────────────────────────────────── */}
         <main className="flex-1 p-4 lg:p-6 pb-24 lg:pb-8 overflow-x-hidden">
-
+          <Earnings/>
           {/* Mobile layout */}
           <motion.div className="lg:hidden space-y-4" initial="hidden" animate="show" variants={stagger}>
             <StatsRow performance={performance} settlement={settlement} />

@@ -60,12 +60,13 @@ import {
 
 import cache       from '../middleware/cache.js';
 import redisClient from '../config/redis.js';
+import { findNearbyAgencyDrivers, findNearbySoloDrivers } from '../services/partnerAssignmentEngine.service.js';
 
 const router = express.Router();
 
 const transportRadiusRad = TRANSPORT_RADIUS_M / 1000 / 6378.1;
 const careRideRadiusRad  = CARE_RIDE_RADIUS_M  / 1000 / 6378.1;
-
+ 
 // ─────────────────────────────────────────────────────────────────────────────
 // CACHE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2024,14 +2025,25 @@ router.get('/admin/bookings/:id/nearby/solo-drivers',
   cache(CACHE_TTL.nearby, req => `GET:/admin/bookings/${req.params.id}/nearby/solo-drivers`),
   async (req, res) => {
     try {
-      const booking = await Booking.findById(req.params.id).select('patientLocation destinationLocation').lean();
+      const booking = await Booking.findById(req.params.id).select('patientLocation').lean();
       if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
-      const coords = booking.patientLocation?.coordinates;
-      if (!coords?.length) return res.status(400).json({ success: false, message: 'No pickup coordinates' });
-      const city = booking.patientLocation?.city?.trim(); const pincode = booking.patientLocation?.pincode?.trim();
-      const destCity = booking.destinationLocation?.city?.trim(); const destPincode = booking.destinationLocation?.pincode?.trim();
-      const { results, strategy } = await resolveSoloDrivers({ coords, city, pincode, destCity, destPincode });
-      return res.json({ success: true, data: { pickupCity: city ?? null, pickupPincode: pincode ?? null, dropCity: destCity ?? null, dropPincode: destPincode ?? null, strategy, total: results.length, results, assignRoute: 'POST /admin/bookings/:id/assign/solo-driver  body: { soloDriverPartnerId }' } });
+      const pickupCoords = booking.patientLocation?.coordinates;
+      if (!pickupCoords?.length) return res.status(400).json({ success: false, message: 'No pickup coordinates' });
+      const pickupCity = booking.patientLocation?.city?.trim() || null;
+      const pickupPincode = booking.patientLocation?.pincode?.trim() || null;
+
+// CHANGE (Point 1): single 3-tier strategy — pickup city/pincode match,
+      // else 30km radius, else every active/available solo partner
+      // system-wide (uncapped, sorted by distance). Never returns empty.
+      const { solo: results = [], strategy } = await findNearbySoloDrivers({ pickupCoords, pickupCity, pickupPincode });
+
+      return res.json({
+        success: true,
+        data: {
+          pickupCity, pickupPincode, strategy, total: results.length, results,
+          assignRoute: 'POST /admin/bookings/:id/assign/solo-driver  body: { soloDriverPartnerId }',
+        },
+      });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
     }
@@ -2043,15 +2055,23 @@ router.get('/admin/bookings/:id/nearby/transport-partners',
   cache(CACHE_TTL.nearby, req => `GET:/admin/bookings/${req.params.id}/nearby/transport-partners`),
   async (req, res) => {
     try {
-      const booking = await Booking.findById(req.params.id).select('patientLocation destinationLocation').lean();
+      const booking = await Booking.findById(req.params.id).select('patientLocation').lean();
       if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
-      const coords = booking.patientLocation?.coordinates;
-      if (!coords?.length) return res.status(400).json({ success: false, message: 'No pickup coordinates' });
-      const city = booking.patientLocation?.city?.trim(); const pincode = booking.patientLocation?.pincode?.trim();
-      const destCity = booking.destinationLocation?.city?.trim(); const destPincode = booking.destinationLocation?.pincode?.trim();
-      const { results, strategy } = await resolveTransportPartners({ coords, city, pincode, destCity, destPincode });
-      const ready = results.filter(r => r.isDispatchReady); const notReady = results.filter(r => !r.isDispatchReady);
-      return res.json({ success: true, data: { pickupCity: city ?? null, pickupPincode: pincode ?? null, dropCity: destCity ?? null, dropPincode: destPincode ?? null, strategy, total: results.length, dispatchReady: ready.length, results: [...ready, ...notReady] } });
+      const pickupCoords = booking.patientLocation?.coordinates;
+      if (!pickupCoords?.length) return res.status(400).json({ success: false, message: 'No pickup coordinates' });
+      const pickupCity = booking.patientLocation?.city?.trim() || null;
+      const pickupPincode = booking.patientLocation?.pincode?.trim() || null;
+
+// CHANGE (Point 1): returns individual AGENCY DRIVERS directly (not
+      // just the TP), matching the same 3-tier strategy as solo drivers —
+      // this also makes admin's manual-assign screen consistent with what
+      // autoReassignRide() sees and picks from automatically.
+      const { agency: results = [], strategy } = await findNearbyAgencyDrivers({ pickupCoords, pickupCity, pickupPincode });
+
+      return res.json({
+        success: true,
+        data: { pickupCity, pickupPincode, strategy, total: results.length, results },
+      });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
     }

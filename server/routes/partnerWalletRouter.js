@@ -79,8 +79,19 @@ const parsePagination = (query, maxLimit = 50) => ({
 // PARTNER_TYPES already doesn't include 'customer', so this can't leak.
 // ADMIN SECTION = admin | superadmin ONLY.
 
-const onlyPartner = authorize(...PARTNER_TYPES);
-const onlyAdmin    = authorize('admin', 'superadmin');
+// hardcoded, decoupled from PARTNER_TYPES shared reference —
+// prevents downstream mutation elsewhere in app from silently
+// dropping 'hospital' (or any role) from this guard
+const onlyPartner = authorize(
+  'doctor',
+  'hospital',
+  'care_assistant',
+  'driver',
+  'solodriverpartner',
+  'transportpartner',
+  'lab_partner'
+);
+const onlyAdmin = authorize('admin', 'superadmin');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

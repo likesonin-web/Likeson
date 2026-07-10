@@ -389,31 +389,51 @@ doctorProfileSchema.statics.resolveEffectivePricing = async function (
     throw new Error(`No consultationPricing/fees configured for ${source} (owner ${pricingOwnerId})`);
   }
 
-  let baseFee = pricingSource[feeKey] ?? pricingSource.consultationFee ?? 600;
-  let doctorShare = pricingSource[honKey] ?? pricingSource.consultationHonorarium ?? baseFee;
+let baseFee = pricingSource[feeKey] ?? pricingSource.consultationFee ?? 600;
+
+  // Doctor share rule (fix):
+  //   hospital-manager → doctor gets a share ONLY if hospital set an explicit
+  //   per-type honorarium (inPersonHonorarium/videoHonorarium/homeVisitHonorarium).
+  //   No fallback to baseFee — null/unset means doctor gets 0, hospital keeps all of baseFee.
+  //   doctor-owner → unchanged, doctor's own consultationHonorarium/baseFee fallback applies.
+  let doctorShare = isHospitalManaged
+    ? (pricingSource[honKey] ?? 0)
+    : (pricingSource[honKey] ?? pricingSource.consultationHonorarium ?? baseFee);
   let grossHospitalShare = 0;
 
   if (isFollowUp) {
     baseFee = followUpFeeOverride || pricingSource.followUpFee || 0;
     const stdFee = pricingSource[feeKey] ?? pricingSource.consultationFee ?? 1;
-    const stdHon = pricingSource[honKey] ?? pricingSource.consultationHonorarium ?? 0;
-    doctorShare = Math.round(baseFee * (stdHon / stdFee));
-    grossHospitalShare = Math.max(0, baseFee - doctorShare);
-  } else {
-    grossHospitalShare = Math.max(0, baseFee - doctorShare);
+    if (isHospitalManaged) {
+      const stdHon = pricingSource[honKey]; // explicit only, no default
+      doctorShare = stdHon != null ? Math.round(baseFee * (stdHon / stdFee)) : 0;
+    } else {
+      const stdHon = pricingSource[honKey] ?? pricingSource.consultationHonorarium ?? 0;
+      doctorShare = Math.round(baseFee * (stdHon / stdFee));
+    }
   }
 
-  // ── Platform fee priority chain (Problem 5) ──────────────────────────────
-  // Doctor override → Hospital override → (global config resolved by caller,
-  // since DoctorProfile has no business reaching into PlatformPricingConfig)
+  // Hospital share rule (fix): hospital ONLY gets money when hospital-manager.
+  // doctor-owner → hospital never paid, ever (grossHospitalShare stays 0).
+  grossHospitalShare = isHospitalManaged ? Math.max(0, baseFee - doctorShare) : 0;
+
+  // ── Platform fee — rule (fix): fee source locked to managementModel, no cross-over ──
+  //   hospital-manager → hospital's fee only. Doctor override NEVER applies here.
+  //   doctor-owner      → doctor's fee only. Hospital never involved.
   let platformFee = null;
   let platformFeeSource = 'unset';
-  if (doctor.platformFee?.value != null) {
-    platformFee = doctor.platformFee;
-    platformFeeSource = 'doctor-override';
-  } else if (isHospitalManaged && hospital.consultationPricing?.platformFeeOverride?.value != null) {
-    platformFee = hospital.consultationPricing.platformFeeOverride;
-    platformFeeSource = 'hospital-override';
+  if (isHospitalManaged) {
+    if (hospital.consultationPricing?.platformFeeOverride?.value != null) {
+      platformFee = hospital.consultationPricing.platformFeeOverride;
+      platformFeeSource = 'hospital-override';
+    }
+    // else: caller falls back to PlatformPricingConfig.resolveHospitalPlatformFee()
+  } else {
+    if (doctor.platformFee?.value != null) {
+      platformFee = doctor.platformFee;
+      platformFeeSource = 'doctor-override';
+    }
+    // else: caller falls back to PlatformPricingConfig.doctor.platformFee
   }
   // If still null, caller (PricingEngine) must fall back to
   // PlatformPricingConfig.getGlobal() → hospital/doctor default fee.

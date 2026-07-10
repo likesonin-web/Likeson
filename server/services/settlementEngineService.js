@@ -57,9 +57,9 @@ import LabPartnerProfile     from '../models/LabPartnerProfile.js';
  * Every collection downstream of this (Wallet/Settlement/Ledger/Liability)
  * is keyed by the User id this returns. Never the profile id directly.
  *
- * 'hospital' lazy-loads mongoose.model('Hospital') since that file wasn't
- * supplied — assumes Hospital.user (ObjectId ref 'User'), matching every
- * other partner profile pattern in this codebase. Fix here if wrong.
+ * 'hospital' uses Hospital.managedBy (ObjectId ref 'User') — Hospital has
+ * NO `user` field, unlike every other partner profile. Confirmed against
+ * Hospital.js schema.
  */
 async function resolveUserIdFromProfile(profileId, partnerRole) {
   switch (partnerRole) {
@@ -69,9 +69,9 @@ async function resolveUserIdFromProfile(profileId, partnerRole) {
     case 'solodriverpartner': return (await SoloDriverPartner.findById(profileId).select('user').lean())?.user;
     case 'transportpartner':  return (await TransportPartner.findById(profileId).select('user').lean())?.user;
     case 'lab_partner':       return (await LabPartnerProfile.findById(profileId).select('user').lean())?.user;
-    case 'hospital': {
+ case 'hospital': {
       const Hospital = mongoose.model('Hospital');
-      return (await Hospital.findById(profileId).select('user').lean())?.user;
+      return (await Hospital.findById(profileId).select('managedBy').lean())?.managedBy;
     }
     default: return null;
   }
@@ -312,11 +312,11 @@ async function processPartnerAllocation({
       netAmount:    netPayable,
       beforeBalance,
       afterBalance,
-      balanceSnapshot: {
+balanceSnapshot: {
         availableBalance:  afterBalance,
         pendingBalance:    wallet.pendingBalance,
         withdrawalBalance: wallet.withdrawalBalance,
-        recoveryBalance:   wallet.recoveryBalance,
+        recoveryBalance:   Math.max(0, wallet.recoveryBalance - recoveryDeduction),
       },
       bookingId:    booking._id,
       settlementId: settlement._id,
@@ -329,15 +329,28 @@ async function processPartnerAllocation({
     { session }
   );
 
-  // ── I. Update Wallet Balances ────────────────────────────────────────────
-  await PartnerWallet.findOneAndUpdate(
-    { _id: wallet._id, __v_balance: wallet.__v_balance }, // optimistic lock
+// ── I. Update Wallet Balances ────────────────────────────────────────────
+  // FIX: `wallet` was fetched BEFORE applyRecovery() ran. When recovery
+  // actually deducts something, it bumps this same wallet's __v_balance in
+  // the DB — but the local `wallet` var here still holds the stale value.
+  // The old optimistic-lock filter `{ __v_balance: wallet.__v_balance }`
+  // then matched 0 docs and silently no-op'd, while settlement/allocation/
+  // ledger below still got written as SETTLED — success with no money moved.
+  // We're already inside one session/transaction here, which gives native
+  // write-conflict protection (a real concurrent writer aborts the whole
+  // txn, it doesn't silently no-op) — the manual version filter was both
+  // redundant and unsafe. Update by _id, keep bumping __v_balance for
+  // telemetry, and hard-fail if the wallet is somehow gone mid-transaction.
+  // NOTE: lifetimeRecovered removed from here — applyRecovery() already
+  // increments it once; incrementing it again here was double-counting
+  // every recovery, which would also throw off daily reconciliation.
+  const walletAfterCredit = await PartnerWallet.findByIdAndUpdate(
+    wallet._id,
     {
       $inc: {
-        availableBalance:  netPayable,
-        lifetimeEarned:    grossAmount,
-        lifetimeRecovered: recoveryDeduction,
-        __v_balance:       1,
+        availableBalance: netPayable,
+        lifetimeEarned:   grossAmount,
+        __v_balance:      1,
       },
       $set: {
         lastSettlementAt: new Date(),
@@ -346,6 +359,12 @@ async function processPartnerAllocation({
     },
     { session, new: true }
   );
+
+  if (!walletAfterCredit) {
+    throw new Error(
+      `[settlementEngine] Wallet ${wallet._id} vanished mid-settlement for partner ${userId} — aborting, no funds moved`
+    );
+  }
 
   // ── J. Mark Settlement + Allocation as SETTLED ───────────────────────────
   await PartnerSettlement.findByIdAndUpdate(
@@ -476,10 +495,15 @@ async function resolveCashCollectorEntity(cashCollectorUserId, session) {
       const doc = await DoctorProfile.findOne({ user: cashCollectorUserId }).select('_id').session(session).lean();
       return doc ? { userId: cashCollectorUserId, partnerRole: 'doctor', profileId: doc._id } : null;
     }
-
-    case 'lab_partner': {
+case 'lab_partner': {
       const lab = await LabPartnerProfile.findOne({ user: cashCollectorUserId }).select('_id').session(session).lean();
       return lab ? { userId: cashCollectorUserId, partnerRole: 'lab_partner', profileId: lab._id } : null;
+    }
+
+    case 'hospital': {
+      const Hospital = mongoose.model('Hospital');
+      const hosp = await Hospital.findOne({ managedBy: cashCollectorUserId }).select('_id').session(session).lean();
+      return hosp ? { userId: cashCollectorUserId, partnerRole: 'hospital', profileId: hosp._id } : null;
     }
 
     default:

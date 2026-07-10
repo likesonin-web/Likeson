@@ -1200,7 +1200,7 @@ const HELP_SECTIONS = [
     items: [
       { q: 'This page access', a: 'Admin + Superadmin only. Protected by authorize("admin","superadmin") middleware on all endpoints. Pharmacy role cannot access store creation, supplier management, or cross-store PO view.' },
       { q: 'Pharmacy staff access', a: 'Pharmacy users access /pharmacy-store/* endpoints which are scoped to their assigned store via attachPharmacyStore middleware. They manage their own orders, inventory, suppliers view, and POs for their store only.' },
-      { q: 'Redux slices', a: 'pharmacySlice (src/redux/slices/pharmacySlice) = stores + admin ops. pharmacyStoreSlice (src/redux/slices/pharmacyStoreSlice) = store-scoped ops like suppliers, POs, inventory. Both used here.' },
+      { q: 'Redux slices', a: 'pharmacySlice (src/@/store/slices/pharmacySlice) = stores + admin ops. pharmacyStoreSlice (src/redux/slices/pharmacyStoreSlice) = store-scoped ops like suppliers, POs, inventory. Both used here.' },
     ],
   },
 ];

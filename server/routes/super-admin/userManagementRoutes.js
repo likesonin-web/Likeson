@@ -4,11 +4,10 @@ import crypto from 'crypto';
 import User from '../../models/User.js';
 import DoctorProfile from '../../models/DoctorProfile.js';
 import PharmacyProfile from '../../models/PharmacyProfile.js';
-import TransportPartnerProfile from '../../models/TransportPartnerProfile.js';
 import CareAssistantProfile from '../../models/CareAssistantProfile.js';
 import Hospital from '../../models/Hospital.js';
 import PharmacyStore from '../../models/PharmacyStore.js';
-import TransportPartner from '../../models/TransportPartner.js';
+import TransportPartner from '../../models/TransportPartner.js'; // Using the unified schema
 import Notification from '../../models/Notification.js';
 import sendEmail from '../../utils/sendEmail.js';
 import { welcomeTemplate } from '../../utils/emailTemplates.js';
@@ -25,8 +24,8 @@ router.get('/meta-data', protect, async (req, res) => {
     const [hospitals, stores, agencies] = await Promise.all([
       Hospital.find({ isActive: true }).select('name _id city'),
       PharmacyStore.find({ status: 'Open' }).select('storeName _id city'),
-      // Matches the "agencyName" field in your TransportPartner model
-      TransportPartner.find({ isVerified: true }).select('agencyName _id')
+      // Updated to match the new TransportPartner schema fields
+      TransportPartner.find({ partnershipStatus: 'active' }).select('businessName _id')
     ]);
 
     res.status(200).json({ hospitals, stores, agencies });
@@ -46,7 +45,7 @@ router.post('/add-user', protect, authorize('admin', 'superadmin'), async (req, 
       // Role specific fields
       hospitalId, specialization, registrationNumber, experienceYears, inPersonFee,
       storeId, qualification,
-      agencyId,
+      businessName, // Swapped agencyId for businessName to match the new schema requirements
       baseServiceCharge
     } = req.body;
 
@@ -93,10 +92,18 @@ router.post('/add-user', protect, authorize('admin', 'superadmin'), async (req, 
         createdBy: req.user._id
       });
     } else if (role === 'transportpartner') {
-      profileData = await TransportPartnerProfile.create({
+      // 5. Create TransportPartner matching the new Model Requirements
+      profileData = await TransportPartner.create({
         user: newUser._id,
-        agency: agencyId,
-        kyc: { panNumber: 'PENDING', aadhaarNumber: 'PENDING' } // To be updated by user
+        businessName: businessName || `${name} Logistics`, // Fallback if not explicitly provided
+        ownerName: name,
+        ownerPhone: phone,
+        ownerEmail: email,
+        ownerKyc: { 
+            kycStatus: 'pending',
+            panNumber: 'PENDING', 
+            aadhaarNumber: '[Aadhaar Redacted]' 
+        } 
       });
     } else if (role === 'care assistant') {
       profileData = await CareAssistantProfile.create({

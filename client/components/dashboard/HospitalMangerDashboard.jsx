@@ -12,7 +12,6 @@ import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
 import Link from "next/link";
-
 import {
   Search,
   Bell,
@@ -44,8 +43,9 @@ import {
   CheckCircle2,
   Smartphone,
   Search as SearchIcon,
-  Building2,
+Building2,
   Siren,
+  IndianRupee,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -58,7 +58,7 @@ import {
   HOSPITAL_MANAGER_PROFILE_LINKS,
 } from "../../constants/hospitalmangerlinks";
 import WelcomeHospitalPage from "@/app/hospital-manager/WelcomeHospitalPage"; // Added Welcome Page Import
-
+import { fetchPartnerWallet } from "@/store/slices/partnerWalletSlice";
 // ─────────────────────────────────────────────────────────────────────────────
 // COMMAND SEARCH INDEX
 // Flat map of all navigable links for the command palette
@@ -254,8 +254,9 @@ const HospitalManagerDashboard = ({ children }) => {
   const router    = useRouter();
   const pathname  = usePathname();
 
-  const { user }       = useSelector((state) => state.user);
+const { user }       = useSelector((state) => state.user);
   const unreadCount    = useSelector(selectUnreadCount);
+  const { wallet }     = useSelector((state) => state.partnerWallet);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [openMenus,     setOpenMenus]     = useState({});
@@ -269,11 +270,14 @@ const HospitalManagerDashboard = ({ children }) => {
   );
 
   // Collapse sidebar on mobile; fetch notifications on mount
-  useEffect(() => {
+useEffect(() => {
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
       setIsSidebarOpen(false);
     }
-    if (user) dispatch(fetchNotifications());
+    if (user) {
+      dispatch(fetchNotifications());
+      dispatch(fetchPartnerWallet());
+    }
   }, [user, dispatch]);
 
   // ⌘K / Ctrl+K command palette
@@ -528,6 +532,22 @@ const HospitalManagerDashboard = ({ children }) => {
             >
               <Search size={17} />
             </button>
+
+{/* Partner Wallet */}
+            <Link href="/partner/wallet">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.94 }}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest transition-all bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
+              >
+                <IndianRupee size={15} strokeWidth={2.5} />
+                <span>
+                  {wallet
+                    ? `₹${wallet.availableBalance?.toLocaleString("en-IN") ?? 0}`
+                    : "Wallet"}
+                </span>
+              </motion.button>
+            </Link>
 
             {/* Theme toggle */}
             <ThemeToggle />

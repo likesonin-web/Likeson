@@ -335,7 +335,7 @@ const driverSchema = new Schema(
     },
 
     // ── Performance ───────────────────────────────────────────────────────────
-    performance: {
+performance: {
       rating:               { type: Number, default: 0, min: 0, max: 5 },
       ratingCount:          { type: Number, default: 0 },
       totalRidesCompleted:  { type: Number, default: 0 },
@@ -343,6 +343,10 @@ const driverSchema = new Schema(
       cancellationRate:     { type: Number, default: 0 },
       avgPickupTimeMinutes: { type: Number, default: 0 },
       totalDistanceKm:      { type: Number, default: 0 },
+      // NEW (Point 7): cumulative hours actually worked across all completed
+      // rides = sum(rideCompletedAt - rideStartedAt). Written by
+      // partnerAssignmentEngine.service.js#recordPartnerTripCompletion.
+      totalHoursWorked:     { type: Number, default: 0, min: 0 },
       totalEarnings:        { type: Number, default: 0 }, // analytics cache — re-derive from BookingPartnerAllocation
       monthlyRides:         { type: Number, default: 0 },
       lastRideAt:           { type: Date },
@@ -374,6 +378,23 @@ const driverSchema = new Schema(
     currentRide: { type: Schema.Types.ObjectId, ref: 'Ride', default: null },
 
     rewards: { type: driverRewardSchema, default: () => ({}) },
+
+    // NEW (Point 7): bounded log of completed-ride distance/hours, written by
+    // recordPartnerTripCompletion(). Capped at 500 most-recent entries via
+    // $slice — performance.totalDistanceKm / totalHoursWorked are the
+    // authoritative running totals; this array is for per-trip drill-down.
+    tripLog: {
+      type: [
+        {
+          rideId:      { type: Schema.Types.ObjectId, ref: 'Ride' },
+          bookingId:   { type: Schema.Types.ObjectId, ref: 'Booking' },
+          distanceKm:  { type: Number, default: 0 },
+          hoursWorked: { type: Number, default: 0 },
+          completedAt: { type: Date },
+        },
+      ],
+      default: [],
+    },
 
     // ── Earnings Display (informational only — Driver has NO wallet) ─────────
     // Real money → TransportPartner.PartnerWallet.

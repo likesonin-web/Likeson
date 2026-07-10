@@ -66,6 +66,10 @@ import {
 } from "../utils/emailTemplates.js";
 import User from "../models/User.js";
 import { applyBookingRating } from "../services/partnerStatsService.js";
+import {
+  validateMinimumLeadTime,
+  cancelBookingFully,
+} from "../services/partnerAssignmentEngine.service.js";  
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER: processHomeCollectionUsage
@@ -735,11 +739,27 @@ router.get("/doctors", protect, async (req, res) => {
       .sort({ "rating.averageRating": -1, isOnline: -1 })
       .lean();
 
-    const doctorsWithPricing = doctors.map((d) => {
-      // Pricing always comes from the doctor's own `fees` — hospitals never
-      // set consultation pricing, even when managementModel is "hospital-manager".
-      const effectiveFees = d.fees || {};
-      const pricingSource = "doctor";
+const doctorsWithPricing = doctors.map((d) => {
+      // Fix: pricing source now follows hospital's managementModel — matches
+      // resolveConsultationFee. hospital-manager → show hospital's fees (doctor
+      // honorarium fields null = 0 to doctor). doctor-owner → doctor's own fees.
+      const isHospitalManaged = d.primaryHospital?.managementModel === "hospital-manager";
+      const hp = d.primaryHospital?.consultationPricing;
+
+      const effectiveFees = isHospitalManaged && hp
+        ? {
+            inPersonFee: hp.inPersonFee ?? 0,
+            videoFee: hp.videoFee ?? 0,
+            homeVisitFee: hp.homeVisitFee ?? 0,
+            inPersonHonorarium: hp.inPersonHonorarium ?? null,
+            videoHonorarium: hp.videoHonorarium ?? null,
+            homeVisitHonorarium: hp.homeVisitHonorarium ?? null,
+            followUpFee: hp.followUpFee ?? 0,
+            followUpDiscountPercent: hp.followUpDiscountPercent ?? 0,
+            followUpValidDays: hp.followUpValidDays ?? 7,
+          }
+        : (d.fees || {});
+      const pricingSource = isHospitalManaged && hp ? "hospital" : "doctor";
 
       return {
         ...d,
@@ -1085,7 +1105,12 @@ router.post(
         });
       }
 
-      const scheduledDate = new Date(scheduledAt);
+let scheduledDate;
+      try {
+        scheduledDate = validateMinimumLeadTime(scheduledAt);
+      } catch (leadErr) {
+        return res.status(400).json({ success: false, message: leadErr.message });
+      }
       const avail = await checkHospitalOrDoctorAvailability({
         hospitalId,
         doctorId,
@@ -1153,10 +1178,11 @@ router.post(
         includeReturn: includeReturnHome,
       });
 
-      const config = await PlatformPricingConfig.getGlobal();
+const config = await PlatformPricingConfig.getGlobal();
+      const caDurationHours = parseInt(req.body.durationHours, 10) || 1;
       const careResult = await resolveCareAssistantFee({
         userId: req.user._id,
-        durationHours: parseInt(req.body.durationHours, 10) || 1,
+        durationHours: caDurationHours,
         config,
       });
 
@@ -1195,13 +1221,14 @@ router.post(
           ? "payment_pending"
           : "pending";
 
-      const booking = await Booking.create({
+const booking = await Booking.create({
         bookingType: "full_care_ride",
         customer: req.user._id,
         patientInfo,
         doctor: doctorId,
         hospital: hospitalId,
         careAssistant: null,
+        careAssistantDurationHours: caDurationHours,
         consultationType,
         scheduledAt: scheduledDate,
         slotId: slotId || null,
@@ -1551,7 +1578,12 @@ router.post(
           success: false,
           message: "doctorId, scheduledAt, patientInfo required",
         });
-      const scheduledDate = new Date(scheduledAt);
+let scheduledDate;
+      try {
+        scheduledDate = validateMinimumLeadTime(scheduledAt);
+      } catch (leadErr) {
+        return res.status(400).json({ success: false, message: leadErr.message });
+      }
       const avail = await checkHospitalOrDoctorAvailability({
         hospitalId,
         doctorId,
@@ -1783,7 +1815,7 @@ router.post(
         });
       }
 
-      const scheduledDate = parseFrontendDateTime(scheduledAt);
+const scheduledDate = parseFrontendDateTime(scheduledAt);
       if (isNaN(scheduledDate.getTime())) {
         return res.status(400).json({
           success: false,
@@ -1791,12 +1823,12 @@ router.post(
             'Invalid scheduledAt — use ISO 8601 e.g. "2026-06-15T10:30:00+05:30"',
         });
       }
-      const GRACE_MS = 10 * 60 * 1000;
-      if (scheduledDate < new Date(Date.now() - GRACE_MS)) {
-        return res.status(400).json({
-          success: false,
-          message: `scheduledAt is in the past. Provided: ${scheduledDate.toISOString()}, Server time: ${new Date().toISOString()}`,
-        });
+      // CHANGE (Point 4): replaces the old 10-minute-grace-period-in-the-past
+      // check with the platform-wide 12-hour minimum advance booking rule.
+      try {
+        validateMinimumLeadTime(scheduledDate);
+      } catch (leadErr) {
+        return res.status(400).json({ success: false, message: leadErr.message });
       }
 
       const avail = await checkHospitalOrDoctorAvailability({
@@ -2061,7 +2093,12 @@ router.post(
         });
       }
 
-      const scheduledDate = new Date(scheduledAt);
+let scheduledDate;
+      try {
+        scheduledDate = validateMinimumLeadTime(scheduledAt);
+      } catch (leadErr) {
+        return res.status(400).json({ success: false, message: leadErr.message });
+      }
       const pickupCoords = patientLocation.coordinates;
       const dropoffCoords = destinationLocation.coordinates;
       const parsedWaitingMinutes = parseInt(waitingMinutes, 10) || 0;
@@ -2429,7 +2466,12 @@ router.post(
           message: "doctorId, scheduledAt, patientInfo required",
         });
 
-      const scheduledDate = new Date(scheduledAt);
+let scheduledDate;
+      try {
+        scheduledDate = validateMinimumLeadTime(scheduledAt);
+      } catch (leadErr) {
+        return res.status(400).json({ success: false, message: leadErr.message });
+      }
       const avail = await checkHospitalOrDoctorAvailability({
         doctorId,
         scheduledAt: scheduledDate,
@@ -2627,8 +2669,13 @@ router.post("/follow-up", protect, authorize("customer"), async (req, res) => {
       });
     }
 
-    // ── Doctor availability ───────────────────────────────────────────────────
-    const scheduledDate = parseFrontendDateTime(scheduledAt);
+// ── Doctor availability ───────────────────────────────────────────────────
+    let scheduledDate;
+    try {
+      scheduledDate = validateMinimumLeadTime(parseFrontendDateTime(scheduledAt));
+    } catch (leadErr) {
+      return res.status(400).json({ success: false, message: leadErr.message });
+    }
     const avail = await checkHospitalOrDoctorAvailability({
       hospitalId,
       doctorId,
@@ -2821,12 +2868,17 @@ router.post(
 
       const lab = await getLabWithTests(labId);
 
-      const resolvedTests = [];
+const resolvedTests = [];
       const resolvedPackages = [];
       const testNames = [];
       const packageNames = [];
       let diagnosticFee = 0;
 
+      // NOTE: tests/packages now store {slug, partnerPrice, chargedPrice}
+      // snapshots instead of bare slug strings — settlementEngine's lab
+      // payout (charged − platform margin = partnerPrice) reads this
+      // directly at settlement time. A bare slug string gave it nothing to
+      // read, silently overpaying the lab the full charged amount.
       for (const rawSlug of tests) {
         const slug = String(rawSlug ?? "").trim();
         if (!slug) continue;
@@ -2837,9 +2889,15 @@ router.post(
           );
           continue;
         }
-        diagnosticFee += t.discountedPrice ?? t.mrpPrice;
+        const chargedPrice = t.discountedPrice ?? t.mrpPrice;
+        diagnosticFee += chargedPrice;
         testNames.push(t.testName);
-        resolvedTests.push(t.slug);
+        resolvedTests.push({
+          slug: t.slug,
+          testName: t.testName,
+          chargedPrice,
+          partnerPrice: t.partnerPrice,
+        });
       }
 
       for (const rawSlug of packages) {
@@ -2856,7 +2914,12 @@ router.post(
         }
         diagnosticFee += p.mrpPrice;
         packageNames.push(p.packageName);
-        resolvedPackages.push(p.slug);
+        resolvedPackages.push({
+          slug: p.slug,
+          packageName: p.packageName,
+          chargedPrice: p.mrpPrice,
+          partnerPrice: p.partnerPrice ?? null,
+        });
       }
 
       if (resolvedTests.length === 0 && resolvedPackages.length === 0) {
@@ -2884,11 +2947,18 @@ router.post(
           ? "payment_pending"
           : "pending";
 
+let scheduledDateDC;
+      try {
+        scheduledDateDC = validateMinimumLeadTime(scheduledAt);
+      } catch (leadErr) {
+        return res.status(400).json({ success: false, message: leadErr.message });
+      }
+
       const booking = await Booking.create({
         bookingType: "diagnostic_center",
         customer: req.user._id,
         patientInfo,
-        scheduledAt: new Date(scheduledAt),
+        scheduledAt: scheduledDateDC,
         diagnosticDetails: {
           labPartner: labId,
           tests: resolvedTests,
@@ -3026,13 +3096,15 @@ router.post(
         hasHomeSampleCollectionInPlan === true &&
         homeCollectionUsedOnce === false;
 
-      const resolvedTests = [];
+const resolvedTests = [];
       const resolvedPackages = [];
       const testNames = [];
       const packageNames = [];
       let diagnosticFee = 0;
       const skippedTests = [];
 
+      // NOTE: see /diagnostic-center — same fix, snapshot {slug, partnerPrice}
+      // instead of bare slug so lab settlement payout math has data to read.
       for (const rawSlug of tests) {
         const slug = String(rawSlug ?? "").trim();
         if (!slug) continue;
@@ -3048,9 +3120,15 @@ router.post(
           );
           continue;
         }
-        diagnosticFee += t.discountedPrice ?? t.mrpPrice;
+        const chargedPrice = t.discountedPrice ?? t.mrpPrice;
+        diagnosticFee += chargedPrice;
         testNames.push(t.testName);
-        resolvedTests.push(t.slug);
+        resolvedTests.push({
+          slug: t.slug,
+          testName: t.testName,
+          chargedPrice,
+          partnerPrice: t.partnerPrice,
+        });
       }
 
       for (const rawSlug of packages) {
@@ -3065,7 +3143,12 @@ router.post(
         }
         diagnosticFee += p.mrpPrice;
         packageNames.push(p.packageName);
-        resolvedPackages.push(p.slug);
+        resolvedPackages.push({
+          slug: p.slug,
+          packageName: p.packageName,
+          chargedPrice: p.mrpPrice,
+          partnerPrice: p.partnerPrice ?? null,
+        });
       }
 
       if (resolvedTests.length === 0 && resolvedPackages.length === 0) {
@@ -3115,7 +3198,12 @@ router.post(
       ).toFixed(2);
       fareBreakdown.amountPaid = fareBreakdown.totalAmount;
 
-      const scheduledDate = new Date(scheduledAt);
+let scheduledDate;
+      try {
+        scheduledDate = validateMinimumLeadTime(scheduledAt);
+      } catch (leadErr) {
+        return res.status(400).json({ success: false, message: leadErr.message });
+      }
       const initialStatus =
         paymentMethod === "Razorpay" && fareBreakdown.totalAmount > 0
           ? "payment_pending"
@@ -3330,12 +3418,20 @@ router.post(
           ? "payment_pending"
           : "pending";
 
-      const booking = await Booking.create({
+let scheduledDateCA;
+      try {
+        scheduledDateCA = validateMinimumLeadTime(scheduledAt);
+      } catch (leadErr) {
+        return res.status(400).json({ success: false, message: leadErr.message });
+      }
+
+const booking = await Booking.create({
         bookingType: "care_assistant",
         customer: req.user._id,
         patientInfo,
         careAssistant: null,
-        scheduledAt: new Date(scheduledAt),
+        careAssistantDurationHours: parseInt(req.body.durationHours, 10) || 4,
+        scheduledAt: scheduledDateCA,
         patientLocation: {
           type: "Point",
           coordinates: patientLocation.coordinates,
@@ -3802,13 +3898,13 @@ router.post(
       const booking = await Booking.findOne({
         _id: req.params.bookingId,
         customer: req.user._id,
-      }).select("+internalNotes");
+      }).select("_id status");
       if (!booking)
         return res
           .status(404)
           .json({ success: false, message: "Booking not found" });
       if (
-        !["pending", "confirmed", "pending_cash", "payment_pending"].includes(
+        !["pending", "confirmed", "pending_cash", "payment_pending", "in_progress"].includes(
           booking.status,
         )
       ) {
@@ -3818,57 +3914,17 @@ router.post(
         });
       }
 
-      let refundPercent = 0,
-        refundAmount = 0;
-      if (["paid", "partially_paid"].includes(booking.paymentStatus)) {
-        ({ refundPercent, refundAmount } = await computeRefundAmount(booking));
-      }
-
-      const recoveryResult = await recoverSubscriptionUsageOnCancel(booking);
-
-      booking.status = "cancelled";
-      booking.cancellation = {
-        cancelledBy: "customer",
-        cancelledByUserId: req.user._id,
-        reason: req.body.reason || "Customer cancelled",
-        refundEligible: refundAmount > 0,
-        refundPercent,
-        cancelledAt: new Date(),
-      };
-      booking.fareBreakdown.refundAmount = refundAmount;
-      booking.updatedBy = req.user._id;
-      await booking.save();
-
-      if (booking.rides?.length) {
-        await Ride.updateMany(
-          {
-            _id: { $in: booking.rides },
-            status: { $in: ["requested", "searching", "driver_assigned"] },
-          },
-          {
-            $set: {
-              status: "cancelled",
-              cancellation: {
-                cancelledBy: "customer",
-                cancelledByUserId: req.user._id,
-                cancelledAt: new Date(),
-              },
-            },
-          },
-        );
-      }
-
-      await createNotification({
-        recipient: req.user._id,
-        title: "Booking Cancelled",
-        body: `Booking ${booking.bookingCode} cancelled. Refund: ₹${refundAmount} (${refundPercent}%)`,
-        type: "BOOKING",
-        bookingId: booking._id,
-      });
-      sendCancellationEmails({ booking, refundAmount, refundPercent });
-      console.log(
-        `[cancel] ✅ booking:${booking._id} cancelled. recovery:`,
-        recoveryResult,
+      // CHANGE (Point 3 + Point 4): now uses the shared cancelBookingFully()
+      // engine — same refund rule as doctor-cancel (12h cutoff: 100%/50%),
+      // AND consistently cancels every linked Ride/RideStop/Consultation/OP,
+      // notifying customer + hospital + doctor + any assigned partner.
+      const { refundPercent, refundAmount, subscriptionRecovery } = await cancelBookingFully(
+        booking._id,
+        {
+          cancelledBy: "customer",
+          cancelledByUserId: req.user._id,
+          reason: req.body.reason || "Customer cancelled",
+        },
       );
 
       return res.json({
@@ -3878,11 +3934,63 @@ router.post(
           refundPercent,
           refundAmount,
           status: "cancelled",
-          subscriptionRecovery: recoveryResult,
+          subscriptionRecovery,
         },
       });
     } catch (err) {
       console.error("[POST /my-bookings/:bookingId/cancel]", err);
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  },
+);
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// NEW ROUTE (Point 3) — DOCTOR CANCELS A BOOKING
+// Always 100% refund, regardless of timing. Cancels the booking, every
+// linked Ride/RideStop, the Consultation (if any), and notifies the
+// customer, hospital, and any assigned driver/solo/TP/care-assistant.
+// ═════════════════════════════════════════════════════════════════════════════
+router.patch(
+  "/:bookingId/doctor-cancel",
+  protect,
+  authorize("doctor", "admin", "superadmin"),
+  async (req, res) => {
+    try {
+      const { reason } = req.body;
+      const booking = await Booking.findById(req.params.bookingId).select("doctor status").lean();
+      if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
+
+      if (req.user.role === "doctor") {
+        const dp = await DoctorProfile.findOne({ user: req.user._id }).select("_id").lean();
+        if (!dp || String(booking.doctor) !== String(dp._id)) {
+          return res.status(403).json({ success: false, message: "Access denied — not your booking" });
+        }
+      }
+
+      if (["cancelled", "completed", "refunded"].includes(booking.status)) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot cancel a booking already in status: ${booking.status}`,
+        });
+      }
+
+      const { refundPercent, refundAmount, subscriptionRecovery } = await cancelBookingFully(
+        booking._id,
+        {
+          cancelledBy: "doctor",
+          cancelledByUserId: req.user._id,
+          reason: reason || "Doctor cancelled the appointment",
+        },
+      );
+
+      return res.json({
+        success: true,
+        message: "Booking cancelled by doctor. Full refund initiated.",
+        data: { refundPercent, refundAmount, status: "cancelled", subscriptionRecovery },
+      });
+    } catch (err) {
+      console.error("[PATCH /:bookingId/doctor-cancel]", err);
       return res.status(500).json({ success: false, message: err.message });
     }
   },

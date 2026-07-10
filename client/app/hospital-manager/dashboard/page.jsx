@@ -14,6 +14,8 @@ import {
   CalendarDays, DollarSign, Heart, RefreshCw,
   TrendingUp, Wallet, Receipt, Percent, ClipboardList,
 } from 'lucide-react';
+import Earnings from '@/app/(partner)/earnings/myEarnings'
+
 import {
   fetchDashboard,
   fetchDoctorStats,
@@ -287,6 +289,7 @@ const stats = [
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <motion.div variants={fadeUp} initial="hidden" animate="visible" className="mb-6">
+        <Earnings />
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <span style={{ ...POPPINS, fontSize: 10, color: 'var(--color-primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>

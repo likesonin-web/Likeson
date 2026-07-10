@@ -90,7 +90,8 @@ function SoloDriverResults({ results, bookingId, dispatch, alreadyAssigned }) {
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             {d.phone && <CallButton phone={d.phone} label="" size="xs" />}
-            <button
+          <button
+              type="button"
               onClick={() => assign(d.soloPartnerId)}
               disabled={!!assigning}
               className={`btn btn-xs gap-1 ${done === d.soloPartnerId ? 'btn-success' : 'btn-primary'}`}
@@ -105,16 +106,17 @@ function SoloDriverResults({ results, bookingId, dispatch, alreadyAssigned }) {
   );
 }
 
-// ── TP results ────────────────────────────────────────────────────────────────
+// ── TP results (Updated to handle flat agency drivers array) ──────────────────
 function TpResults({ results, bookingId, dispatch }) {
   const [assigning, setAssigning] = useState(null);
   const [done,      setDone]      = useState(null);
 
-  const assign = async (transportPartnerId) => {
-    setAssigning(transportPartnerId);
+  const assign = async (agencyId) => {
+    setAssigning(agencyId);
     try {
-      await dispatch(adminAssignTransportPartner({ bookingId, transportPartnerId })).unwrap();
-      setDone(transportPartnerId);
+      // Maps agencyId from the new JSON format to transportPartnerId
+      await dispatch(adminAssignTransportPartner({ bookingId, transportPartnerId: agencyId })).unwrap();
+      setDone(agencyId);
       setTimeout(() => setDone(null), 2500);
       dispatch(fetchAdminBookingById({ bookingId }));
     } catch {}
@@ -123,34 +125,36 @@ function TpResults({ results, bookingId, dispatch }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <FieldNote text="TP then assigns their own driver from their fleet" />
+      <FieldNote text="Shows nearby agency drivers. Assigning will notify the Transport Partner to lock this ride." />
       {results.length === 0 ? (
-        <p className="text-xs text-base-content/40 text-center py-4">No transport partners nearby</p>
-      ) : results.map(tp => (
-        <div key={tp.tpId} className="rounded-xl border border-base-300 bg-base-200 p-3 flex items-start justify-between gap-3">
+        <p className="text-xs text-base-content/40 text-center py-4">No transport partners/agency drivers nearby</p>
+      ) : results.map((d, index) => (
+        <div key={`${d.driverId}-${index}`} className="rounded-xl border border-base-300 bg-base-200 p-3 flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold text-base-content m-0 truncate">{tp.businessName}</p>
-            <div className="flex items-center gap-2 flex-wrap text-[10px] text-base-content/50 mt-0.5">
-              <span>{tp.availableDriversNearby} drivers near</span>
-              <span>{tp.activeVehicles} vehicles</span>
-              {tp.isDispatchReady && <span className="text-success font-bold">Dispatch ready</span>}
+            <p className="text-xs font-bold text-base-content m-0 truncate">{d.agencyName}</p>
+            <div className="flex items-center gap-2 mt-0.5 mb-0.5">
+              <span className="text-[11px] text-base-content/80">Driver: {d.name}</span>
+              {d.rating > 0 && (
+                <span className="flex items-center gap-0.5 text-[10px] text-warning">
+                  <Star size={8} fill="currentColor" /> {d.rating?.toFixed(1)}
+                </span>
+              )}
             </div>
-            {tp.distanceKm != null && (
-              <p className="text-[10px] text-base-content/35 m-0 mt-0.5"><MapPin size={8} className="inline mr-0.5" />{tp.distanceKm} km</p>
-            )}
-            {tp.matchedZone && (
-              <p className="text-[10px] text-base-content/30 m-0">Zone: {tp.matchedZone.city}</p>
-            )}
+            <div className="flex items-center gap-2 flex-wrap text-[10px] text-base-content/50">
+              {d.distanceKm != null && (
+                <span><MapPin size={8} className="inline mr-0.5" />{d.distanceKm} km away</span>
+              )}
+            </div>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
-            {tp.ownerPhone && <CallButton phone={tp.ownerPhone} label="" size="xs" />}
+            {d.phone && <CallButton phone={d.phone} label="Driver" size="xs" />}
             <button
-              onClick={() => assign(tp.tpId)}
+              onClick={() => assign(d.agencyId)}
               disabled={!!assigning}
-              className={`btn btn-xs gap-1 ${done === tp.tpId ? 'btn-success' : 'btn-primary'}`}
+              className={`btn btn-xs gap-1 ${done === d.agencyId ? 'btn-success' : 'btn-primary'}`}
             >
-              {assigning === tp.tpId ? <Spinner size={10} /> : done === tp.tpId ? <Check size={10} /> : <ChevronRight size={10} />}
-              {done === tp.tpId ? 'Assigned' : 'Assign TP'}
+              {assigning === d.agencyId ? <Spinner size={10} /> : done === d.agencyId ? <Check size={10} /> : <ChevronRight size={10} />}
+              {done === d.agencyId ? 'Assigned' : 'Assign TP'}
             </button>
           </div>
         </div>
@@ -305,7 +309,7 @@ export function NearbyAssignPanel({ booking, dispatch }) {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 ">
       {/* Sub-tabs */}
       <div className="flex gap-1 flex-wrap">
         {allowedTabs.map(t => {
@@ -342,7 +346,8 @@ export function NearbyAssignPanel({ booking, dispatch }) {
       )}
 
       {/* Search button */}
-      <button
+     <button
+        type="button"
         onClick={fetchNearby}
         disabled={nearbyLoading}
         className="btn btn-sm btn-outline gap-1.5 self-start"

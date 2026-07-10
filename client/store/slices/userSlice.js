@@ -1,3 +1,4 @@
+// path app/store/slices/userSlice
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import API from "../api";
 import toast from "react-hot-toast";

@@ -196,7 +196,7 @@ export default function DoctorDashboard() {
 
   return (
     <div
-      className="min-h-screen font-poppins"
+      className="min-h-screen px-3 font-poppins"
       style={{ backgroundColor: 'var(--base-100)', color: 'var(--base-content)' }}
       data-theme="doctor"
     >

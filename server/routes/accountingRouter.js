@@ -39,6 +39,7 @@ import CareAssistantProfile     from '../models/CareAssistantProfile.js';
 import TransportPartner         from '../models/TransportPartner.js';
 import SoloDriverPartner        from '../models/SoloDriverPartner.js';
 import LabPartnerProfile        from '../models/LabPartnerProfile.js';
+import Hospital                 from '../models/Hospital.js';
 
 // ── Services ───────────────────────────────────────────────────────────────
 import { processBookingSettlement }          from '../services/settlementEngineService.js';
@@ -54,14 +55,14 @@ import {
   reconcilePartnerWalletById,
   reconcilePlatformRevenue,
 } from '../services/reconciliationService.js';
+ 
 
 const router = express.Router();
 
 // ── Role groups ────────────────────────────────────────────────────────────
 const ADMIN_ROLES   = ['admin', 'superadmin'];
 const FINANCE_ROLES = ['admin', 'superadmin', 'finance'];
-const PARTNER_ROLES = ['doctor', 'care_assistant', 'driver', 'solodriverpartner', 'transportpartner', 'lab_partner'];
-
+const PARTNER_ROLES = ['doctor', 'hospital', 'care_assistant', 'driver', 'solodriverpartner', 'transportpartner', 'lab_partner'];
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 /**
@@ -80,6 +81,20 @@ async function resolvePartnerWallet(userId) {
   const wallet = await PartnerWallet.findOne({ partner: userId });
   if (!wallet) throw Object.assign(new Error('Wallet not found for this partner'), { status: 404 });
   return wallet;
+}
+
+/**
+ * resolveBookingByIdOrCode
+ * Accepts either a Mongo ObjectId (booking._id) or a human bookingCode
+ * (e.g. "BK-7F3K9QZP") and returns the matching booking document/query.
+ * Throws 404-style error if not found.
+ */
+function buildBookingLookupFilter(idOrCode) {
+  if (mongoose.isValidObjectId(idOrCode)) {
+    return { _id: idOrCode };
+  }
+  // Not a valid ObjectId — treat as bookingCode (case-insensitive, matches schema's uppercase: true)
+  return { bookingCode: idOrCode.trim().toUpperCase() };
 }
 
 /**
@@ -104,6 +119,7 @@ const asyncRoute = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 async function resolveProfileRef(userId, role) {
   switch (role) {
     case 'doctor':           return (await DoctorProfile.findOne({ user: userId }).select('_id').lean())?._id;
+    case 'hospital':         return (await Hospital.findOne({ user: userId }).select('_id').lean())?._id; // add if model exists
     case 'care_assistant':   return (await CareAssistantProfile.findOne({ user: userId }).select('_id').lean())?._id;
     case 'driver':           return (await Driver.findOne({ user: userId }).select('_id').lean())?._id;
     case 'solodriverpartner':return (await SoloDriverPartner.findOne({ user: userId }).select('_id').lean())?._id;
@@ -132,11 +148,9 @@ router.post(
   asyncRoute(async (req, res) => {
     const { bookingId } = req.params;
 
-    if (!mongoose.isValidObjectId(bookingId)) {
-      return res.status(400).json({ success: false, message: 'Invalid bookingId' });
-    }
+    const filter = buildBookingLookupFilter(bookingId);
 
-    const booking = await Booking.findById(bookingId).select('status settlementProcessed bookingCode');
+    const booking = await Booking.findOne(filter).select('status settlementProcessed bookingCode');
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
@@ -147,7 +161,9 @@ router.post(
       });
     }
 
-    const result = await processBookingSettlement(bookingId);
+    // processBookingSettlement expects the real ObjectId internally —
+    // always pass booking._id, never the raw param (which may be a code)
+    const result = await processBookingSettlement(booking._id);
 
     return res.status(200).json({
       success: true,
@@ -172,25 +188,25 @@ router.get(
   asyncRoute(async (req, res) => {
     const { bookingId } = req.params;
 
-    if (!mongoose.isValidObjectId(bookingId)) {
-      return res.status(400).json({ success: false, message: 'Invalid bookingId' });
-    }
+    const filter = buildBookingLookupFilter(bookingId);
 
-    const [booking, allocations, settlements] = await Promise.all([
-      Booking.findById(bookingId)
-        .select('bookingCode status settlementProcessed settlementProcessedAt settlementVersion settlementIdempotencyKey paymentStatus fareBreakdown')
-        .lean(),
-      BookingPartnerAllocation.find({ bookingId })
-        .populate('partnerId', 'name role')
-        .lean(),
-      PartnerSettlement.find({ bookingId })
-        .populate('partnerId', 'name role')
-        .lean(),
-    ]);
+    const booking = await Booking.findOne(filter)
+      .select('bookingCode status settlementProcessed settlementProcessedAt settlementVersion settlementIdempotencyKey paymentStatus fareBreakdown')
+      .lean();
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
+
+    // Now that we have the real _id, use it for the downstream lookups
+    const [allocations, settlements] = await Promise.all([
+      BookingPartnerAllocation.find({ bookingId: booking._id })
+        .populate('partnerId', 'name role')
+        .lean(),
+      PartnerSettlement.find({ bookingId: booking._id })
+        .populate('partnerId', 'name role')
+        .lean(),
+    ]);
 
     return res.status(200).json({
       success: true,
@@ -1968,12 +1984,8 @@ router.post(
   asyncRoute(async (req, res) => {
     const { bookingId } = req.params;
 
-    if (!mongoose.isValidObjectId(bookingId)) {
-      return res.status(400).json({ success: false, message: 'Invalid bookingId' });
-    }
-
-    // Force-reset settlementProcessed flag to allow re-run (admin override)
-    const booking = await Booking.findById(bookingId);
+    const filter = buildBookingLookupFilter(bookingId);
+    const booking = await Booking.findOne(filter);
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
@@ -1985,9 +1997,8 @@ router.post(
       });
     }
 
-    // Admin override: reset settlement flag
     if (booking.settlementProcessed) {
-      await Booking.findByIdAndUpdate(bookingId, {
+      await Booking.findByIdAndUpdate(booking._id, {
         $set: {
           settlementProcessed:      false,
           settlementProcessedAt:    null,
@@ -1996,7 +2007,7 @@ router.post(
       });
     }
 
-    const result = await processBookingSettlement(bookingId);
+    const result = await processBookingSettlement(booking._id);
 
     return res.status(200).json({
       success: true,

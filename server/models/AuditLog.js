@@ -20,7 +20,7 @@ const auditLogSchema = new Schema(
   {
     action:       { type: String, enum: AUDIT_ACTIONS, required: true, index: true },
     actor:        { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    targetType:   { type: String, enum: ['Conversation', 'Message', 'User', 'Attachment', null], default: null },
+    enum: ['Conversation', 'Message', 'User', 'Attachment', 'SupportTicket', 'SupportMessage', 'SupportAttachment'],
     targetId:     { type: Schema.Types.ObjectId, default: null },
     conversation: { type: Schema.Types.ObjectId, ref: 'Conversation', default: null, index: true },
     metadata:     { type: Schema.Types.Mixed, default: {} },

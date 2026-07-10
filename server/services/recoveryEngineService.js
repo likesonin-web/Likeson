@@ -91,8 +91,8 @@ export async function applyRecovery({ partnerId, wallet, bookingEarning, booking
   });
   await liability.save({ session }); // pre-save hook auto-updates outstandingLiability + status
 
-  // Update wallet recoveryBalance
-  await PartnerWallet.findByIdAndUpdate(
+// Update wallet recoveryBalance
+  const walletAfterRecovery = await PartnerWallet.findByIdAndUpdate(
     wallet._id,
     {
       $inc: {
@@ -101,8 +101,12 @@ export async function applyRecovery({ partnerId, wallet, bookingEarning, booking
         __v_balance:       1,
       },
     },
-    { session }
+    { session, new: true }
   );
+
+  if (!walletAfterRecovery) {
+    throw new Error(`[recoveryEngine] Wallet ${wallet._id} vanished mid-recovery for partner ${partnerId} — aborting`);
+  }
 
   return { recoveryDeduction, updatedLiability: liability };
 }

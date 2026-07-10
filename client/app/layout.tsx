@@ -10,7 +10,9 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from 'react-hot-toast';
 import AuthSocketBridge from '@/context/AuthSocketBridge';
 import { GoogleMapsProvider } from '@/context/GoogleMapsProvider';
-
+ 
+import ToastProvider from '../providers/ToastProvider';
+import SupportErrorBoundary from '../providers/SupportErrorBoundary';
 const poppins = Poppins({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
@@ -135,33 +137,24 @@ export default function RootLayout({
     >
       <body className="font-poppins antialiased" suppressHydrationWarning>
         <StoreProvider>
+          <ToastProvider>
           <ThemeProvider attribute="class" defaultTheme="dark">
             <AuthSocketBridge>
               <GoogleMapsProvider>
                 <ConnectivityWrapper>
                   <LayoutConditionalWrapper>
+                    <SupportErrorBoundary>
                     {children}
+                    </SupportErrorBoundary>
                   </LayoutConditionalWrapper>
+               
                 </ConnectivityWrapper>
               </GoogleMapsProvider>
             </AuthSocketBridge>
 
-            <Toaster
-              position="bottom-right"
-              toastOptions={{
-                style: {
-                  borderRadius: 'var(--r-field)',
-                  background: 'var(--neutral)',
-                  color: 'var(--neutral-content)',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  fontFamily: 'var(--font-poppins), sans-serif',
-                  border: '1px solid var(--base-300)',
-                  boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
-                },
-              }}
-            />
+           
           </ThemeProvider>
+          </ToastProvider>
         </StoreProvider>
 
         <Analytics />

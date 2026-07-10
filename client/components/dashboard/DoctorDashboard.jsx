@@ -35,7 +35,7 @@ import {
   DOCTOR_PROFILE_LINKS,
 } from "../../constants/doctor";
 import WelcomeDoctorPage from "@/app/doctor/WelcomeDoctorPage"; 
-
+import { fetchPartnerWallet } from "@/store/slices/partnerWalletSlice";
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const bellRingingVariant = {
@@ -226,8 +226,9 @@ const DoctorDashboard = ({ children }) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  const { user } = useSelector((state) => state.user);
+const { user } = useSelector((state) => state.user);
   const unreadCount = useSelector(selectUnreadCount);
+  const { wallet } = useSelector((state) => state.partnerWallet);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [openMenus, setOpenMenus] = useState({});
@@ -246,9 +247,12 @@ const DoctorDashboard = ({ children }) => {
     ? "Welcome"
     : pathname.split("/").filter(Boolean).pop()?.replace(/-/g, " ") || "Dashboard";
 
-  useEffect(() => {
+useEffect(() => {
     if (window.innerWidth < 1024) setIsSidebarOpen(false);
-    if (user) dispatch(fetchNotifications());
+    if (user) {
+      dispatch(fetchNotifications());
+      dispatch(fetchPartnerWallet());
+    }
   }, [user, dispatch]);
 
   // ⌘K / Ctrl+K shortcut
@@ -510,7 +514,7 @@ const DoctorDashboard = ({ children }) => {
 
             <ThemeToggle />
 
-            {/* Partner Wallet */}
+{/* Partner Wallet */}
             <Link href="/partner/wallet">
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -518,7 +522,11 @@ const DoctorDashboard = ({ children }) => {
                 className="flex items-center gap-1.5 px-3 py-2 h-10 rounded-md border text-[10px] font-bold uppercase tracking-widest transition-all bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
               >
                 <IndianRupee size={15} strokeWidth={2.5} />
-                <span className="hidden sm:inline">Wallet</span>
+                <span>
+                  {wallet
+                    ? `₹${wallet.availableBalance?.toLocaleString("en-IN") ?? 0}`
+                    : "Wallet"}
+                </span>
               </motion.button>
             </Link>
 

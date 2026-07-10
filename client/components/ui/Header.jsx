@@ -2029,11 +2029,15 @@ const Header = () => {
   const RoleIcon = mood?.icon ?? null;
   const accentColor = mood?.accent ?? "var(--primary)";
 
+  // 🆕 ADDED: Support Page hidden logic combined with tracking logic
   const isTrackingPage =
     pathname === "/search" ||
     (pathname.startsWith("/rides/") && pathname.endsWith("/tracking")) ||
     pathname.startsWith("/driver/tracking") ||
     pathname.includes("/tracking");
+
+  const isSupportPage = pathname?.includes("/support");
+  const isHiddenPage = isTrackingPage || isSupportPage;
 
   return (
     <>
@@ -2045,11 +2049,12 @@ const Header = () => {
         Skip to main content
       </a>
 
+      {/* 🔄 UPDATED: Use isHiddenPage instead of isTrackingPage */}
       <header
         ref={headerRef}
         data-theme={headerDataTheme}
         className={cn(
-          isTrackingPage
+          isHiddenPage
             ? "hidden"
             : "sticky top-0 z-[100] w-full backdrop-blur-md border-b border-base-300 transition-all duration-300",
           !isCustomer && roleBottomNavLinks && "mb-0",
@@ -2491,7 +2496,8 @@ const Header = () => {
       </header>
 
       {/* ── ROLE BOTTOM NAV ─────────────────────────────────────────────── */}
-      {!isCustomer && user && roleBottomNavLinks && !isTrackingPage && (
+      {/* 🔄 UPDATED: Use isHiddenPage instead of isTrackingPage */}
+      {!isCustomer && user && roleBottomNavLinks && !isHiddenPage && (
         <BottomNav
           links={roleBottomNavLinks}
           palette={rolePalette}
@@ -2501,7 +2507,8 @@ const Header = () => {
       )}
 
       {/* ── CUSTOMER MOBILE BOTTOM NAV ───────────────────────────────── */}
-      {isCustomer && !isTrackingPage && (
+      {/* 🔄 UPDATED: Use isHiddenPage instead of isTrackingPage */}
+      {isCustomer && !isHiddenPage && (
         <div
           className="fixed bottom-0 left-0 right-0 z-[99] flex md:hidden items-center justify-around border-t safe-bottom"
           style={{

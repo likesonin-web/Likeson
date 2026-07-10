@@ -1,7 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
 
- 
-
 import accountingReducer from "./slices/accountingSlice";
 import adminAnalysticsReducer from "./slices/adminAnalyticsSlice";
 import adminUserReducer from "./slices/adminUserSlice";
@@ -13,8 +11,11 @@ import bookingReducer from "./slices/bookingSlice";
 import careAssistantReducer from "./slices/careAssistantSlice";
 import partnerWalletReducer from "./slices/partnerWalletSlice";
 import clinicalReducer from "./slices/clinicalSlice";
-import consulationReducer from "./slices/consultationSlice";
+import consultationReducer from "./slices/consultationSlice";
  
+ 
+import presenceReducer from './slices/presenceSlice';
+import attachmentsReducer from './slices/attachmentSlice';
 import customerProfileReducer from "./slices/customerProfileSlice";
 import driverReducer from "./slices/driverSlice";
 import faqReducer from "./slices/faqSlice";
@@ -46,8 +47,12 @@ import uploadReducer from "./slices/uploadSlice";
 import userManagementReducer from "./slices/userManagementSlice";
 import userReducer from "./slices/userSlice";
 import walletReducer from "./slices/walletSlice";
+import earningsReducer from './slices/earningsSlice';
 
-import earningsReducer from './slices/earningsSlice'
+import ticketReducer from './slices/ticketSlice';
+import chatReducer from './slices/chatSlice';
+import socketReducer from './slices/socketSlice';
+import analyticsReducer from './slices/analyticsSlice';
 // ─────────────────────────────────────────────────────────────────────────────
 // STORE CONFIGURATION
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,10 +67,15 @@ export const store = configureStore({
     bloodBank: bloodbankReducer,
     booking: bookingReducer,
     careAssistant: careAssistantReducer,
-
+    attachments: attachmentsReducer, // Comma added here
     clinical: clinicalReducer,
-    consultation: consulationReducer,
-
+    consultation: consultationReducer,
+    // ── Support module ────────────────────────────────────────────────────
+    ticket: ticketReducer,
+    chat: chatReducer,
+    supportSocket: socketReducer,
+    supportAnalytics: analyticsReducer,
+    presence: presenceReducer,
     customerProfile: customerProfileReducer,
     driver: driverReducer,
     faq: faqReducer,
@@ -97,10 +107,20 @@ export const store = configureStore({
     user: userReducer,
     userManagement: userManagementReducer,
     wallet: walletReducer,
-    partnerWallet:partnerWalletReducer,
+    partnerWallet: partnerWalletReducer,
     earnings: earningsReducer,
   },
- 
+    middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      // Socket.IO client instances and Date objects pass through a couple of
+      // support actions (presence/typing payloads) — serializableCheck stays
+      // on for everything else, just narrowed for these specific paths.
+      serializableCheck: {
+        ignoredActions: ['supportSocket/setSocketInstance'],
+        ignoredPaths: ['supportSocket.instance'],
+      },
+    }),
+  devTools: process.env.NODE_ENV !== 'production',
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

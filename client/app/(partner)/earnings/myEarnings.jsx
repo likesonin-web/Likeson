@@ -1,276 +1,491 @@
-"use client";
+'use client';
+ 
 
-import { useEffect, useMemo, useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Wallet, Clock, CheckCircle2, RotateCcw, TrendingUp, Calendar,
-  ChevronLeft, ChevronRight, X, Receipt, IndianRupee, Filter,
-  Loader2, ArrowUpRight, Banknote, AlertCircle, User2,
-} from "lucide-react";
+  Wallet, CheckCircle2, RotateCcw, AlertTriangle, Clock,
+  Calendar, ChevronLeft, ChevronRight, X, RefreshCw,
+  ArrowUpRight, ArrowDownRight, FileText, TrendingUp,
+  Filter, RotateCw, Banknote, Receipt, ShieldAlert, Ticket,
+} from 'lucide-react';
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip,
-  CartesianGrid, Legend,
-} from "recharts";
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
+  Tooltip, CartesianGrid, Legend,
+} from 'recharts';
+
 import {
   fetchEarnings,
   fetchEarningDetail,
   setStatusFilter,
   setRangeFilter,
+  setDateRangeFilter,
   setPage,
   clearSelectedEarning,
-} from "@/store/slices/earningsSlice";
+  resetFilters,
+} from '@/store/slices/earningsSlice';
 
-// ── Framer Motion variants (project convention) ──────────────────────────
-const STAGGER = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06 } },
-};
-const ITEM = {
-  hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
-};
-const FADE_UP = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
-};
-
-const formatINR = (amount = 0) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount);
-
-const formatDate = (d) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+// ─────────────────────────────────────────────────────────────────
+// STATIC CONFIG
+// ─────────────────────────────────────────────────────────────────
 
 const STATUS_META = {
-  pending:  { label: "Pending",  badge: "badge-warning", icon: Clock },
-  settled:  { label: "Settled",  badge: "badge-success", icon: CheckCircle2 },
-  reversed: { label: "Reversed", badge: "badge-error",   icon: RotateCcw },
-  recovery: { label: "Recovery", badge: "badge-info",    icon: AlertCircle },
-  partial:  { label: "Partial",  badge: "badge-accent",  icon: Banknote },
+  pending:  { label: 'Pending',  icon: Clock,        tone: 'warning' },
+  settled:  { label: 'Settled',  icon: CheckCircle2, tone: 'success' },
+  reversed: { label: 'Reversed', icon: RotateCcw,    tone: 'error'   },
+  recovery: { label: 'Recovery', icon: AlertTriangle,tone: 'error'   },
+  partial:  { label: 'Partial',  icon: Wallet,        tone: 'info'    },
+};
+
+const CHART_COLOR = {
+  pending:  'var(--warning)',
+  settled:  'var(--success)',
+  reversed: 'var(--error)',
+  recovery: 'color-mix(in srgb, var(--error), black 20%)',
+  partial:  'var(--info)',
 };
 
 const RANGE_OPTIONS = [
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
-  { value: "yearly", label: "Yearly" },
+  { value: 'weekly',  label: 'Weekly'  },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly',  label: 'Yearly'  },
 ];
 
-export default function MyEarnings() {
+const fadeUp = {
+  hidden: { opacity: 0, y: 18 },
+  show: (i = 0) => ({
+    opacity: 1, y: 0,
+    transition: { delay: i * 0.06, duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+  }),
+};
+
+const inr = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+
+// ─────────────────────────────────────────────────────────────────
+// SMALL PRESENTATIONAL PIECES
+// ─────────────────────────────────────────────────────────────────
+
+function StatusBadge({ status }) {
+  const meta = STATUS_META[status] ?? STATUS_META.pending;
+  const Icon = meta.icon;
+  return (
+    <span className={`badge badge-${meta.tone}`}>
+      <Icon size={11} />
+      {meta.label}
+    </span>
+  );
+}
+
+function SummaryCard({ statusKey, data, index, active, onClick }) {
+  const meta = STATUS_META[statusKey];
+  const Icon = meta.icon;
+  return (
+    <motion.button
+      custom={index}
+      variants={fadeUp}
+      initial="hidden"
+      animate="show"
+      onClick={onClick}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.97 }}
+      className={`stat-card text-left cursor-pointer ${active ? 'border-primary/50' : ''}`}
+    >
+      <div className="flex items-start justify-between">
+        <span className={`p-2 rounded-xl bg-${meta.tone}/10`}>
+          <Icon size={16} className={`text-${meta.tone}`} />
+        </span>
+        <span className="text-[10px] font-bold text-base-content/35">{data.count} entries</span>
+      </div>
+      <p className="stat-card-value mt-3 text-xl">{inr(data.netTotal)}</p>
+      <p className="stat-card-label">{meta.label}</p>
+      <p className="text-[10px] font-semibold text-base-content/35 mt-0.5">
+        Gross {inr(data.total)}
+      </p>
+    </motion.button>
+  );
+}
+
+function HeroCard({ gross, net }) {
+  return (
+    <motion.div
+      variants={fadeUp} custom={0} initial="hidden" animate="show"
+      className="glass-card p-5 lg:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+    >
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-widest text-primary/80 flex items-center gap-1.5">
+          <TrendingUp size={13} /> All-Time Net Earnings
+        </p>
+        <p className="text-3xl lg:text-4xl font-black text-base-content mt-1 font-montserrat">
+          {inr(net)}
+        </p>
+        <p className="text-xs text-base-content/45 mt-1">
+          on {inr(gross)} gross across all statuses
+        </p>
+      </div>
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-primary/8 border border-primary/20 self-start">
+        <Banknote size={16} className="text-primary" />
+        <span className="text-xs font-bold text-primary">
+          {gross > 0 ? `${Math.round((net / gross) * 100)}% retained` : '—'}
+        </span>
+      </div>
+    </motion.div>
+  );
+}
+
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="card px-3.5 py-2.5 text-[11px]">
+      <p className="font-bold mb-1.5 text-base-content">{label}</p>
+      {payload.map((p) => (
+        <p key={p.dataKey} className="flex items-center gap-1.5 m-0" style={{ color: p.color }}>
+          <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+          {STATUS_META[p.dataKey]?.label ?? p.dataKey}: <strong>{inr(p.value)}</strong>
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function EmptyState({ label }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-14 gap-3">
+      <FileText size={30} className="text-base-content/20" />
+      <p className="text-xs font-semibold text-base-content/40">{label}</p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DETAIL DRAWER
+// ─────────────────────────────────────────────────────────────────
+
+function EarningDetailDrawer({ open, onClose, detail, loading }) {
+  const allocation = detail?.allocation;
+  const settlement = detail?.settlement;
+  const liability = detail?.liability;
+  const booking = allocation?.bookingId;
+
+  const rows = allocation ? [
+    { label: 'Gross amount',       value: allocation.grossAmount,       sign: '+' },
+    { label: 'Platform fee',       value: allocation.platformFee,       sign: '−' },
+    { label: 'Tax',                value: allocation.taxAmount,         sign: '−' },
+    { label: 'TDS',                value: allocation.tdsAmount,         sign: '−' },
+    { label: 'Recovery deduction', value: allocation.recoveryDeduction, sign: '−' },
+  ] : [];
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[90]"
+          />
+          <motion.aside
+            initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+            transition={{ type: 'spring', stiffness: 300, damping: 32 }}
+            className="fixed inset-y-0 right-0 z-[91] w-full sm:w-[420px] bg-base-100 border-l border-base-300 overflow-y-auto"
+          >
+            <div className="sticky top-0 bg-base-100/95 backdrop-blur-strong border-b border-base-300 px-5 py-4 flex items-center justify-between">
+              <h3 className="text-sm font-black text-base-content">Earning Detail</h3>
+              <button onClick={onClose} className="p-2 rounded-xl hover:bg-base-200 transition-colors">
+                <X size={16} className="text-base-content/60" />
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="p-5 space-y-3">
+                {Array(5).fill(0).map((_, i) => (
+                  <div key={i} className="h-12 skeleton rounded-xl" />
+                ))}
+              </div>
+            ) : !allocation ? (
+              <EmptyState label="Could not load this earning." />
+            ) : (
+              <div className="p-5 space-y-5">
+
+                <div className="flex items-center justify-between">
+                  <StatusBadge status={allocation.status} />
+                  <span className="text-[11px] font-semibold text-base-content/40">
+                    {allocation.createdAt ? new Date(allocation.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                  </span>
+                </div>
+
+                {/* Booking context */}
+                <div className="card p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-base-content/40 mb-2">Booking</p>
+                  <p className="text-sm font-bold text-base-content">{booking?.bookingCode ?? '—'}</p>
+                  <p className="text-xs text-base-content/50 mt-0.5 capitalize">
+                    {booking?.bookingType?.replace(/_/g, ' ') ?? allocation.bookingType?.replace(/_/g, ' ')} · {booking?.consultationType ?? allocation.partnerRole}
+                  </p>
+                  {booking?.scheduledAt && (
+                    <p className="text-[11px] text-base-content/40 mt-1.5 flex items-center gap-1.5">
+                      <Calendar size={11} /> {new Date(booking.scheduledAt).toLocaleString('en-IN')}
+                    </p>
+                  )}
+                </div>
+
+                {/* Amount breakdown */}
+                <div className="card p-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-base-content/40 mb-3">Breakdown</p>
+                  <div className="space-y-2">
+                    {rows.map((r) => (
+                      <div key={r.label} className="flex items-center justify-between text-xs">
+                        <span className="text-base-content/55 font-semibold">{r.label}</span>
+                        <span className={`font-bold ${r.sign === '−' ? 'text-error' : 'text-base-content'}`}>
+                          {r.sign} {inr(r.value)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="divider !my-2" />
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-black text-base-content">Net payable</span>
+                      <span className="font-black text-success">{inr(allocation.netPayable)}</span>
+                    </div>
+                    {allocation.subscriptionAbsorbed > 0 && (
+                      <p className="text-[10px] text-base-content/35 pt-1">
+                        Includes {inr(allocation.subscriptionAbsorbed)} subscription discount absorbed by platform.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Settlement */}
+                {settlement && (
+                  <div className="card p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-base-content/40 mb-2 flex items-center gap-1.5">
+                      <Receipt size={12} /> Settlement
+                    </p>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-base-content/55 font-semibold">Reference</span>
+                      <span className="font-bold text-base-content">{settlement.settlementCode ?? settlement._id?.slice(-8) ?? '—'}</span>
+                    </div>
+                    {allocation.settledAt && (
+                      <div className="flex items-center justify-between text-xs mt-2">
+                        <span className="text-base-content/55 font-semibold">Settled on</span>
+                        <span className="font-bold text-base-content">
+                          {new Date(allocation.settledAt).toLocaleDateString('en-IN')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Cash collection liability */}
+                {liability && (
+                  <div className="alert alert-warning">
+                    <ShieldAlert size={16} className="text-warning shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-bold text-warning">Cash Collector Liability</p>
+                      <p className="text-[11px] text-base-content/55 mt-0.5">
+                        You collected {inr(allocation.cashCollected)} in cash for this booking. Outstanding liability: {inr(liability.outstandingAmount ?? liability.amount ?? 0)}.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {allocation.remarks && (
+                  <div className="flex items-start gap-2 text-[11px] text-base-content/45">
+                    <Ticket size={13} className="shrink-0 mt-0.5" />
+                    <p>{allocation.remarks}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────────
+
+export default function Earnings() {
   const dispatch = useDispatch();
   const {
-    summary,
-    periodBreakdown,
-    items,
-    pagination,
-    filters,
-    selectedEarning,
-    listStatus,
-    detailStatus,
-  } = useSelector((state) => state.earnings);
+    summary, periodBreakdown, items, pagination, filters,
+    selectedEarning, listStatus, detailStatus,
+  } = useSelector((s) => s.earnings);
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [dateDraft, setDateDraft] = useState({ from: filters.from, to: filters.to });
 
   useEffect(() => {
-    dispatch(fetchEarnings({ page: 1 }));
+    dispatch(fetchEarnings());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.status, filters.range]);
+  }, [dispatch, filters.status, filters.range, filters.from, filters.to, pagination.page]);
 
-  const handlePageChange = useCallback(
-    (newPage) => {
-      dispatch(setPage(newPage));
-      dispatch(fetchEarnings({ page: newPage }));
-    },
-    [dispatch]
-  );
+  const handleStatusClick = useCallback((key) => {
+    dispatch(setStatusFilter(filters.status === key ? '' : key));
+  }, [dispatch, filters.status]);
 
-  const handleViewDetail = useCallback(
-    (allocationId) => {
-      dispatch(fetchEarningDetail(allocationId));
-    },
-    [dispatch]
-  );
+  const handleRowClick = useCallback((allocationId) => {
+    setDrawerOpen(true);
+    dispatch(fetchEarningDetail(allocationId));
+  }, [dispatch]);
 
-  // ── Chart data — group periodBreakdown rows by period into pending/settled columns ──
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    dispatch(clearSelectedEarning());
+  }, [dispatch]);
+
+  const applyDateRange = () => dispatch(setDateRangeFilter(dateDraft));
+
   const chartData = useMemo(() => {
     const map = new Map();
     (periodBreakdown || []).forEach((row) => {
       const period = row._id.period;
       const status = row._id.status;
-      if (!map.has(period)) map.set(period, { period, pending: 0, settled: 0 });
-      const entry = map.get(period);
-      if (status === "pending") entry.pending = row.total;
-      if (status === "settled") entry.settled = row.total;
+      if (!map.has(period)) map.set(period, { period });
+      map.get(period)[status] = row.netTotal;
     });
-    return Array.from(map.values()).sort((a, b) => a.period.localeCompare(b.period)).slice(-12);
+    return Array.from(map.values()).sort((a, b) => a.period.localeCompare(b.period));
   }, [periodBreakdown]);
 
-  const statCards = [
-    {
-      key: "pending",
-      label: "Pending Earnings",
-      value: summary.pending.total,
-      count: summary.pending.count,
-      icon: Clock,
-      tone: "warning",
-    },
-    {
-      key: "settled",
-      label: "Settled Earnings",
-      value: summary.settled.total,
-      count: summary.settled.count,
-      icon: CheckCircle2,
-      tone: "success",
-    },
-    {
-      key: "allTime",
-      label: "All-Time Earnings",
-      value: summary.allTimeGross,
-      count: summary.pending.count + summary.settled.count,
-      icon: TrendingUp,
-      tone: "primary",
-    },
-    {
-      key: "net",
-      label: "Net Payable (All-Time)",
-      value: summary.allTimeNet,
-      count: null,
-      icon: Wallet,
-      tone: "accent",
-    },
-  ];
+  const isLoading = listStatus === 'loading';
+  const statusKeys = Object.keys(STATUS_META);
 
   return (
-    <div className="container-custom py-8 max-w-7xl">
-      {/* ── Header ── */}
+    <div className="space-y-6  pb-10">
+
+      {/* ── Header ─────────────────────────────────────────── */}
       <motion.div
-        variants={FADE_UP}
-        initial="hidden"
-        animate="show"
-        className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8"
+        variants={fadeUp} custom={0} initial="hidden" animate="show"
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
       >
         <div>
-          <h1 className="section-heading mb-1">My Earnings</h1>
-          <p className="section-subheading mb-0">
-            Track what you've earned from completed bookings — pending and settled.
+          <h1 className="text-xl font-black text-base-content font-montserrat">Earnings</h1>
+          <p className="text-xs text-base-content/45 mt-0.5">
+            Track allocations, settlements and recoveries across every booking.
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => dispatch(fetchEarnings())}
+            className="btn btn-ghost btn-sm border border-base-300"
+          >
+            <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} /> Refresh
+          </button>
+          <button
+            onClick={() => { dispatch(resetFilters()); setDateDraft({ from: '', to: '' }); }}
+            className="btn btn-outline btn-sm"
+          >
+            Reset filters
+          </button>
+        </div>
+      </motion.div>
 
-        <div className="flex items-center gap-1 bg-base-200 rounded-field p-1 border border-base-300 w-fit">
-          {RANGE_OPTIONS.map((opt) => (
+      {/* ── Hero ───────────────────────────────────────────── */}
+      <HeroCard gross={summary.allTimeGross} net={summary.allTimeNet} />
+
+      {/* ── Summary cards ──────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {statusKeys.map((key, i) => (
+          <SummaryCard
+            key={key}
+            statusKey={key}
+            data={summary[key]}
+            index={i + 1}
+            active={filters.status === key}
+            onClick={() => handleStatusClick(key)}
+          />
+        ))}
+      </div>
+
+      {/* ── Filter bar ─────────────────────────────────────── */}
+      <motion.div
+        variants={fadeUp} custom={1} initial="hidden" animate="show"
+        className="card p-4 flex flex-col lg:flex-row lg:items-center gap-3"
+      >
+        <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-base-content/40 shrink-0">
+          <Filter size={12} /> Range
+        </div>
+        <div className="flex rounded-xl p-1 gap-1 bg-base-200 w-fit">
+          {RANGE_OPTIONS.map((r) => (
             <button
-              key={opt.value}
-              onClick={() => dispatch(setRangeFilter(opt.value))}
-              className={`btn btn-sm ${
-                filters.range === opt.value ? "btn-primary" : "btn-ghost"
+              key={r.value}
+              onClick={() => dispatch(setRangeFilter(r.value))}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                filters.range === r.value ? 'bg-primary text-primary-content' : 'text-base-content/50 hover:text-base-content'
               }`}
             >
-              {opt.label}
+              {r.label}
             </button>
           ))}
         </div>
+
+        <div className="flex items-center gap-2 lg:ml-auto">
+          <input
+            type="date"
+            value={dateDraft.from || ''}
+            onChange={(e) => setDateDraft((d) => ({ ...d, from: e.target.value }))}
+            className="input-field !py-1.5 !text-xs w-36"
+          />
+          <span className="text-base-content/30 text-xs">to</span>
+          <input
+            type="date"
+            value={dateDraft.to || ''}
+            onChange={(e) => setDateDraft((d) => ({ ...d, to: e.target.value }))}
+            className="input-field !py-1.5 !text-xs w-36"
+          />
+          <button onClick={applyDateRange} className="btn btn-primary btn-sm">Apply</button>
+        </div>
       </motion.div>
 
-      {/* ── Stat Cards ── */}
-      <motion.div
-        variants={STAGGER}
-        initial="hidden"
-        animate="show"
-        className="grid-responsive mb-8"
-      >
-        {statCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <motion.div key={card.key} variants={ITEM} className="stat-card glass-card">
-              <div className="flex items-start justify-between mb-3">
-                <div className={`badge badge-${card.tone}`}>
-                  <Icon className="w-3.5 h-3.5" />
-                  {card.label}
-                </div>
-              </div>
-              <div className="stat-card-value flex items-center gap-1">
-                <IndianRupee className="w-6 h-6" strokeWidth={2.5} />
-                {card.value.toLocaleString("en-IN")}
-              </div>
-              {card.count !== null && (
-                <div className="stat-card-label">{card.count} booking{card.count !== 1 ? "s" : ""}</div>
-              )}
-            </motion.div>
-          );
-        })}
-      </motion.div>
-
-      {/* ── Chart ── */}
-      <motion.div variants={FADE_UP} initial="hidden" animate="show" className="card p-5 md:p-6 mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <TrendingUp className="w-5 h-5 text-primary" />
-          <h3 className="text-lg font-bold">Earnings Trend</h3>
+      {/* ── Chart ──────────────────────────────────────────── */}
+      <motion.div variants={fadeUp} custom={2} initial="hidden" animate="show" className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-black uppercase tracking-widest text-base-content/55">
+            Net Earnings by Period
+          </h3>
+          <span className="text-[11px] font-semibold text-base-content/35 capitalize">{filters.range} view</span>
         </div>
         {chartData.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-base-content/40">
-            <Receipt className="w-10 h-10 mb-2" />
-            <p className="text-sm">No earnings data for this range yet</p>
-          </div>
+          <EmptyState label="No earnings data for this range yet." />
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--base-300)" />
-              <XAxis dataKey="period" tick={{ fontSize: 12, fill: "var(--base-content)" }} />
-              <YAxis tick={{ fontSize: 12, fill: "var(--base-content)" }} />
-              <Tooltip
-                formatter={(value) => formatINR(value)}
-                contentStyle={{
-                  backgroundColor: "var(--base-100)",
-                  border: "1px solid var(--base-300)",
-                  borderRadius: "var(--r-field)",
-                  fontSize: "0.8rem",
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: "0.8rem" }} />
-              <Bar dataKey="pending" name="Pending" fill="var(--warning)" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="settled" name="Settled" fill="var(--success)" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--base-300)" vertical={false} />
+                <XAxis dataKey="period" tick={{ fontSize: 10, fill: 'var(--base-content)', opacity: 0.5 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--base-content)', opacity: 0.5 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--base-300)', opacity: 0.3 }} />
+                <Legend
+                  formatter={(v) => STATUS_META[v]?.label ?? v}
+                  wrapperStyle={{ fontSize: 11, fontWeight: 700 }}
+                />
+                {statusKeys.map((key) => (
+                  <Bar key={key} dataKey={key} stackId="a" fill={CHART_COLOR[key]} radius={[3, 3, 0, 0]} maxBarSize={36} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </motion.div>
 
-      {/* ── Filters ── */}
-      <motion.div
-        variants={FADE_UP}
-        initial="hidden"
-        animate="show"
-        className="flex flex-wrap items-center gap-3 mb-4"
-      >
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-base-content/50" />
-          <span className="text-sm font-semibold text-base-content/70">Status:</span>
+      {/* ── Table ──────────────────────────────────────────── */}
+      <motion.div variants={fadeUp} custom={3} initial="hidden" animate="show" className="card p-0 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-base-300">
+          <h3 className="text-xs font-black uppercase tracking-widest text-base-content/55">
+            Transactions
+          </h3>
+          <span className="text-[11px] font-semibold text-base-content/35">
+            {pagination.totalCount} total
+          </span>
         </div>
-        {["", "pending", "settled", "reversed", "recovery", "partial"].map((s) => (
-          <button
-            key={s || "all"}
-            onClick={() => dispatch(setStatusFilter(s))}
-            className={`badge cursor-pointer ${
-              filters.status === s ? "badge-primary" : "badge-secondary opacity-60"
-            }`}
-          >
-            {s ? STATUS_META[s]?.label : "All"}
-          </button>
-        ))}
-      </motion.div>
 
-      {/* ── Earnings Table ── */}
-      <motion.div variants={FADE_UP} initial="hidden" animate="show" className="card overflow-hidden">
-        {listStatus === "loading" && items.length === 0 ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        {isLoading ? (
+          <div className="p-5 space-y-2.5">
+            {Array(6).fill(0).map((_, i) => <div key={i} className="h-12 skeleton rounded-xl" />)}
           </div>
         ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
-            <Receipt className="w-12 h-12 mb-3" />
-            <p className="text-sm font-semibold">No earnings found</p>
-            <p className="text-xs mt-1">Complete a booking to start earning</p>
-          </div>
+          <EmptyState label="No earnings match the current filters." />
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
@@ -280,246 +495,70 @@ export default function MyEarnings() {
                   <th>Type</th>
                   <th>Date</th>
                   <th>Gross</th>
-                  <th>Net Payable</th>
+                  <th>Net</th>
                   <th>Status</th>
-                  <th></th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => {
-                  const meta = STATUS_META[item.status] || STATUS_META.pending;
-                  const StatusIcon = meta.icon;
-                  return (
-                    <tr key={item._id}>
-                      <td>
-                        <span className="font-bold text-sm">
-                          {item.bookingId?.bookingCode || "—"}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="text-xs text-base-content/60 capitalize">
-                          {(item.bookingId?.bookingType || item.bookingType || "").replaceAll("_", " ")}
-                        </span>
-                      </td>
-                      <td className="text-sm">{formatDate(item.createdAt)}</td>
-                      <td className="font-semibold text-sm">{formatINR(item.grossAmount)}</td>
-                      <td className="font-semibold text-sm text-success">{formatINR(item.netPayable)}</td>
-                      <td>
-                        <span className={`badge badge-sm ${meta.badge}`}>
-                          <StatusIcon className="w-3 h-3" />
-                          {meta.label}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          onClick={() => handleViewDetail(item._id)}
-                          className="btn btn-ghost btn-sm"
-                        >
-                          View <ArrowUpRight className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {items.map((item) => (
+                  <tr
+                    key={item._id}
+                    onClick={() => handleRowClick(item._id)}
+                    className="cursor-pointer"
+                  >
+                    <td>
+                      <p className="font-bold text-base-content">{item.bookingId?.bookingCode ?? '—'}</p>
+                      <p className="text-[10px] text-base-content/40">{item.bookingId?.patientInfo?.name}</p>
+                    </td>
+                    <td className="capitalize text-xs text-base-content/60">
+                      {item.bookingType?.replace(/_/g, ' ')}
+                    </td>
+                    <td className="text-xs text-base-content/60">
+                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}
+                    </td>
+                    <td className="text-xs font-semibold text-base-content/70">{inr(item.grossAmount)}</td>
+                    <td className="text-xs font-black text-success">{inr(item.netPayable)}</td>
+                    <td><StatusBadge status={item.status} /></td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
 
-        {/* ── Pagination ── */}
+        {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-4 border-t border-base-300">
-            <span className="text-xs text-base-content/50">
-              Page {pagination.page} of {pagination.totalPages} · {pagination.totalCount} total
+          <div className="flex items-center justify-between px-5 py-3.5 border-t border-base-300">
+            <span className="text-[11px] font-semibold text-base-content/40">
+              Page {pagination.page} of {pagination.totalPages}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
-                onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={pagination.page <= 1}
-                className="btn btn-ghost btn-sm btn-circle"
+                onClick={() => dispatch(setPage(pagination.page - 1))}
+                className="btn btn-ghost btn-xs border border-base-300 disabled:opacity-30"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft size={13} />
               </button>
               <button
-                onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={pagination.page >= pagination.totalPages}
-                className="btn btn-ghost btn-sm btn-circle"
+                onClick={() => dispatch(setPage(pagination.page + 1))}
+                className="btn btn-ghost btn-xs border border-base-300 disabled:opacity-30"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight size={13} />
               </button>
             </div>
           </div>
         )}
       </motion.div>
 
-      {/* ── Detail Drawer/Modal ── */}
-      <AnimatePresence>
-        {selectedEarning && (
-          <EarningDetailModal
-            data={selectedEarning}
-            loading={detailStatus === "loading"}
-            onClose={() => dispatch(clearSelectedEarning())}
-          />
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// ── Detail Modal ────────────────────────────────────────────────────────
-
-function EarningDetailModal({ data, loading, onClose }) {
-  const { allocation, settlement, liability } = data || {};
-  const meta = STATUS_META[allocation?.status] || STATUS_META.pending;
-  const StatusIcon = meta.icon;
-
-  return (
-    <motion.div
-      className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-soft p-0 md:p-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-    >
-      <motion.div
-        className="glass-card w-full md:max-w-lg max-h-[88vh] overflow-y-auto scrollbar-thin rounded-t-box md:rounded-box"
-        initial={{ y: 60, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 60, opacity: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-base-300 sticky top-0 bg-base-100/90 backdrop-blur-soft z-10">
-          <h3 className="text-lg font-bold flex items-center gap-2">
-            <Receipt className="w-5 h-5 text-primary" />
-            Earning Detail
-          </h3>
-          <button onClick={onClose} className="btn btn-ghost btn-sm btn-circle">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        ) : !allocation ? (
-          <div className="p-8 text-center text-base-content/50 text-sm">No data found</div>
-        ) : (
-          <div className="p-5 space-y-5">
-            {/* Status + amount */}
-            <div className="flex items-center justify-between">
-              <span className={`badge ${meta.badge}`}>
-                <StatusIcon className="w-3.5 h-3.5" />
-                {meta.label}
-              </span>
-              <span className="stat-card-value text-2xl">{formatINR(allocation.netPayable)}</span>
-            </div>
-
-            {/* Booking info */}
-            <div className="stat-card">
-              <div className="stat-card-label mb-2">Booking</div>
-              <div className="flex items-center justify-between text-sm mb-1">
-                <span className="text-base-content/60">Code</span>
-                <span className="font-semibold">{allocation.bookingId?.bookingCode || "—"}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm mb-1">
-                <span className="text-base-content/60">Type</span>
-                <span className="font-semibold capitalize">
-                  {(allocation.bookingId?.bookingType || "").replaceAll("_", " ")}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm mb-1">
-                <span className="text-base-content/60 flex items-center gap-1">
-                  <User2 className="w-3.5 h-3.5" /> Patient
-                </span>
-                <span className="font-semibold">{allocation.bookingId?.patientInfo?.name || "—"}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-base-content/60 flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" /> Scheduled
-                </span>
-                <span className="font-semibold">{formatDate(allocation.bookingId?.scheduledAt)}</span>
-              </div>
-            </div>
-
-            {/* Amount breakdown */}
-            <div className="stat-card">
-              <div className="stat-card-label mb-3">Amount Breakdown</div>
-              <BreakdownRow label="Gross Amount" value={allocation.grossAmount} />
-              <BreakdownRow label="Platform Fee" value={-allocation.platformFee} negative />
-              <BreakdownRow label="Tax" value={-allocation.taxAmount} negative />
-              <BreakdownRow label="TDS" value={-allocation.tdsAmount} negative />
-              {allocation.recoveryDeduction > 0 && (
-                <BreakdownRow label="Recovery Deduction" value={-allocation.recoveryDeduction} negative />
-              )}
-              <div className="divider my-2" />
-              <BreakdownRow label="Net Payable" value={allocation.netPayable} bold />
-            </div>
-
-            {/* Cash collector info */}
-            {allocation.isCashCollector && (
-              <div className="alert alert-info">
-                <Banknote className="w-4 h-4 shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  You collected <strong>{formatINR(allocation.cashCollected)}</strong> cash for this
-                  booking on behalf of all partners.
-                </div>
-              </div>
-            )}
-
-            {/* Liability */}
-            {liability && (
-              <div className="stat-card">
-                <div className="stat-card-label mb-2">Collection Liability</div>
-                <BreakdownRow label="Total Liability" value={liability.totalLiability} />
-                <BreakdownRow label="Recovered" value={liability.amountRecovered} />
-                <BreakdownRow label="Outstanding" value={liability.outstandingLiability} bold />
-                <div className="mt-2">
-                  <span className={`badge badge-sm ${
-                    liability.status === "RECOVERED" ? "badge-success" : "badge-warning"
-                  }`}>
-                    {liability.status}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Settlement */}
-            {settlement && (
-              <div className="stat-card">
-                <div className="stat-card-label mb-2">Settlement</div>
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-base-content/60">Settlement ID</span>
-                  <span className="font-semibold">{settlement.settlementId}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-base-content/60">Status</span>
-                  <span className="font-semibold">{settlement.settlementStatus}</span>
-                </div>
-                {settlement.settledAt && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-base-content/60">Settled On</span>
-                    <span className="font-semibold">{formatDate(settlement.settledAt)}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </motion.div>
-    </motion.div>
-  );
-}
-
-function BreakdownRow({ label, value, negative = false, bold = false }) {
-  return (
-    <div className="flex items-center justify-between text-sm py-1">
-      <span className="text-base-content/60">{label}</span>
-      <span className={`${bold ? "font-bold text-base" : "font-medium"} ${negative ? "text-error" : ""}`}>
-        {negative ? "-" : ""}
-        {formatINR(Math.abs(value || 0))}
-      </span>
+      {/* ── Detail drawer ──────────────────────────────────── */}
+      <EarningDetailDrawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        detail={selectedEarning}
+        loading={detailStatus === 'loading'}
+      />
     </div>
   );
 }

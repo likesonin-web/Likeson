@@ -20,7 +20,7 @@ const { Schema } = mongoose;
  *   Both can also be set directly by admin via PATCH /wallets/:id/kyc-status
  */
 
-export const PARTNER_TYPES = [
+export const PARTNER_TYPES = Object.freeze([
   'doctor',
   'hospital',
   'care_assistant',
@@ -28,14 +28,14 @@ export const PARTNER_TYPES = [
   'solodriverpartner',
   'transportpartner',
   'lab_partner',
-];
+]);
 
-export const WALLET_STATUSES = [
+export const WALLET_STATUSES = Object.freeze([
   'active',
   'frozen',    // admin-frozen; no credits/debits
   'suspended', // KYC/compliance hold
   'closed',
-];
+]);
 
 // ── Bank Details Sub-Schema ───────────────────────────────────────────────────
 // Stored on wallet so withdrawal doesn't need to join profile model.

@@ -1004,8 +1004,8 @@ export const checkHospitalOrDoctorAvailability = async ({
 };
 
 export const getDoctorsByHospital = async (hospitalId) => {
-  const hospital = await Hospital.findById(hospitalId)
-    .select("managementModel linkedDoctors isActive isVerified")
+const hospital = await Hospital.findById(hospitalId)
+    .select("managementModel linkedDoctors isActive isVerified consultationPricing")
     .lean();
   if (!hospital) throw new Error("Hospital not found");
   if (!hospital.isActive || !hospital.isVerified)
@@ -1023,20 +1023,35 @@ export const getDoctorsByHospital = async (hospitalId) => {
     )
     .lean();
 
-  const isHospitalManaged = hospital.managementModel === "hospital-manager";
+const isHospitalManaged = hospital.managementModel === "hospital-manager";
+  const hp = isHospitalManaged ? hospital.consultationPricing : null;
 
-  // Pricing always comes from the doctor's own fees — hospitals (managed or
-  // owner-operated) do not set consultation pricing.
+  // Fix: hospital-manager → hospital's own consultationPricing shown, with
+  // honorarium fields kept as-is (null = doctor gets 0 on that type, per rule).
+  // doctor-owner → doctor's own fees, unchanged.
   return doctors.map((doc) => {
-    const effectiveFees = {
-      inPersonFee: doc.fees?.inPersonFee ?? doc.fees?.consultationFee ?? 0,
-      videoFee: doc.fees?.videoFee ?? doc.fees?.consultationFee ?? 0,
-      homeVisitFee: doc.fees?.homeVisitFee ?? doc.fees?.consultationFee ?? 0,
-      followUpFee: doc.fees?.followUpFee ?? 0,
-      followUpDiscountPercent: doc.fees?.followUpDiscountPercent ?? 0,
-      followUpValidDays: doc.fees?.followUpValidDays ?? 7,
-      source: "doctor",
-    };
+    const effectiveFees = isHospitalManaged && hp
+      ? {
+          inPersonFee: hp.inPersonFee ?? 0,
+          videoFee: hp.videoFee ?? 0,
+          homeVisitFee: hp.homeVisitFee ?? 0,
+          inPersonHonorarium: hp.inPersonHonorarium ?? null,
+          videoHonorarium: hp.videoHonorarium ?? null,
+          homeVisitHonorarium: hp.homeVisitHonorarium ?? null,
+          followUpFee: hp.followUpFee ?? 0,
+          followUpDiscountPercent: hp.followUpDiscountPercent ?? 0,
+          followUpValidDays: hp.followUpValidDays ?? 7,
+          source: "hospital",
+        }
+      : {
+          inPersonFee: doc.fees?.inPersonFee ?? doc.fees?.consultationFee ?? 0,
+          videoFee: doc.fees?.videoFee ?? doc.fees?.consultationFee ?? 0,
+          homeVisitFee: doc.fees?.homeVisitFee ?? doc.fees?.consultationFee ?? 0,
+          followUpFee: doc.fees?.followUpFee ?? 0,
+          followUpDiscountPercent: doc.fees?.followUpDiscountPercent ?? 0,
+          followUpValidDays: doc.fees?.followUpValidDays ?? 7,
+          source: "doctor",
+        };
     return { ...doc, effectiveFees, hospitalManaged: isHospitalManaged };
   });
 };
@@ -1715,25 +1730,66 @@ export const resolveConsultationFee = async ({
   };
   let gstRate = gstRateMap[consultationType] ?? 0.0;
 
-  let baseFee = 600;
+let baseFee = 600;
   let doctorShare = 600;
   let hospitalShare = 0;
   let source = "default";
 
-  // PRICING ALWAYS COMES FROM THE DOCTOR PROFILE.
-  // Hospitals (managed or owner-operated) never set their own consultation
-  // pricing — there is no `consultationPricing` field on the Hospital model,
-  // and there should not be one. The doctor's `fees` sub-document is the
-  // single source of truth for what the patient pays and what the doctor
-  // keeps, regardless of which hospital they're linked to.
-  if (doctorId) {
+  // Pricing source rule (fix — matches DoctorProfile.resolveEffectivePricing):
+  //   hospital-manager → Hospital.consultationPricing is authoritative. Doctor
+  //   gets a share ONLY if hospital set an explicit per-type honorarium; null
+  //   means doctor gets 0, hospital keeps full baseFee.
+  //   doctor-owner (or no hospital linked) → doctor's own `fees` is authoritative,
+  //   hospital NEVER gets a share.
+  let hospital = null;
+  if (hospitalId) {
+    hospital = await Hospital.findById(hospitalId)
+      .select("managementModel consultationPricing")
+      .lean();
+  } else if (doctorId) {
+    const docForHosp = await DoctorProfile.findById(doctorId)
+      .select("primaryHospital")
+      .lean();
+    if (docForHosp?.primaryHospital) {
+      hospital = await Hospital.findById(docForHosp.primaryHospital)
+        .select("managementModel consultationPricing")
+        .lean();
+    }
+  }
+
+  const isHospitalManaged = hospital?.managementModel === "hospital-manager";
+
+  if (isHospitalManaged && hospital?.consultationPricing) {
+    source = "hospital";
+    const hp = hospital.consultationPricing;
+    const feeMap = {
+      inPerson: hp.inPersonFee,
+      video: hp.videoFee,
+      homeVisit: hp.homeVisitFee,
+    };
+    const honMap = {
+      inPerson: hp.inPersonHonorarium,
+      video: hp.videoHonorarium,
+      homeVisit: hp.homeVisitHonorarium,
+    };
+
+    if (isFollowUp) {
+      baseFee = followUpFee || hp.followUpFee || 0;
+      const stdFee = feeMap[consultationType] ?? hp.inPersonFee ?? 1;
+      const stdHon = honMap[consultationType]; // explicit only, no default
+      doctorShare = stdHon != null ? Math.round(baseFee * (stdHon / stdFee)) : 0;
+    } else {
+      baseFee = feeMap[consultationType] ?? 600;
+      doctorShare = honMap[consultationType] ?? 0; // null → doctor gets nothing
+    }
+    hospitalShare = Math.max(0, baseFee - doctorShare);
+  } else if (doctorId) {
     const doc = await DoctorProfile.findById(doctorId).select("fees").lean();
     if (doc?.fees) {
       source = "doctor";
 
       if (isFollowUp) {
         baseFee = followUpFee || 0;
-        // Pro-rata the follow-up fee based on the doctor's standard inPerson split
         const stdFee = doc.fees.inPersonFee ?? doc.fees.consultationFee ?? 1;
         const stdHon =
           doc.fees.inPersonHonorarium ?? doc.fees.consultationHonorarium ?? 0;
@@ -1757,11 +1813,9 @@ export const resolveConsultationFee = async ({
           baseFee;
       }
 
-      // Whatever the doctor doesn't take as honorarium is the hospital's
-      // facility/platform cut. Works for both hospital-manager doctors
-      // (hospital provides space/staff) and doctor-owners (hospitalShare
-      // naturally becomes 0 since honorarium == fee in that case).
-      hospitalShare = Math.max(0, baseFee - doctorShare);
+      // doctor-owner → hospital NEVER gets a cut, doctor keeps everything left.
+      hospitalShare = 0;
+      doctorShare = baseFee; // doctor-owner: doctor takes full fee, no honorarium split
     }
   }
 

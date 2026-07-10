@@ -347,10 +347,20 @@ const bookingSchema = new Schema(
     },
 
     // ── Consultation Details ──────────────────────────────────────────────────
-    consultationType: {
+  consultationType: {
       type: String,
       enum: ["inPerson", "video", "homeVisit", null],
       default: null,
+    },
+
+    // Care-assistant visit duration in hours — drives
+    // PlatformPricingConfig.resolveCareAssistantTier() at settlement time.
+    // Set at booking-creation when a care_assistant/full_care_ride booking
+    // is priced against a duration tier.
+    careAssistantDurationHours: {
+      type: Number,
+      default: null,
+      min: 0,
     },
 
     scheduledAt: {

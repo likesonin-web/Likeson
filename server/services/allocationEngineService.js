@@ -62,11 +62,13 @@
  *   to doctor/hospital/care_assistant/lab_partner (no config signal given).
  *   Revisit if finance gives per-role TDS config.
  *
- * ── ASSUMPTION TO VERIFY ──────────────────────────────────────────────────
- *   Hospital model is loaded lazily via mongoose.model('Hospital') (file not
- *   supplied). We assume it has a `user` field (ObjectId ref 'User') and may
- *   have a `platformFeeOverride` field (same shape as platformFeeSchema). If
- *   your Hospital.js differs, send it and these two spots get corrected.
+* ── HOSPITAL RESOLUTION (confirmed) ──────────────────────────────────────
+ *   Hospital model loaded lazily via mongoose.model('Hospital'). Confirmed:
+ *   Hospital has NO `user` field (settlementEngine keys it via `managedBy`
+ *   instead). This file only reads `platformFeeOverride` off Hospital, so
+ *   that part was already correct. The hospitalId used here comes from
+ *   pricing.pricingOwnerId (see resolveEffectivePricing), not booking.hospital,
+ *   since booking.hospital is frequently unset.
  */
 
 import mongoose from 'mongoose';
@@ -202,14 +204,15 @@ async function computeRideBasedAllocations(booking, pricingConfig, session) {
       .lean();
     if (!partnerDoc) continue; // partner deleted/missing — skip rather than crash settlement
 
+// Confirmed rule: gross = distanceKm * baseFarePerKm, no minimumFare
+    // floor, no waiting/night/wheelchair surcharge in partner payout — those
+    // are customer-facing / platform revenue only, never partner earnings.
     const ratePerKm = partnerDoc.pricing?.baseFarePerKm ?? pricingConfig.transport.defaultRatePerKm;
-    const minimumFare = partnerDoc.pricing?.minimumFare ?? pricingConfig.transport.baseFare;
 
     let grossAmount = 0;
     const rideLegs = [];
     for (const leg of group.legs) {
-      const computed = +(ratePerKm * leg.km).toFixed(2);
-      const legFare = computed > minimumFare ? computed : minimumFare;
+      const legFare = +(ratePerKm * leg.km).toFixed(2);
       grossAmount = +(grossAmount + legFare).toFixed(2);
       rideLegs.push({ ...leg, fare: legFare });
     }
@@ -236,7 +239,7 @@ async function computeRideBasedAllocations(booking, pricingConfig, session) {
 
 // ── Doctor + Hospital ───────────────────────────────────────────────────────
 
-async function computeDoctorHospitalAllocations(booking, pricingConfig, session) {
+export async function computeDoctorHospitalAllocations(booking, pricingConfig, session) {
   if (!booking.doctor) return [];
 
   const consultationType = booking.consultationType || 'inPerson';
@@ -255,25 +258,43 @@ async function computeDoctorHospitalAllocations(booking, pricingConfig, session)
 
   const allocations = [];
 
-  if (doctorShare > 0) {
-    const doctorDoc = await DoctorProfile.findById(booking.doctor).select('platformFee').session(session).lean();
-    const feeCfg = resolvePlatformFee(doctorDoc?.platformFee, pricingConfig.doctor.platformFee);
+if (doctorShare > 0) {
+    // Hospital-manager booking: hospital owns pricing/fee, doctor gets the
+    // FULL doctorShare with zero platform-fee deduction — the platform's
+    // cut is taken from the hospital's allocation below, not here.
+    // Doctor-owner booking: doctor's own override (else global config) fee
+    // applies as before — no hospital allocation exists in that case at all.
+    const isHospitalManaged = pricing.source === 'hospital';
+    let doctorPlatformFee = 0;
+
+    if (!isHospitalManaged) {
+      const doctorDoc = await DoctorProfile.findById(booking.doctor).select('platformFee').session(session).lean();
+      const feeCfg = resolvePlatformFee(doctorDoc?.platformFee, pricingConfig.doctor.platformFee);
+      doctorPlatformFee = applyPlatformFee(doctorShare, feeCfg);
+    }
+
     allocations.push({
       partnerId: booking.doctor,
       partnerRole: 'doctor',
       grossAmount: doctorShare,
-      platformFee: applyPlatformFee(doctorShare, feeCfg),
+      platformFee: doctorPlatformFee,
       taxAmount: applyGst(doctorShare, pricingConfig.tax?.consultationGstPercent),
       tdsAmount: 0,
       subscriptionAbsorbed: 0,
     });
   }
 
-  // Hospital only paid when this booking actually has a hospital attached.
-  // See header note — assumes Hospital.user + optional Hospital.platformFeeOverride.
-  if (booking.hospital && hospitalShare > 0) {
+// Hospital only paid when pricing was actually resolved as hospital-managed.
+  // pricing.pricingOwnerId (from DoctorProfile.resolveEffectivePricing above)
+  // is the correct hospital._id in that case — booking.hospital is often
+  // unset (booking created directly under a doctor, no hospital step ever
+  // ran) and must NOT gate this allocation. Fall back to booking.hospital
+  // only as a last resort for any legacy/edge path.
+  const hospitalId = pricing.source === 'hospital' ? pricing.pricingOwnerId : booking.hospital;
+
+  if (hospitalId && hospitalShare > 0) {
     const Hospital = mongoose.model('Hospital');
-    const hospitalDoc = await Hospital.findById(booking.hospital)
+    const hospitalDoc = await Hospital.findById(hospitalId)
       .select('platformFeeOverride')
       .session(session)
       .lean()
@@ -281,7 +302,7 @@ async function computeDoctorHospitalAllocations(booking, pricingConfig, session)
 
     const feeCfg = resolvePlatformFee(hospitalDoc?.platformFeeOverride, pricingConfig.hospital.platformFee);
     allocations.push({
-      partnerId: booking.hospital,
+      partnerId: hospitalId,
       partnerRole: 'hospital',
       grossAmount: hospitalShare,
       platformFee: applyPlatformFee(hospitalShare, feeCfg),
@@ -295,11 +316,34 @@ async function computeDoctorHospitalAllocations(booking, pricingConfig, session)
 }
 
 // ── Care Assistant ───────────────────────────────────────────────────────────
-
 async function computeCareAssistantAllocation(booking, pricingConfig) {
   if (!booking.careAssistant) return [];
-  const grossAmount = booking.fareBreakdown?.careAssistantFee ?? 0;
-  if (grossAmount <= 0) return [];
+
+  const chargedAmount = booking.fareBreakdown?.careAssistantFee ?? 0;
+  if (chargedAmount <= 0) return [];
+
+  // Resolve which pricing tier applies. Preferred path: explicit duration
+  // on the booking (careAssistantDurationHours — see Booking.js patch).
+  // Fallback: reverse-match the tier whose chargeToUser equals what the
+  // customer was actually charged (tiers are duration-bracketed and their
+  // chargeToUser values are effectively unique in practice).
+  let tier = null;
+  if (typeof booking.careAssistantDurationHours === 'number') {
+    tier = PlatformPricingConfig.resolveCareAssistantTier(pricingConfig, booking.careAssistantDurationHours);
+  }
+  if (!tier) {
+    tier = (pricingConfig.careAssistant?.pricingTiers ?? [])
+      .find((t) => t.isActive && t.chargeToUser === chargedAmount) ?? null;
+  }
+
+  // grossAmount = CA's entitled earning BEFORE platform-fee deduction.
+  // This is tier.payoutToAssistant, NOT the amount the customer was charged.
+  const grossAmount = tier ? tier.payoutToAssistant : chargedAmount;
+  if (!tier) {
+    console.warn(
+      `[allocationEngine] Booking ${booking._id}: no CA pricing tier matched charged amount ₹${chargedAmount} — falling back to charged amount as gross. Check booking-creation pricing flow.`
+    );
+  }
 
   const feeCfg = pricingConfig.careAssistant.platformFee; // no per-CA override field defined yet
   return [{
@@ -314,25 +358,47 @@ async function computeCareAssistantAllocation(booking, pricingConfig) {
 }
 
 // ── Lab Partner ───────────────────────────────────────────────────────────────
-
-async function computeLabAllocation(booking, pricingConfig, session) {
+async function computeLabAllocation(booking, pricingConfig) {
   if (!booking.labPartner) return [];
-  const grossAmount = +(((booking.fareBreakdown?.diagnosticFee ?? 0) + (booking.fareBreakdown?.homeCollectionFee ?? 0))).toFixed(2);
+
+  const diagnosticDetails = booking.diagnosticDetails;
+  const items = [
+    ...(diagnosticDetails?.tests ?? []),
+    ...(diagnosticDetails?.packages ?? []),
+  ];
+
+  // Confirmed rule: lab gets (charged amount − platformMargin), which BY
+  // DEFINITION equals the sum of partnerPrice snapshots on the booked
+  // tests/packages (platformMargin virtual = charged − partnerPrice on
+  // LabPartnerProfile.labTests/labPackages). No platform fee on top — ever.
+  let grossAmount = items.reduce((sum, item) => {
+    const price = Number(item?.partnerPrice);
+    return Number.isFinite(price) ? sum + price : sum;
+  }, 0);
+
+  // Home collection fee flows to the lab in full — no margin defined on it.
+  grossAmount += booking.fareBreakdown?.homeCollectionFee ?? 0;
+  grossAmount = +grossAmount.toFixed(2);
+
+  // Fallback only if diagnosticDetails carries no partnerPrice snapshots
+  // (upstream booking-creation gap) — pay full charged amount rather than
+  // ₹0, but log loudly since margin was NOT actually deducted here.
+  if (grossAmount <= 0) {
+    grossAmount = +(((booking.fareBreakdown?.diagnosticFee ?? 0) + (booking.fareBreakdown?.homeCollectionFee ?? 0))).toFixed(2);
+    if (grossAmount > 0) {
+      console.warn(
+        `[allocationEngine] Booking ${booking._id}: no partnerPrice snapshots on diagnosticDetails — paying lab full charged amount ₹${grossAmount}, platform margin NOT deducted. Check booking-creation flow.`
+      );
+    }
+  }
+
   if (grossAmount <= 0) return [];
-
-  const labDoc = await LabPartnerProfile.findById(booking.labPartner)
-    .select('_id')
-    .session(session)
-    .lean();
-
-  const feeCfg = PlatformPricingConfig.resolveLabPlatformFee(pricingConfig, labDoc)
-    ?? pricingConfig.diagnostics.platformFee;
 
   return [{
     partnerId: booking.labPartner,
     partnerRole: 'lab_partner',
     grossAmount,
-    platformFee: applyPlatformFee(grossAmount, feeCfg),
+    platformFee: 0, // labs: no platform fee — margin already baked into partnerPrice vs mrp/discountedPrice
     taxAmount: applyGst(grossAmount, pricingConfig.tax?.diagnosticsGstPercent),
     tdsAmount: 0,
     subscriptionAbsorbed: 0,
@@ -345,7 +411,7 @@ export async function computePartnerAllocations(booking, pricingConfig, session)
   const [doctorHospital, careAssistant, lab, rideBased] = await Promise.all([
     computeDoctorHospitalAllocations(booking, pricingConfig, session),
     computeCareAssistantAllocation(booking, pricingConfig),
-    computeLabAllocation(booking, pricingConfig, session),
+    computeLabAllocation(booking, pricingConfig),
     computeRideBasedAllocations(booking, pricingConfig, session),
   ]);
 

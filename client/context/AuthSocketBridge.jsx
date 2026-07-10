@@ -1,14 +1,10 @@
 'use client';
 
-/**
- * AuthSocketBridge.jsx — Likeson.in
- *
- * Root-level wrapper around SocketProvider and SupportSocketProvider.
- * Mounted once, near the top of the tree (inside StoreProvider).
- */
+ 
 
 import { useSelector } from 'react-redux';
 import SocketProvider from '@/context/SocketProvider';
+import SupportSocketProvider from '@/context/SupportSocketProvider';
 
 import { selectToken } from '@/store/slices/userSlice';
 
@@ -17,10 +13,9 @@ export default function AuthSocketBridge({ children }) {
 
   return (
     <SocketProvider token={token}>
-      {/* Add SupportSocketProvider inside or alongside the main SocketProvider */}
-   
+      <SupportSocketProvider token={token}>
         {children}
-  
+      </SupportSocketProvider>
     </SocketProvider>
   );
 }

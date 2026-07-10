@@ -32,13 +32,16 @@ const CASH_COLLECTOR_BY_TYPE = {
   diagnostic_home:     'lab_partner',
 };
 
+import { computeDoctorHospitalAllocations } from './allocationEngineService.js';
+import PlatformPricingConfig from '../models/PlatformPricingConfig.js';
+
 export async function createAllocationsForBooking(bookingId, session = null) {
   const Booking                   = mongoose.model('Booking');
   const BookingPartnerAllocation  = mongoose.model('BookingPartnerAllocation');
   const Hospital                  = mongoose.model('Hospital');
 
   let bookingQuery = Booking.findById(bookingId)
-    .select('bookingType doctor hospital careAssistant transportPartner solodriverpartner labPartner fareBreakdown status')
+    .select('bookingType consultationType doctor hospital careAssistant transportPartner solodriverpartner labPartner fareBreakdown status')
     .lean();
   if (session) bookingQuery = bookingQuery.session(session);
   const booking = await bookingQuery;
@@ -62,28 +65,52 @@ export async function createAllocationsForBooking(bookingId, session = null) {
   // exists, don't silently produce zero earning — attribute totalAmount to the
   // single primary partner for that bookingType. Prevents "no allocation created"
   // when fareBreakdown is only partially populated at completion time.
-  const hasAnyShare = (fb.doctorShare || fb.hospitalShare || fb.careAssistantFee || fb.transportFee || fb.diagnosticFee) > 0;
+// Doctor/hospital shares NO LONGER read from fb here — resolveEffectivePricing()
+  // is now the single source of truth (see candidates block below). Fallback stays
+  // only for roles that still rely on fareBreakdown.
+  const hasAnyShare = (fb.careAssistantFee || fb.transportFee || fb.diagnosticFee) > 0;
   if (!hasAnyShare && fb.totalAmount > 0) {
     const primaryRole = CASH_COLLECTOR_BY_TYPE[booking.bookingType];
-    if (primaryRole === 'doctor') fb.doctorShare = fb.totalAmount;
-    else if (primaryRole === 'driver') fb.transportFee = fb.totalAmount;
+    if (primaryRole === 'driver') fb.transportFee = fb.totalAmount;
     else if (primaryRole === 'care_assistant') fb.careAssistantFee = fb.totalAmount;
     else if (primaryRole === 'lab_partner') fb.diagnosticFee = fb.totalAmount;
   }
 
-  // ── Resolve candidate partner legs: {partnerRole, partnerId(User), partnerProfileId, grossAmount} ──
+ // ── Resolve candidate partner legs: {partnerRole, partnerId(User), partnerProfileId, grossAmount} ──
   const candidates = [];
 
-  if (booking.doctor && fb.doctorShare > 0) {
-    candidates.push({ partnerRole: 'doctor', profileModel: 'DoctorProfile', profileId: booking.doctor, grossAmount: fb.doctorShare });
-  }
+  // Doctor + Hospital legs — ONE source of truth now: DoctorProfile.resolveEffectivePricing()
+  // via computeDoctorHospitalAllocations, same function settlementEngineService uses.
+  // platformFee/taxAmount computed here too (Q4) — pending earning already shows net, not gross.
+  if (booking.doctor) {
+    const pricingConfig = await PlatformPricingConfig.getGlobal();
+    const dhAllocs = await computeDoctorHospitalAllocations(booking, pricingConfig, session);
 
-  if (booking.hospital && fb.hospitalShare > 0) {
-    let hospitalQuery = Hospital.findById(booking.hospital).select('managedBy').lean();
-    if (session) hospitalQuery = hospitalQuery.session(session);
-    const hospital = await hospitalQuery;
-    if (hospital?.managedBy) {
-      candidates.push({ partnerRole: 'hospital', partnerId: hospital.managedBy, profileId: booking.hospital, grossAmount: fb.hospitalShare });
+    for (const alloc of dhAllocs) {
+      if (alloc.partnerRole === 'doctor') {
+        candidates.push({
+          partnerRole:  'doctor',
+          profileModel: 'DoctorProfile',
+          profileId:    alloc.partnerId,
+          grossAmount:  alloc.grossAmount,
+          platformFee:  alloc.platformFee ?? 0,
+          taxAmount:    alloc.taxAmount ?? 0,
+        });
+      } else if (alloc.partnerRole === 'hospital') {
+        let hospitalQuery = Hospital.findById(alloc.partnerId).select('managedBy').lean();
+        if (session) hospitalQuery = hospitalQuery.session(session);
+        const hospital = await hospitalQuery;
+        if (hospital?.managedBy) {
+          candidates.push({
+            partnerRole: 'hospital',
+            partnerId:   hospital.managedBy,
+            profileId:   alloc.partnerId,
+            grossAmount: alloc.grossAmount,
+            platformFee: alloc.platformFee ?? 0,
+            taxAmount:   alloc.taxAmount ?? 0,
+          });
+        }
+      }
     }
   }
 
@@ -155,12 +182,15 @@ export async function createAllocationsForBooking(bookingId, session = null) {
       partnerProfileId: r.profileId,
       partnerRole: r.partnerRole,
       bookingType: booking.bookingType,
-      grossAmount: r.grossAmount,
-      platformFee: 0,   // per-partner platform fee split — wire in once PricingEngine finalized
-      taxAmount: 0,
+grossAmount: r.grossAmount,
+      platformFee: r.platformFee ?? 0,
+      taxAmount: r.taxAmount ?? 0,
       tdsAmount: 0,
       recoveryDeduction: 0,
-      netPayable: r.grossAmount, // no deductions applied yet — settlement job recalculates at settle time
+      // Fix (Q4): doctor/hospital legs now carry real platformFee/taxAmount from
+      // resolveEffectivePricing at creation time — pending earning shown to partner
+      // already reflects the cut, not gross. Other roles unchanged (fee=0 until settle).
+      netPayable: Math.max(0, +(r.grossAmount - (r.platformFee ?? 0) - (r.taxAmount ?? 0)).toFixed(2)), // no deductions applied yet — settlement job recalculates at settle time
       subscriptionAbsorbed: 0,
       paymentSource,
       isCashCollector: isCollector,

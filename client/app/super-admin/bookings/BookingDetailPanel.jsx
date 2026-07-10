@@ -143,7 +143,7 @@ export function BookingDetailPanel({ bookingId, dispatch, onTabNavigate }) {
       </div>
 
       {/* ── Action tabs ─────────────────────────────────────────────────────── */}
-      <div className="shrink-0 border-b border-base-300 bg-base-200/60 px-4 pt-3 pb-4">
+<div className="shrink-0 border-b border-base-300 bg-base-200/60 px-4 pt-3 pb-4 max-h-[50vh] overflow-y-auto scrollbar-thin">
         {/* Tab buttons — split into two rows for readability */}
         <div className="flex gap-1 flex-wrap mb-3">
           {allowedTabs.map((id) => {
@@ -152,8 +152,9 @@ export function BookingDetailPanel({ bookingId, dispatch, onTabNavigate }) {
             const { icon: Icon, label } = meta;
             const isSos = id === 'sos';
             return (
-              <button
+<button
                 key={id}
+                type="button"
                 onClick={() => setActionTab(id)}
                 className={`btn btn-xs gap-1.5 ${
                   id === safeTab

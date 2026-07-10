@@ -419,10 +419,14 @@ const soloDriverPartnerSchema = new Schema(
     // ── Rating & Performance ──────────────────────────────────────────────────
     rating: { type: ratingSummarySchema, default: () => ({}) },
 
-    stats: {
+stats: {
       totalRidesCompleted:      { type: Number, default: 0 },
       totalRidesCancelled:      { type: Number, default: 0 },
       totalRidesDisputed:       { type: Number, default: 0 },
+      // NEW (Point 7): cumulative distance/hours across completed rides,
+      // written by partnerAssignmentEngine.service.js#recordPartnerTripCompletion.
+      totalDistanceKm:          { type: Number, default: 0, min: 0 },
+      totalHoursWorked:         { type: Number, default: 0, min: 0 },
       // Analytics cache — re-derive from PartnerWalletTransaction /
       // BookingPartnerAllocation. PartnerWallet/PartnerSettlement are
       // the real source of truth, never hand-incremented here.
@@ -433,8 +437,23 @@ const soloDriverPartnerSchema = new Schema(
       lastRideAt:               { type: Date },
     },
 
-    // ── Rewards (gamification — NOT money) ───────────────────────────────────
+// ── Rewards (gamification — NOT money) ───────────────────────────────────
     rewards: { type: rewardsSchema, default: () => ({}) },
+
+    // NEW (Point 7): bounded per-trip distance/hours log, same shape and
+    // purpose as Driver.tripLog — see that patch note for details.
+    tripLog: {
+      type: [
+        {
+          rideId:      { type: Schema.Types.ObjectId, ref: 'Ride' },
+          bookingId:   { type: Schema.Types.ObjectId, ref: 'Booking' },
+          distanceKm:  { type: Number, default: 0 },
+          hoursWorked: { type: Number, default: 0 },
+          completedAt: { type: Date },
+        },
+      ],
+      default: [],
+    },
 
     // ── Partnership Status ────────────────────────────────────────────────────
     partnershipStatus: {

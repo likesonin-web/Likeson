@@ -1,3 +1,4 @@
+// app/store/slices/bookingslice
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import toast                              from 'react-hot-toast';
 import API                                from '../api';
