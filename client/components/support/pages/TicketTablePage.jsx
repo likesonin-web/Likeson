@@ -4,15 +4,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import dayjs from 'dayjs';
-import { fetchTickets, selectAllTickets, selectTicketListLoading } from '../../store/slices/ticketSlice';
+import { fetchTickets, selectAllTickets, selectTicketListLoading } from '@/store/slices/ticketSlice';
 import { useTicketFilters } from '../../hooks/support/useTicketFilters';
-import StatusBadge from '../support/shared/StatusBadge';
-import PriorityBadge from '../support/shared/PriorityBadge';
-import FilterBar from '../support/ticket/FilterBar';
-import Pagination from '../support/shared/Pagination';
-import { TableRowSkeleton } from '../support/shared/Skeletons';
-import { EmptyState } from '../support/shared/StateViews';
-import { TICKET_TYPE_LABELS } from '../../features/support/constants/support.constants';
+import StatusBadge from '@/components/support/shared/StatusBadge';
+import PriorityBadge from '@/components/support/shared/PriorityBadge';
+import FilterBar from '@/components/support/ticket/FilterBar';
+import Pagination from '@/components/support/shared/Pagination';
+import { TableRowSkeleton } from '@/components/support/shared/Skeletons';
+import { EmptyState } from '@/components/support/shared/StateViews';
+import { TICKET_TYPE_LABELS } from '@/features/support/constants/support.constants';
 
 const PAGE_SIZE = 20;
 
