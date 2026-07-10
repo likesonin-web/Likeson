@@ -4,7 +4,7 @@ import { Clock, Bell } from 'lucide-react';
 import {
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
-} from '../../features/support/constants/support.constants';
+} from '@/features/support/constants/support.constants';
 
 // SLA targets mirrored from backend constants/support.constants.js
 // (SLA_FIRST_RESPONSE_MINUTES / SLA_RESOLUTION_MINUTES) — display only here;

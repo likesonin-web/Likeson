@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import dayjs from 'dayjs';
 import { fetchTickets, selectAllTickets, selectTicketListLoading } from '@/store/slices/ticketSlice';
-import { useTicketFilters } from '../../hooks/support/useTicketFilters';
+import { useTicketFilters } from '@/hooks/support/useTicketFilters';
 import StatusBadge from '@/components/support/shared/StatusBadge';
 import PriorityBadge from '@/components/support/shared/PriorityBadge';
 import FilterBar from '@/components/support/ticket/FilterBar';
