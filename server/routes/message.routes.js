@@ -2,7 +2,7 @@
 
 import { Router } from 'express';
 import asyncHandler from '../utils/asyncHandler.js';
-import { protect, getDeviceInfo } from '../middleware/authmiddleware.js';
+import { protect, getDeviceInfo } from '../middleware/authMiddleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import { mongoSanitize } from '../middleware/mongoSanitize.middleware.js';
 import { loadTicketAndCheckAccess } from '../middleware/ticketAccess.middleware.js';
