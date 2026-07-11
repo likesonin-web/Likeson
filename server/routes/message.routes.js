@@ -21,7 +21,7 @@ import { ticketIdParamSchema } from '../validators/ticket.validator.js';
 import { ALLOWED_MIME_TYPES } from '../constants/support.constants.js';
 import * as messageService from '../services/message.service.js';
 import * as attachmentService from '../services/attachment.service.js';
- 
+
 function classifyMimeType(mimeType) {
   // Same codec-suffix issue as the frontend's classifyFile — a recorded
   // voice note arrives as e.g. "audio/webm;codecs=opus", not the bare
@@ -29,11 +29,11 @@ function classifyMimeType(mimeType) {
   const base = mimeType?.split(';')[0]?.trim();
   return Object.entries(ALLOWED_MIME_TYPES).find(([, mimes]) => mimes.includes(base))?.[0] ?? null;
 }
- 
+
 const router = Router({ mergeParams: true });
- 
+
 router.use(protect, getDeviceInfo, mongoSanitize);
- 
+
 // ── Send message (text or already-uploaded attachment reference) ─────────
 router.post(
   '/',
@@ -51,7 +51,7 @@ router.post(
     res.status(201).json({ success: true, data: message });
   })
 );
- 
+
 // ── Upload + send media message in one call ───────────────────────────────
 router.post(
   '/media',
@@ -60,12 +60,12 @@ router.post(
   handleFileUpload,
   asyncHandler(async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file provided.', code: 'NO_FILE' });
- 
+
     const fileType = classifyMimeType(req.file.mimetype);
     if (!fileType) {
       return res.status(400).json({ success: false, message: `File type '${req.file.mimetype}' is not permitted.`, code: 'UNSUPPORTED_FILE_TYPE' });
     }
- 
+
     const attachment = await attachmentService.uploadAttachment({
       ticketId: req.params.ticketId,
       actor: req.user,
@@ -78,7 +78,7 @@ router.post(
         fileType,
       },
     });
- 
+
     const message = await messageService.sendMessage({
       ticketId: req.params.ticketId,
       actor: req.user,
@@ -98,11 +98,11 @@ router.post(
       },
       io: req.app.get('io'),
     });
- 
+
     res.status(201).json({ success: true, data: message });
   })
 );
- 
+
 // ── List (cursor-paginated) ────────────────────────────────────────────────
 router.get(
   '/',
@@ -114,7 +114,7 @@ router.get(
     res.status(200).json({ success: true, ...result });
   })
 );
- 
+
 // ── Edit (admin/superadmin only) ───────────────────────────────────────────
 router.patch(
   '/:messageId',
@@ -134,7 +134,7 @@ router.patch(
     res.status(200).json({ success: true, data: message });
   })
 );
- 
+
 // ── Soft delete ─────────────────────────────────────────────────────────
 router.delete(
   '/:messageId',
@@ -153,7 +153,7 @@ router.delete(
     res.status(200).json({ success: true, data: message });
   })
 );
- 
+
 // ── React ──────────────────────────────────────────────────────────────────
 router.post(
   '/:messageId/react',
@@ -171,7 +171,7 @@ router.post(
     res.status(200).json({ success: true, data: message });
   })
 );
- 
+
 // ── Mark read (bulk, up to a message) ──────────────────────────────────────
 router.post(
   '/read',
@@ -187,5 +187,5 @@ router.post(
     res.status(200).json({ success: true });
   })
 );
- 
+
 export default router;
