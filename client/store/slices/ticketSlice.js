@@ -54,7 +54,11 @@ export const fetchTicketById = createAsyncThunk(
       const { data } = await supportApi.getTicket(ticketId);
       return data;
     } catch (err) {
-      return rejectWithValue(extractError(err, 'Failed to load ticket.'));
+      return rejectWithValue({
+        message: extractError(err, 'Failed to load ticket.'),
+        code: err?.response?.data?.code ?? null,
+        status: err?.response?.status ?? null,
+      });
     }
   }
 );

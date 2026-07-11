@@ -56,7 +56,7 @@ const ROLE_FOOTER_CONFIG = {
     ],
     company: [
       { name: 'About Us',           href: '/about' },
-      { name: 'Contact Support',    href: '/contact' },
+      { name: 'Contact Support',    href: '/support' },
       { name: 'Privacy Policy',     href: '/privacy' },
       { name: 'Terms of Service',   href: '/terms' },
     ],

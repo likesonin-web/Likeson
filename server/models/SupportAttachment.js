@@ -17,7 +17,7 @@ const supportAttachmentSchema = new Schema(
 
     uploadedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
 
-    fileType: { type: String, enum: ['image', 'video', 'pdf', 'audio'], required: true },
+    fileType: { type: String, enum: ['image', 'video', 'pdf', 'document', 'audio'], required: true },
     mimeType: { type: String, required: true },
     originalName: { type: String, required: true, maxlength: 255 },
     sizeBytes: { type: Number, required: true },

@@ -1,5 +1,31 @@
 'use client';
- 
+
+/**
+ * SupportSocketProvider.jsx — Likeson.in
+ *
+ * FIX: Previously, the entire socket connection lifecycle (connect,
+ * event-listener binding, heartbeat, disconnect) lived inside the
+ * useSupportSocket() hook, and that hook was called directly from
+ * SupportShell — which remounts on every navigation between
+ * /support, /support/[ticketId], /admin/support/dashboard, etc.
+ * (different route = different page component tree in the App Router,
+ * so SupportShell unmounts and remounts each time).
+ *
+ * That meant: every single navigation inside the Support Center
+ * disconnected the socket and reconnected it from scratch — dropping
+ * in-flight typing indicators, occasionally missing the odd realtime
+ * event fired in the gap, and adding needless reconnect churn at scale
+ * (10,000 concurrent users reconnecting on every click is exactly the
+ * kind of thing that overloads a Socket.IO/Redis-adapter cluster).
+ *
+ * FIX: the connection lifecycle now lives HERE, mounted exactly once,
+ * near the root of the tree (inside AuthSocketBridge, next to the
+ * existing SocketProvider) and never unmounts for the lifetime of the
+ * session. useSupportSocket() (hooks/support/useSupportSocket.js) no
+ * longer owns the connection — it's now a thin hook that just returns
+ * the emit-helper functions, safe to call from any component without
+ * triggering a new connect/disconnect cycle.
+ */
 
 import { createContext, useContext, useEffect, useRef, useMemo } from 'react';
 import { useDispatch } from 'react-redux';
@@ -29,7 +55,7 @@ import {
   setUserOnline,
   setUserOffline,
 } from '@/store/slices/socketSlice';
-import { receiveMessage, setTypingUsers, applyDeliveredReceipt, applyReadReceipt, resendStuckMessages } from '@/store/slices/chatSlice';
+import { receiveMessage, setTypingUsers, applyDeliveredReceipt, applyReadReceipt } from '@/store/slices/chatSlice';
 import { patchTicketFromSocket, touchTicketLastMessage } from '@/store/slices/ticketSlice';
 import { addIncomingNotification } from '@/store/slices/notificationSlice';
 
@@ -57,14 +83,7 @@ export default function SupportSocketProvider({ token, children }) {
     dispatch(scConnecting());
     connectSupportSocket();
 
-    const onConnect = () => {
-      dispatch(scConnected());
-      // Auto-retry anything that got stuck 'sending'/'failed' while we
-      // were disconnected — the whole point of this fix. Small delay so
-      // join_ticket rooms (re-joined by each open ChatWindow's own effect)
-      // have a moment to re-establish before we replay sends into them.
-      setTimeout(() => dispatch(resendStuckMessages()), 300);
-    };
+    const onConnect = () => dispatch(scConnected());
     const onDisconnect = (reason) => dispatch(scDisconnected({ reason }));
     const onReconnectAttempt = (attempt) => dispatch(scReconnecting({ attempt }));
     const onConnectError = (err) => dispatch(scConnectionError(err?.message));
@@ -82,6 +101,14 @@ export default function SupportSocketProvider({ token, children }) {
 
     const onTyping = ({ ticketId, userId }) => dispatch(setTypingUsers({ ticketId, userId, isTyping: true }));
     const onStopTyping = ({ ticketId, userId }) => dispatch(setTypingUsers({ ticketId, userId, isTyping: false }));
+
+    // Edit/delete/react all just upsert the (already fully-populated)
+    // message by _id — receiveMessage is a generic upsert reducer, exactly
+    // what's needed here too so every participant's screen updates without
+    // a refresh, not just the actor who made the change.
+    const onMessageEdit = (message) => dispatch(receiveMessage(message));
+    const onMessageDelete = (message) => dispatch(receiveMessage(message));
+    const onMessageReact = (message) => dispatch(receiveMessage(message));
 
     const onDelivered = ({ ticketId, userId, messageIds }) =>
       dispatch(applyDeliveredReceipt({ ticketId, userId, messageIds }));
@@ -115,6 +142,9 @@ export default function SupportSocketProvider({ token, children }) {
     socket.on(SOCKET_EVENTS.STOP_TYPING, onStopTyping);
     socket.on(SOCKET_EVENTS.MESSAGE_DELIVERED, onDelivered);
     socket.on(SOCKET_EVENTS.MESSAGE_READ, onRead);
+    socket.on(SOCKET_EVENTS.MESSAGE_EDIT, onMessageEdit);
+    socket.on(SOCKET_EVENTS.MESSAGE_DELETE, onMessageDelete);
+    socket.on(SOCKET_EVENTS.MESSAGE_REACT, onMessageReact);
     socket.on(SOCKET_EVENTS.PRESENCE_UPDATE, onPresence);
     socket.on(SOCKET_EVENTS.STATUS_CHANGED, onStatusChanged);
     socket.on(SOCKET_EVENTS.ASSIGNMENT, onAssignment);
@@ -135,6 +165,9 @@ export default function SupportSocketProvider({ token, children }) {
       socket.off(SOCKET_EVENTS.STOP_TYPING, onStopTyping);
       socket.off(SOCKET_EVENTS.MESSAGE_DELIVERED, onDelivered);
       socket.off(SOCKET_EVENTS.MESSAGE_READ, onRead);
+      socket.off(SOCKET_EVENTS.MESSAGE_EDIT, onMessageEdit);
+      socket.off(SOCKET_EVENTS.MESSAGE_DELETE, onMessageDelete);
+      socket.off(SOCKET_EVENTS.MESSAGE_REACT, onMessageReact);
       socket.off(SOCKET_EVENTS.PRESENCE_UPDATE, onPresence);
       socket.off(SOCKET_EVENTS.STATUS_CHANGED, onStatusChanged);
       socket.off(SOCKET_EVENTS.ASSIGNMENT, onAssignment);
@@ -152,7 +185,17 @@ export default function SupportSocketProvider({ token, children }) {
     () => ({
       joinTicket: (ticketId) =>
         new Promise((resolve, reject) => {
-          emitJoinTicket(ticketId, (ack) => (ack?.success ? resolve(ack) : reject(new Error(ack?.message))));
+          // Without this timeout, a silently-no-op'd emit (e.g. the socket
+          // singleton not created yet — see emitJoinTicket's `socket?.emit`)
+          // never invokes the ack callback at all, so this Promise would
+          // hang forever: neither resolving nor rejecting, silently, with
+          // no error for any caller to catch or retry on.
+          const timer = setTimeout(() => reject(new Error('Timed out waiting to join ticket room.')), 5000);
+          emitJoinTicket(ticketId, (ack) => {
+            clearTimeout(timer);
+            if (ack?.success) resolve(ack);
+            else reject(new Error(ack?.message || 'Join ticket failed.'));
+          });
         }),
       leaveTicket: (ticketId) => emitLeaveTicket(ticketId),
       sendTyping: (ticketId) => emitTyping(ticketId),

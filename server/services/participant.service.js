@@ -1,6 +1,7 @@
 // services/participant.service.js
 
 import SupportParticipant from '../models/SupportParticipant.js';
+import { emitToTicket } from '../utils/socketEmit.util.js';
 import SupportTicket from '../models/SupportTicket.js';
 import { recordTimelineEvent } from './timeline.service.js';
 import { recordAudit } from '../utils/auditIntegration.util.js';
@@ -47,7 +48,7 @@ export async function addParticipant({ ticketId, actor, deviceInfo, userId, role
   await notifySupportEvent('participant_added', [userId], ticket, { io });
 
   if (io) {
-    io.to(`ticket:${ticketId}`).emit('support:participant_joined', { ticketId, userId, role });
+    emitToTicket(io, ticketId, 'support:participant_joined', { ticketId, userId, role });
   }
 
   return participant;
@@ -81,7 +82,7 @@ export async function removeParticipant({ ticketId, actor, deviceInfo, userId, r
   });
 
   if (io) {
-    io.to(`ticket:${ticketId}`).emit('support:participant_left', { ticketId, userId });
+    emitToTicket(io, ticketId, 'support:participant_left', { ticketId, userId });
   }
 
   return participant;

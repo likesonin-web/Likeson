@@ -1,6 +1,7 @@
 // services/ticket.service.js
 
 import mongoose from 'mongoose';
+import { emitToTicket } from '../utils/socketEmit.util.js';
 import SupportTicket from '../models/SupportTicket.js';
 import SupportParticipant from '../models/SupportParticipant.js';
 import SupportRating from '../models/SupportRating.js';
@@ -306,7 +307,7 @@ export async function changeStatus({ ticketId, actor, deviceInfo, status, reason
   await notifySupportEvent(status === 'closed' ? 'ticket_closed' : 'status_change', recipients, ticket, { io });
 
   if (io) {
-    io.to(`ticket:${ticketId}`).emit('support:status_changed', { ticketId, status, from, changedBy: actor._id });
+    emitToTicket(io, ticketId, 'support:status_changed', { ticketId, status, from, changedBy: actor._id });
   }
 
   return ticket;

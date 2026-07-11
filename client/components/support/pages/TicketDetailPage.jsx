@@ -15,6 +15,7 @@ import {
   touchRecentlyViewed,
   selectActiveTicket,
   selectActiveTicketLoading,
+  selectActiveTicketError,
   selectParticipantsForTicket,
   selectTimelineForTicket,
   selectTicketLoaders,
@@ -34,10 +35,11 @@ const TABS = ['Timeline', 'Participants', 'Audit'];
 /**
  * @param {{ ticketId: string, backHref: string, currentUser: object }} props
  */
-export default function TicketDetailPage({ ticketId, backHref, currentUser }) {
+export default function TicketDetailPage({ ticketId, backHref, currentUser, loginHref = '/login' }) {
   const dispatch = useDispatch();
   const ticket = useSelector(selectActiveTicket);
   const loading = useSelector(selectActiveTicketLoading);
+  const ticketError = useSelector(selectActiveTicketError);
   const participants = useSelector(selectParticipantsForTicket(ticketId));
   const timeline = useSelector(selectTimelineForTicket(ticketId));
   const loaders = useSelector(selectTicketLoaders);
@@ -46,17 +48,55 @@ export default function TicketDetailPage({ ticketId, backHref, currentUser }) {
   const [assignOpen, setAssignOpen] = useState(false);
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
 
-  const staff = isStaff(currentUser.role);
-
   useEffect(() => {
+    if (!currentUser) return;
     dispatch(fetchTicketById(ticketId));
     dispatch(fetchParticipants(ticketId));
     dispatch(fetchTicketTimeline({ ticketId }));
     dispatch(touchRecentlyViewed(ticketId));
-  }, [ticketId, dispatch]);
+  }, [ticketId, dispatch, currentUser]);
+
+  // No one logged in at all — show this before anything below ever touches
+  // `currentUser.role`, which used to throw here instead of rendering a
+  // message when currentUser was missing.
+  if (!currentUser) {
+    return (
+      <ErrorState
+        icon="lock"
+        title="Please log in"
+        description="You need to be signed in to view this conversation."
+        action={{ label: 'Log in', onClick: () => window.location.assign(loginHref) }}
+      />
+    );
+  }
+
+  const staff = isStaff(currentUser.role);
 
   if (loading && !ticket) return <MessageThreadSkeleton />;
-  if (!ticket) return <ErrorState title="Ticket not found" description="It may have been removed or you don't have access." />;
+
+  // Logged in, but not allowed to see THIS ticket (wrong role / not a
+  // participant) — a distinct message from a plain "doesn't exist", so
+  // people aren't left guessing which one it is.
+  if (!ticket && ticketError?.status === 403) {
+    return (
+      <ErrorState
+        icon="lock"
+        title="You don't have access to this ticket"
+        description="This conversation belongs to a different account or role. If you think this is a mistake, contact support."
+        action={{ label: 'Go back', onClick: () => window.location.assign(backHref) }}
+      />
+    );
+  }
+
+  if (!ticket) {
+    return (
+      <ErrorState
+        title="Ticket not found"
+        description="It may have been removed, or the link is incorrect."
+        action={{ label: 'Go back', onClick: () => window.location.assign(backHref) }}
+      />
+    );
+  }
 
   const isOwner = ticket.createdBy === currentUser._id || ticket.createdBy?._id === currentUser._id;
   const canRate = isOwner && ticket.status === 'resolved' && !ratingSubmitted;

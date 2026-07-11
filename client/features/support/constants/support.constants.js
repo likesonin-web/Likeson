@@ -131,6 +131,7 @@ export const MESSAGE_TYPES = [
   'image',
   'video',
   'pdf',
+  'document',
   'audio',
   'system',
   'assignment',
@@ -138,7 +139,7 @@ export const MESSAGE_TYPES = [
   'timeline',
 ];
 
-export const MEDIA_MESSAGE_TYPES = ['image', 'video', 'pdf', 'audio'];
+export const MEDIA_MESSAGE_TYPES = ['image', 'video', 'pdf', 'document', 'audio'];
 
 export const MESSAGE_STATUSES = ['sending', 'sent', 'delivered', 'read', 'failed'];
 
@@ -232,6 +233,9 @@ export const SOCKET_EVENTS = {
   MESSAGE_READ: 'support:message_read',
   MESSAGE_DELIVERED: 'support:message_delivered',
   MESSAGE_SEEN: 'support:message_seen',
+  MESSAGE_EDIT: 'support:message_edit',
+  MESSAGE_DELETE: 'support:message_delete',
+  MESSAGE_REACT: 'support:message_react',
   PARTICIPANT_JOINED: 'support:participant_joined',
   PARTICIPANT_LEFT: 'support:participant_left',
   ASSIGNMENT: 'support:assignment',
@@ -248,6 +252,18 @@ export const ALLOWED_MIME_TYPES = {
   image: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
   video: ['video/mp4', 'video/quicktime', 'video/webm'],
   pdf: ['application/pdf'],
+  document: [
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain',
+    'text/csv',
+    'application/zip',
+    'application/x-zip-compressed',
+  ],
   audio: ['audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/ogg', 'audio/webm'],
 };
 
@@ -255,6 +271,7 @@ export const MAX_FILE_SIZE_BYTES = {
   image: 8 * 1024 * 1024,
   video: 100 * 1024 * 1024,
   pdf: 20 * 1024 * 1024,
+  document: 20 * 1024 * 1024,
   audio: 25 * 1024 * 1024,
 };
 

@@ -7,7 +7,9 @@ const BAR_COUNT = 28;
 
 /**
  * WhatsApp-style voice message recorder: tap mic -> live waveform while
- * recording -> stop -> review with playback -> send or discard.
+ * recording (browser MediaRecorder, no external service) -> stop -> review
+ * with playback -> send or discard. Produces a plain `File` that the caller
+ * uploads through the same pipeline as any other attachment.
  *
  * @param {{ onRecorded: (file: File) => void, disabled?: boolean, onPhaseChange?: (phase: 'idle'|'recording'|'review') => void }} props
  */
@@ -28,6 +30,10 @@ export default function VoiceRecorderButton({ onRecorded, disabled, onPhaseChang
   const startTimeRef = useRef(null);
   const timerRef = useRef(null);
   const playbackRef = useRef(null);
+
+  useEffect(() => {
+    onPhaseChange?.(phase);
+  }, [phase, onPhaseChange]);
 
   const stopStream = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -145,10 +151,6 @@ export default function VoiceRecorderButton({ onRecorded, disabled, onPhaseChang
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
-
-  useEffect(() => {
-    onPhaseChange?.(phase);
-  }, [phase, onPhaseChange]);
 
   const formatTime = (ms) => {
     const totalSec = Math.floor(ms / 1000);

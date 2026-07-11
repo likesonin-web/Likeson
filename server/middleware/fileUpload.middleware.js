@@ -1,7 +1,7 @@
 // middlewares/fileUpload.middleware.js
 
 import multer from 'multer';
-import { MAX_FILE_SIZE_BYTES } from '../constants/support.constants.js';
+import { MAX_FILE_SIZE_BYTES, ALLOWED_MIME_TYPES } from '../constants/support.constants.js';
 import { FileValidationError } from '../utils/errors.js';
 
 // Memory storage — files are streamed straight to ImageKit in the service
@@ -11,14 +11,16 @@ import { FileValidationError } from '../utils/errors.js';
 const storage = multer.memoryStorage();
 
 const MAX_UPLOAD_BYTES = Math.max(...Object.values(MAX_FILE_SIZE_BYTES)); // widest cap; per-type cap re-checked in service
+const ALL_ALLOWED_MIMES = new Set(Object.values(ALLOWED_MIME_TYPES).flat());
 
 export const uploadMiddleware = multer({
   storage,
   limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
   fileFilter: (req, file, cb) => {
-    const allowedPrefixes = ['image/', 'video/', 'audio/'];
-    const isAllowed = allowedPrefixes.some((p) => file.mimetype.startsWith(p)) || file.mimetype === 'application/pdf';
-    if (!isAllowed) {
+    // MediaRecorder-produced audio arrives as e.g. "audio/webm;codecs=opus" —
+    // strip the codec suffix before checking against the plain-mimetype set.
+    const baseMimeType = file.mimetype?.split(';')[0]?.trim();
+    if (!ALL_ALLOWED_MIMES.has(baseMimeType)) {
       return cb(new FileValidationError(`File type '${file.mimetype}' is not permitted.`));
     }
     cb(null, true);

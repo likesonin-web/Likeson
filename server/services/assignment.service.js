@@ -1,6 +1,7 @@
 // services/assignment.service.js
 
 import mongoose from 'mongoose';
+import { emitToTicket } from '../utils/socketEmit.util.js';
 import SupportTicket from '../models/SupportTicket.js';
 import SupportAssignmentHistory from '../models/SupportAssignmentHistory.js';
 import SupportParticipant from '../models/SupportParticipant.js';
@@ -141,7 +142,7 @@ export async function assignTicket({ ticketId, actor, deviceInfo, assignees, not
     );
 
     if (io) {
-      io.to(`ticket:${ticketId}`).emit('support:assignment', { ticketId, assignees });
+      emitToTicket(io, ticketId, 'support:assignment', { ticketId, assignees });
     }
 
     return ticket;

@@ -1,9 +1,14 @@
- 
+// store/slices/chatSlice.js
+//
+// Messages are keyed by ticketId, each holding its own normalized
+// {byId, allIds} pair plus pagination cursor — this is the "chatSlice" from
+// the spec, deliberately separate from ticketSlice since message volume and
+// update frequency (every keystroke's typing event, every receipt) is an
+// order of magnitude higher than ticket-level changes.
 
 import { createSlice, createAsyncThunk, createSelector } from '@reduxjs/toolkit';
 import toast from 'react-hot-toast';
 import supportApi from '../../services/support/supportApi';
-import { sendMessageOverSocket, isSupportSocketConnected } from '../../services/support/supportSocket';
 
 const extractError = (err, fallback = 'Something went wrong.') => {
   const serverMsg = err?.response?.data?.message;
@@ -45,23 +50,6 @@ export const fetchMessages = createAsyncThunk(
 export const sendMessage = createAsyncThunk(
   'chat/sendMessage',
   async ({ ticketId, clientMessageId, payload }, { rejectWithValue }) => {
-    // PRIMARY path: send over the socket. It auto-reconnects and buffers
-    // emits made while briefly disconnected (e.g. backend restarting under
-    // nodemon) — a fresh axios POST has none of that, which is why
-    // messages were sometimes silently failing with ERR_CONNECTION_REFUSED
-    // even though the same message would go through moments later.
-    if (isSupportSocketConnected()) {
-      try {
-        const data = await sendMessageOverSocket(ticketId, { ...payload, clientMessageId });
-        return { ticketId, clientMessageId, message: data };
-      } catch (socketErr) {
-        // Socket send failed or timed out — fall through to REST rather
-        // than failing the message outright.
-        console.warn('[chatSlice] socket send failed, falling back to REST:', socketErr.message);
-      }
-    }
-
-    // FALLBACK path: REST. Also used when the socket was never connected.
     try {
       const { data } = await supportApi.sendMessage(ticketId, { ...payload, clientMessageId });
       return { ticketId, clientMessageId, message: data };
@@ -135,40 +123,6 @@ export const markMessagesRead = createAsyncThunk(
   }
 );
 
-/**
- * Dispatched by SupportSocketProvider whenever the socket (re)connects —
- * finds every message currently stuck in 'failed' (or 'sending', in case
- * the tab was closed/frozen mid-send) across ALL open threads and
- * re-dispatches sendMessage for each, using the tempMessage's own text/
- * attachment/replyTo as the payload. Fixes the "sometimes it just doesn't
- * send and I have to notice and click retry" complaint — it now retries
- * itself the moment connectivity is back.
- */
-export const resendStuckMessages = () => (dispatch, getState) => {
-  const { threads } = getState().chat;
-
-  Object.entries(threads).forEach(([ticketId, thread]) => {
-    Object.values(thread.byId).forEach((message) => {
-      if (message.status !== 'failed' && message.status !== 'sending') return;
-      if (!message._id || typeof message._id !== 'string') return;
-
-      dispatch(retryMessage({ ticketId, clientMessageId: message._id }));
-      dispatch(
-        sendMessage({
-          ticketId,
-          clientMessageId: message._id,
-          payload: {
-            messageType: message.messageType,
-            text: message.text,
-            attachment: message.attachment ?? undefined,
-            replyTo: message.replyTo ?? undefined,
-          },
-        })
-      );
-    });
-  });
-};
-
 // ── Slice ─────────────────────────────────────────────────────────────────
 
 const chatSlice = createSlice({
@@ -231,6 +185,9 @@ const chatSlice = createSlice({
         if (msg) {
           const receipt = msg.receipts?.find((r) => r.userId === userId);
           if (receipt) receipt.deliveredAt = new Date().toISOString();
+          // Advance single-tick -> double-tick(grey). Never downgrade a message
+          // that's already 'read' (read implies delivered).
+          if (msg.status === 'sent') msg.status = 'delivered';
         }
       });
     },
@@ -244,6 +201,7 @@ const chatSlice = createSlice({
         if (new Date(msg.createdAt) <= new Date(upToMsg.createdAt)) {
           const receipt = msg.receipts?.find((r) => r.userId === userId);
           if (receipt) receipt.readAt = new Date().toISOString();
+          if (msg.status === 'sent' || msg.status === 'delivered') msg.status = 'read';
         }
       });
     },

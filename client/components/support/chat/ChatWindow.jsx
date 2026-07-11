@@ -53,8 +53,35 @@ export default function ChatWindow({ ticketId, currentUser }) {
   const highlightTimeoutRef = useRef(null);
 
   useEffect(() => {
-    joinTicket(ticketId).catch(() => {});
-    return () => leaveTicket(ticketId);
+    let cancelled = false;
+
+    async function joinWithRetry(attempt = 1) {
+      try {
+        await joinTicket(ticketId);
+      } catch (err) {
+        if (cancelled) return;
+        console.error(`[ChatWindow] joinTicket failed (attempt ${attempt}):`, err.message);
+        // The very first attempt can legitimately race the socket's auth
+        // handshake right after a page load/reconnect — retry a couple of
+        // times before treating it as real. A REAL failure here (ticket not
+        // found, permission denied) is silent otherwise: the WebSocket
+        // connection itself still looks "connected", but this client never
+        // actually joins the room, so it will never receive a single live
+        // event for this ticket — exactly the "receiver needs a refresh"
+        // symptom, with zero visible error unless we surface it here.
+        if (attempt < 3) {
+          setTimeout(() => joinWithRetry(attempt + 1), attempt * 1000);
+        } else {
+          toast.error(`Live updates aren't connected for this chat (${err.message}). Try refreshing.`);
+        }
+      }
+    }
+
+    joinWithRetry();
+    return () => {
+      cancelled = true;
+      leaveTicket(ticketId);
+    };
   }, [ticketId, joinTicket, leaveTicket]);
 
   const items = useMemo(() => withDateSeparators(messages), [messages]);

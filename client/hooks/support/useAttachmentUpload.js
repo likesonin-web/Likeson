@@ -11,7 +11,12 @@ import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '../../features/support/
 const ALL_ALLOWED_MIMES = Object.values(ALLOWED_MIME_TYPES).flat();
 
 function classifyFile(mimeType) {
-  return Object.entries(ALLOWED_MIME_TYPES).find(([, mimes]) => mimes.includes(mimeType))?.[0] ?? null;
+  // Browsers report MediaRecorder's mimetype with a codec suffix, e.g.
+  // "audio/webm;codecs=opus" — strip it before matching against the plain
+  // "audio/webm" entries in ALLOWED_MIME_TYPES, or every recorded voice
+  // note gets rejected as "not a supported file type".
+  const base = mimeType?.split(';')[0]?.trim();
+  return Object.entries(ALLOWED_MIME_TYPES).find(([, mimes]) => mimes.includes(base))?.[0] ?? null;
 }
 
 /**
@@ -62,6 +67,7 @@ export function useAttachmentUpload(ticketId, currentUser) {
 
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('clientMessageId', clientMessageId);
 
       setIsUploading(true);
       setUploadProgress(0);

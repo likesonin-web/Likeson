@@ -1,6 +1,7 @@
 // services/message.service.js
 
 import sanitizeHtml from 'sanitize-html';
+import { emitToTicket } from '../utils/socketEmit.util.js';
 import SupportMessage from '../models/SupportMessage.js';
 import SupportTicket from '../models/SupportTicket.js';
 import SupportParticipant from '../models/SupportParticipant.js';
@@ -28,18 +29,57 @@ function sanitizeText(text) {
  * ticket. Mentioning a role with no matching active participant is not an
  * error — it simply resolves to zero recipients for that token.
  */
+/**
+ * Resolves @tokens to actual userIds of currently ACTIVE participants on
+ * this ticket. A token matches either:
+ *   - a platform role (e.g. "finance", "admin") — mentions everyone active
+ *     in that role, or
+ *   - a specific participant's display name with spaces stripped (e.g.
+ *     "@JohnSmith" for "John Smith") — the token inserted by the frontend's
+ *     mention-autocomplete dropdown when a person is selected by name.
+ * A token with no match (role or name) simply resolves to zero recipients
+ * for that token — not an error.
+ */
 async function resolveMentions(ticketId, mentionTokens) {
   if (!mentionTokens?.length) return { userIds: [], roles: [] };
 
   const participants = await SupportParticipant.find({ ticket: ticketId, active: true })
-    .populate('userId', 'role')
+    .populate('userId', 'role name')
     .lean();
 
-  const matched = participants.filter((p) => mentionTokens.includes(p.userId?.role));
+  const lowerTokens = mentionTokens.map((t) => t.toLowerCase());
+  const nameTokenOf = (name) => (name || '').replace(/\s+/g, '').toLowerCase();
+
+  const roleMatches = participants.filter((p) => p.userId?.role && lowerTokens.includes(p.userId.role.toLowerCase()));
+  const nameMatches = participants.filter((p) => lowerTokens.includes(nameTokenOf(p.userId?.name)));
+
+  const matched = [...roleMatches, ...nameMatches];
+  const uniqueUserIds = [...new Map(matched.map((p) => [String(p.userId._id), p.userId._id])).values()];
+
   return {
-    userIds: matched.map((p) => p.userId._id),
-    roles: [...new Set(matched.map((p) => p.userId.role))],
+    userIds: uniqueUserIds,
+    roles: [...new Set(roleMatches.map((p) => p.userId.role))],
   };
+}
+
+/**
+ * Populates the fields the frontend needs to render a message immediately
+ * (sender name/avatar for the bubble header, and a nested populate on
+ * replyTo.sender so the WhatsApp-style quoted-reply preview has both the
+ * quoted text AND the original sender's name without a refetch).
+ * Used before every socket emit and every direct API response involving a
+ * message — send, edit, delete, react — so no path can leak a bare
+ * unpopulated ObjectId to the client.
+ */
+async function populateMessage(message) {
+  return message.populate([
+    { path: 'sender', select: 'name role avatar' },
+    {
+      path: 'replyTo',
+      select: 'text messageType sender isDeleted',
+      populate: { path: 'sender', select: 'name role avatar' },
+    },
+  ]);
 }
 
 export async function sendMessage({ ticketId, actor, deviceInfo, payload, io }) {
@@ -134,8 +174,10 @@ export async function sendMessage({ ticketId, actor, deviceInfo, payload, io }) 
     deviceInfo,
   });
 
+  await populateMessage(message);
+
   if (io) {
-    io.to(`ticket:${ticketId}`).emit('support:message_receive', serializeMessage(message));
+    emitToTicket(io, ticketId, 'support:message_receive', serializeMessage(message));
   }
 
   if (mentionIds.length > 0) {
@@ -151,7 +193,7 @@ export async function sendMessage({ ticketId, actor, deviceInfo, payload, io }) 
   return message;
 }
 
-export async function editMessage({ ticketId, messageId, actor, deviceInfo, text }) {
+export async function editMessage({ ticketId, messageId, actor, deviceInfo, text, io }) {
   if (!canEditMessage(actor.role)) {
     throw new ForbiddenError('Only Admin or Superadmin can edit messages.');
   }
@@ -178,10 +220,16 @@ export async function editMessage({ ticketId, messageId, actor, deviceInfo, text
     deviceInfo,
   });
 
+  await populateMessage(message);
+
+  if (io) {
+    emitToTicket(io, ticketId, 'support:message_edit', serializeMessage(message));
+  }
+
   return message;
 }
 
-export async function deleteMessage({ ticketId, messageId, actor, deviceInfo, reason }) {
+export async function deleteMessage({ ticketId, messageId, actor, deviceInfo, reason, io }) {
   const message = await SupportMessage.findOne({ _id: messageId, ticket: ticketId });
   if (!message) throw new NotFoundError('Message');
 
@@ -205,10 +253,16 @@ export async function deleteMessage({ ticketId, messageId, actor, deviceInfo, re
     deviceInfo,
   });
 
+  await populateMessage(message);
+
+  if (io) {
+    emitToTicket(io, ticketId, 'support:message_delete', serializeMessage(message));
+  }
+
   return message;
 }
 
-export async function reactToMessage({ ticketId, messageId, actor, emoji }) {
+export async function reactToMessage({ ticketId, messageId, actor, emoji, io }) {
   const message = await SupportMessage.findOne({ _id: messageId, ticket: ticketId });
   if (!message) throw new NotFoundError('Message');
 
@@ -219,6 +273,13 @@ export async function reactToMessage({ ticketId, messageId, actor, emoji }) {
     message.reactions.push({ userId: actor._id, emoji });
   }
   await message.save();
+
+  await populateMessage(message);
+
+  if (io) {
+    emitToTicket(io, ticketId, 'support:message_react', serializeMessage(message));
+  }
+
   return message;
 }
 
@@ -226,6 +287,12 @@ export async function markDelivered({ ticketId, userId, messageIds }) {
   await SupportMessage.updateMany(
     { ticket: ticketId, _id: { $in: messageIds }, 'receipts.userId': userId, 'receipts.deliveredAt': null },
     { $set: { 'receipts.$.deliveredAt': new Date() } }
+  );
+  // Advance the single-tick -> double-tick(grey) status too. Never touches
+  // a message that's already 'read' — read is a superset of delivered.
+  await SupportMessage.updateMany(
+    { ticket: ticketId, _id: { $in: messageIds }, status: 'sent' },
+    { $set: { status: 'delivered' } }
   );
 }
 
@@ -283,6 +350,9 @@ export function serializeMessage(message) {
     isInternalNote: obj.isInternalNote,
     status: obj.status,
     isEdited: obj.isEdited,
+    isDeleted: obj.isDeleted,
+    reactions: obj.reactions,
+    receipts: obj.receipts,
     createdAt: obj.createdAt,
     // Required for sender-side optimistic-UI dedupe (chatSlice.receiveMessage
     // matches on this). Without it, the socket echo can't find and remove

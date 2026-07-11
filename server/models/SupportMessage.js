@@ -32,7 +32,7 @@ const attachmentSchema = new Schema(
     attachment: { type: Schema.Types.ObjectId, ref: 'SupportAttachment', default: null },
     url: { type: String, required: true },
     fileId: { type: String, required: true }, // ImageKit fileId
-    fileType: { type: String, enum: ['image', 'video', 'pdf', 'audio'], required: true },
+    fileType: { type: String, enum: ['image', 'video', 'pdf', 'document', 'audio'], required: true },
     originalName: { type: String, maxlength: 255 },
     mimeType: { type: String },
     sizeBytes: { type: Number },
