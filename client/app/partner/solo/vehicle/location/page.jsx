@@ -1,17 +1,22 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  MapPin, Navigation, Search, Loader2, CheckCircle2,
-  AlertTriangle, Map, Crosshair, Building2, Hash,
-  RefreshCw, Clock, Info, ChevronLeft
+  MapPin, Search, Loader2, CheckCircle2,
+  AlertTriangle, Crosshair, Building2, Hash,
+  Clock, Info, ChevronLeft, Car, Zap
 } from "lucide-react";
 import {
   updateVehicleLocation,
-  selectVehicle, selectLoading, selectError
+  fetchVehicle,
+  fetchDispatchStatus,
+  selectVehicle, 
+  selectDispatchStatus,
+  selectLoading, 
+  selectError
 } from "@/store/slices/soloDriverSlice";
 import Container from "@/components/ui/Container";
 
@@ -50,119 +55,17 @@ function Dot({ color = "bg-success", size = 2 }) {
   );
 }
 
-// ── Google Map ────────────────────────────────────────────────────────────────
-function LiveMap({ lat, lng, onMapClick }) {
-  const mapRef      = useRef(null);
-  const mapInstance = useRef(null);
-  const markerRef   = useRef(null);
-  const [loaded, setLoaded] = useState(false);
-
-  const initMap = useCallback(() => {
-    if (!mapRef.current || !window.google) return;
-    const center = { lat: lat || 16.506, lng: lng || 80.648 };
-
-    mapInstance.current = new window.google.maps.Map(mapRef.current, {
-      center,
-      zoom: 14,
-      mapTypeId: "roadmap",
-      styles: [
-        { featureType: "all",         elementType: "geometry",          stylers: [{ color: "#f1f5f9" }] },
-        { featureType: "all",         elementType: "labels.text.fill",  stylers: [{ color: "#475569" }] },
-        { featureType: "all",         elementType: "labels.text.stroke",stylers: [{ color: "#f8fafc" }] },
-        { featureType: "road",        elementType: "geometry",          stylers: [{ color: "#e2e8f0" }] },
-        { featureType: "road.highway",elementType: "geometry",          stylers: [{ color: "#cbd5e1" }] },
-        { featureType: "water",       elementType: "geometry",          stylers: [{ color: "#bae6fd" }] },
-        { featureType: "poi",         elementType: "all",               stylers: [{ visibility: "off" }] },
-        { featureType: "landscape",   elementType: "geometry",          stylers: [{ color: "#f8fafc" }] },
-      ],
-      disableDefaultUI: true,
-      zoomControl: true,
-      zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_CENTER },
-      gestureHandling: "cooperative",
-    });
-
-    markerRef.current = new window.google.maps.Marker({
-      position: center,
-      map: mapInstance.current,
-      draggable: true,
-      icon: {
-        path:        window.google.maps.SymbolPath.CIRCLE,
-        scale:       10,
-        fillColor:   "#2563eb",
-        fillOpacity: 1,
-        strokeColor: "#fff",
-        strokeWeight: 3,
-      },
-      title: "Your Location",
-    });
-
-    markerRef.current.addListener("dragend", () => {
-      const pos = markerRef.current.getPosition();
-      onMapClick(pos.lat(), pos.lng());
-    });
-
-    mapInstance.current.addListener("click", (e) => {
-      const pos = e.latLng;
-      markerRef.current.setPosition(pos);
-      onMapClick(pos.lat(), pos.lng());
-    });
-
-    setLoaded(true);
-  }, []); // eslint-disable-line
-
-  useEffect(() => {
-    if (window.google) { initMap(); return; }
-    const id = "gmaps-sdk";
-    if (!document.getElementById(id)) {
-      const s = document.createElement("script");
-      s.id    = id;
-      s.src   = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&libraries=places,geocoding`;
-      s.async = true;
-      s.defer = true;
-      s.onload = initMap;
-      document.head.appendChild(s);
-    } else {
-      const t = setInterval(() => { if (window.google) { clearInterval(t); initMap(); } }, 200);
-    }
-  }, [initMap]);
-
-  // Sync marker when coords change from outside
-  useEffect(() => {
-    if (loaded && markerRef.current && lat && lng) {
-      const pos = { lat, lng };
-      markerRef.current.setPosition(pos);
-      mapInstance.current?.panTo(pos);
-    }
-  }, [lat, lng, loaded]);
-
-  return (
-    <div className="relative w-full h-full rounded-2xl overflow-hidden">
-      <div ref={mapRef} className="w-full h-full" />
-      {!loaded && (
-        <div className="absolute inset-0 bg-base-200 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <span className="text-sm text-base-content/50 font-medium">Loading map…</span>
-          </div>
-        </div>
-      )}
-      {loaded && (
-        <div className="absolute top-3 left-3 bg-base-100/90 backdrop-blur-sm rounded-xl px-3 py-1.5
-                        border border-base-300 text-xs font-semibold text-base-content/60 shadow-sm">
-          Click on map or drag blue pin to set location
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function UpdateLocation() {
   const dispatch = useDispatch();
   const router   = useRouter();
-  const vehicle  = useSelector(selectVehicle);
-  const updating = useSelector(selectLoading("updateLocation"));
-  const error    = useSelector(selectError("updateLocation"));
+  
+  // Selectors
+  const vehicle         = useSelector(selectVehicle);
+  const dispatchStatus  = useSelector(selectDispatchStatus);
+  const updating        = useSelector(selectLoading("updateLocation"));
+  const fetchingVehicle = useSelector(selectLoading("vehicle"));
+  const error           = useSelector(selectError("updateLocation"));
 
   const [mode,        setMode]        = useState("gps"); // "gps" | "manual"
   const [coords,      setCoords]      = useState({ lat: null, lng: null });
@@ -173,10 +76,30 @@ export default function UpdateLocation() {
   const [saved,       setSaved]       = useState(false);
   const [geocoding,   setGeocoding]   = useState(false);
 
-  // Populate from existing vehicle location
+  // 1. Fetch fresh data on mount
   useEffect(() => {
-    if (vehicle?.lastKnownLocation?.coordinates) {
-      const [lng, lat] = vehicle.lastKnownLocation.coordinates;
+    dispatch(fetchVehicle());
+    dispatch(fetchDispatchStatus());
+  }, [dispatch]);
+
+  // 2. Inject Google Maps SDK for Geocoding
+  useEffect(() => {
+    if (window.google) return;
+    const id = "gmaps-sdk";
+    if (!document.getElementById(id)) {
+      const s = document.createElement("script");
+      s.id    = id;
+      s.src   = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&libraries=places,geocoding`;
+      s.async = true;
+      s.defer = true;
+      document.head.appendChild(s);
+    }
+  }, []);
+
+  // 3. Populate from existing standalone vehicle location format
+  useEffect(() => {
+    if (vehicle?.location?.coordinates) {
+      const [lng, lat] = vehicle.location.coordinates;
       setCoords({ lat, lng });
     }
   }, [vehicle]);
@@ -228,16 +151,11 @@ export default function UpdateLocation() {
         const { lat, lng } = results[0].geometry.location;
         setCoords({ lat: lat(), lng: lng() });
         setAddress(results[0].formatted_address);
+        setSaved(false);
       } else {
         setGpsError("Location not found. Please try a different area or city name.");
       }
     });
-  };
-
-  const handleMapClick = (lat, lng) => {
-    setCoords({ lat, lng });
-    reverseGeocode(lat, lng);
-    setSaved(false);
   };
 
   const handleSave = async () => {
@@ -249,9 +167,18 @@ export default function UpdateLocation() {
 
   const hasCoords = coords.lat !== null && coords.lng !== null;
 
-  const lastUpdated = vehicle?.lastLocationUpdatedAt
-    ? new Date(vehicle.lastLocationUpdatedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+  // Utilize the corrected timestamp field from standalone Vehicle schema
+  const lastUpdated = vehicle?.locationUpdatedAt
+    ? new Date(vehicle.locationUpdatedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
     : null;
+
+  if (fetchingVehicle && !vehicle) {
+    return (
+      <div className="min-h-screen bg-base-100 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-base-100 text-base-content font-[family-name:var(--font-family-poppins)]">
@@ -269,7 +196,7 @@ export default function UpdateLocation() {
       <div className="fixed bottom-1/3 left-1/4 w-80 h-80 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
 
       <Container>
-        <div className="relative py-6 lg:py-8 space-y-6">
+        <div className="relative py-6 lg:py-8 space-y-6 max-w-2xl mx-auto">
 
           {/* ── Back button ─────────────────────────────────────────────────── */}
           <motion.div initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
@@ -314,6 +241,29 @@ export default function UpdateLocation() {
                 </div>
               )}
             </div>
+            
+            {/* ── Driver / Vehicle Info Banner ───────────────────────────────── */}
+            <div className="bg-base-200/50 border-t border-base-300 px-5 py-3 flex flex-wrap gap-4 items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Car className="w-4 h-4 text-base-content/50" />
+                <span className="text-sm font-semibold text-base-content">
+                  {vehicle?.registrationNumber || 'No Vehicle Linked'}
+                </span>
+                <span className="text-xs text-base-content/50 border-l border-base-300 pl-2">
+                  {vehicle?.make} {vehicle?.model}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Zap className={`w-4 h-4 ${dispatchStatus === 'Available' ? 'text-success' : 'text-base-content/40'}`} />
+                <span className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Status:</span>
+                <span className={`text-sm font-bold ${
+                  dispatchStatus === 'Available' ? 'text-success' : 
+                  dispatchStatus === 'On-Trip' ? 'text-info' : 'text-warning'
+                }`}>
+                  {dispatchStatus || 'Offline'}
+                </span>
+              </div>
+            </div>
           </motion.div>
 
           {/* ── Mode toggle ──────────────────────────────────────────────────── */}
@@ -339,219 +289,196 @@ export default function UpdateLocation() {
           </motion.div>
 
           {/* ── Main layout ──────────────────────────────────────────────────── */}
-          <motion.div initial="hidden" animate="visible" variants={stagger}
-            className="grid grid-cols-1 lg:grid-cols-5 gap-5"
-          >
-            {/* Controls panel */}
-            <motion.div variants={fadeUp} className="lg:col-span-2 space-y-4">
-              <AnimatePresence mode="wait">
-                {/* GPS panel */}
-                {mode === "gps" ? (
-                  <motion.div
-                    key="gps-panel"
-                    initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
-                    className="rounded-2xl border border-base-300 bg-base-100 shadow-sm p-5 space-y-4"
-                  >
-                    <h3 className="text-sm font-bold text-base-content flex items-center gap-2">
-                      <Navigation className="w-4 h-4 text-primary" />
-                      GPS Auto-Detect
-                    </h3>
-
-                    <div>
-                      <button
-                        onClick={handleGetGps}
-                        disabled={gpsLoading}
-                        className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl bg-primary text-primary-content
-                                   text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-all shadow-sm"
-                      >
-                        {gpsLoading
-                          ? <Loader2 className="w-4 h-4 animate-spin" />
-                          : <Crosshair className="w-4 h-4" />}
-                        {gpsLoading ? "Getting location…" : "Get My Current Location"}
-                      </button>
-                      <FieldNote>Tap to detect your current GPS coordinates. Requires location permission to be granted in the browser.</FieldNote>
-                    </div>
-
-                    {gpsError && (
-                      <div className="flex items-start gap-2 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs">
-                        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />{gpsError}
-                      </div>
-                    )}
-
-                    <div className="p-3 rounded-xl bg-base-200/70 border border-base-300 space-y-1">
-                      <p className="text-xs font-semibold text-base-content/60">Or click on the map to set manually</p>
-                      <FieldNote>Drag the blue pin to the exact pickup point. Click anywhere on the map to move the pin there.</FieldNote>
-                    </div>
-                  </motion.div>
-                ) : (
-                  /* Manual panel */
-                  <motion.div
-                    key="manual-panel"
-                    initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
-                    className="rounded-2xl border border-base-300 bg-base-100 shadow-sm p-5 space-y-4"
-                  >
-                    <h3 className="text-sm font-bold text-base-content flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-primary" />
-                      Enter Location Manually
-                    </h3>
-
-                    {/* Area */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-base-content">Area / Landmark</label>
-                      <div className="relative">
-                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/30" />
-                        <input
-                          value={manualInput.area}
-                          onChange={e => setManualInput(p => ({ ...p, area: e.target.value }))}
-                          placeholder="e.g. Benz Circle, MG Road"
-                          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-base-200 border border-base-300 focus:border-primary/60
-                                     text-base-content text-sm placeholder:text-base-content/30 outline-none focus:ring-2
-                                     focus:ring-primary/20 transition-all"
-                        />
-                      </div>
-                      <FieldNote>Enter a well-known landmark, area name, or street to locate your position accurately.</FieldNote>
-                    </div>
-
-                    {/* City */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-base-content">City</label>
-                      <div className="relative">
-                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/30" />
-                        <input
-                          value={manualInput.city}
-                          onChange={e => setManualInput(p => ({ ...p, city: e.target.value }))}
-                          placeholder="e.g. Vijayawada"
-                          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-base-200 border border-base-300 focus:border-primary/60
-                                     text-base-content text-sm placeholder:text-base-content/30 outline-none focus:ring-2
-                                     focus:ring-primary/20 transition-all"
-                        />
-                      </div>
-                      <FieldNote>Enter the city name. Combined with the area above, this helps geocoding find an accurate pin on the map.</FieldNote>
-                    </div>
-
-                    {/* Pincode */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-base-content">PIN Code</label>
-                      <div className="relative">
-                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/30" />
-                        <input
-                          value={manualInput.pincode}
-                          onChange={e => setManualInput(p => ({ ...p, pincode: e.target.value }))}
-                          placeholder="e.g. 520001"
-                          maxLength={6}
-                          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-base-200 border border-base-300 focus:border-primary/60
-                                     text-base-content text-sm placeholder:text-base-content/30 outline-none focus:ring-2
-                                     focus:ring-primary/20 transition-all"
-                        />
-                      </div>
-                      <FieldNote>6-digit Indian PIN code. Optional but improves geocoding accuracy significantly.</FieldNote>
-                    </div>
-
-                    <div>
-                      <button
-                        onClick={handleManualGeocode}
-                        disabled={geocoding || (!manualInput.area && !manualInput.city && !manualInput.pincode)}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary/10 border border-primary/25
-                                   text-primary text-sm font-bold hover:bg-primary/20 disabled:opacity-40 transition-all"
-                      >
-                        {geocoding
-                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          : <Search className="w-3.5 h-3.5" />}
-                        {geocoding ? "Finding location…" : "Find on Map"}
-                      </button>
-                      <FieldNote>Click to geocode the address above and place the pin on the map. You can drag the pin afterwards for fine-tuning.</FieldNote>
-                    </div>
-
-                    {gpsError && (
-                      <div className="flex items-start gap-2 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs">
-                        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />{gpsError}
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Detected address */}
-              {address && (
+          <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-4">
+            
+            <AnimatePresence mode="wait">
+              {/* GPS panel */}
+              {mode === "gps" ? (
                 <motion.div
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                  className="rounded-2xl border border-success/25 bg-success/5 p-4 space-y-1"
+                  key="gps-panel"
+                  initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
+                  className="rounded-2xl border border-base-300 bg-base-100 shadow-sm p-5 space-y-4"
                 >
-                  <p className="text-xs font-bold text-success flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />Detected Address
-                  </p>
-                  <p className="text-sm text-base-content/70 leading-relaxed">{address}</p>
-                </motion.div>
-              )}
+                  <h3 className="text-sm font-bold text-base-content flex items-center gap-2">
+                    <Crosshair className="w-4 h-4 text-primary" />
+                    GPS Auto-Detect
+                  </h3>
 
-              {/* Coordinates display */}
-              {hasCoords && (
-                <motion.div
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="rounded-2xl border border-base-300 bg-base-200/50 p-4"
-                >
-                  <p className="text-xs font-bold text-base-content/60 mb-2">Selected Coordinates</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="p-2.5 rounded-xl bg-base-100 border border-base-300 text-center">
-                      <p className="text-xs text-base-content/40 mb-0.5">Latitude</p>
-                      <p className="text-sm font-bold text-primary font-mono">{coords.lat?.toFixed(6)}</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-base-100 border border-base-300 text-center">
-                      <p className="text-xs text-base-content/40 mb-0.5">Longitude</p>
-                      <p className="text-sm font-bold text-primary font-mono">{coords.lng?.toFixed(6)}</p>
-                    </div>
-                  </div>
-                  <FieldNote>These coordinates will be saved as your vehicle's current location visible to nearby customers.</FieldNote>
-                </motion.div>
-              )}
-
-              {/* Save button */}
-              <AnimatePresence>
-                {hasCoords && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  >
-                    {error && (
-                      <div className="mb-2 flex items-center gap-2 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs font-semibold">
-                        <AlertTriangle className="w-3.5 h-3.5" />{error}
-                      </div>
-                    )}
-                    {saved && (
-                      <div className="mb-2 flex items-center gap-2 p-3 rounded-xl bg-success/10 border border-success/20 text-success text-xs font-semibold">
-                        <CheckCircle2 className="w-3.5 h-3.5" />Location updated successfully!
-                      </div>
-                    )}
+                  <div>
                     <button
-                      onClick={handleSave}
-                      disabled={updating}
+                      onClick={handleGetGps}
+                      disabled={gpsLoading}
                       className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl bg-primary text-primary-content
                                  text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-all shadow-sm"
                     >
-                      {updating
+                      {gpsLoading
                         ? <Loader2 className="w-4 h-4 animate-spin" />
-                        : <MapPin className="w-4 h-4" />}
-                      {updating ? "Updating location…" : "Save Location"}
+                        : <Crosshair className="w-4 h-4" />}
+                      {gpsLoading ? "Getting location…" : "Get My Current Location"}
                     </button>
-                    <FieldNote>Saving updates your location on the dispatch system. Customers searching for nearby drivers will see your updated position.</FieldNote>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
+                    <FieldNote>Tap to detect your current GPS coordinates. Requires location permission to be granted in the browser.</FieldNote>
+                  </div>
 
-            {/* Map */}
-            <motion.div
-              variants={fadeUp}
-              className="lg:col-span-3 rounded-2xl border border-base-300 bg-base-100 shadow-sm overflow-hidden"
-              style={{ height: 460 }}
-            >
-              <div className="h-full">
-                <LiveMap
-                  lat={coords.lat || 16.506}
-                  lng={coords.lng || 80.648}
-                  onMapClick={handleMapClick}
-                />
-              </div>
-            </motion.div>
+                  {gpsError && (
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />{gpsError}
+                    </div>
+                  )}
+                </motion.div>
+              ) : (
+                /* Manual panel */
+                <motion.div
+                  key="manual-panel"
+                  initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
+                  className="rounded-2xl border border-base-300 bg-base-100 shadow-sm p-5 space-y-4"
+                >
+                  <h3 className="text-sm font-bold text-base-content flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-primary" />
+                    Enter Location Manually
+                  </h3>
+
+                  {/* Area */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-base-content">Area / Landmark</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/30" />
+                      <input
+                        value={manualInput.area}
+                        onChange={e => setManualInput(p => ({ ...p, area: e.target.value }))}
+                        placeholder="e.g. Benz Circle, MG Road"
+                        className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-base-200 border border-base-300 focus:border-primary/60
+                                   text-base-content text-sm placeholder:text-base-content/30 outline-none focus:ring-2
+                                   focus:ring-primary/20 transition-all"
+                      />
+                    </div>
+                    <FieldNote>Enter a well-known landmark, area name, or street to locate your position accurately.</FieldNote>
+                  </div>
+
+                  {/* City */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-base-content">City</label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/30" />
+                      <input
+                        value={manualInput.city}
+                        onChange={e => setManualInput(p => ({ ...p, city: e.target.value }))}
+                        placeholder="e.g. Vijayawada"
+                        className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-base-200 border border-base-300 focus:border-primary/60
+                                   text-base-content text-sm placeholder:text-base-content/30 outline-none focus:ring-2
+                                   focus:ring-primary/20 transition-all"
+                      />
+                    </div>
+                    <FieldNote>Enter the city name. Combined with the area above, this helps geocoding accurately establish coordinates.</FieldNote>
+                  </div>
+
+                  {/* Pincode */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-base-content">PIN Code</label>
+                    <div className="relative">
+                      <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/30" />
+                      <input
+                        value={manualInput.pincode}
+                        onChange={e => setManualInput(p => ({ ...p, pincode: e.target.value }))}
+                        placeholder="e.g. 520001"
+                        maxLength={6}
+                        className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-base-200 border border-base-300 focus:border-primary/60
+                                   text-base-content text-sm placeholder:text-base-content/30 outline-none focus:ring-2
+                                   focus:ring-primary/20 transition-all"
+                      />
+                    </div>
+                    <FieldNote>6-digit Indian PIN code. Optional but improves geocoding accuracy significantly.</FieldNote>
+                  </div>
+
+                  <div>
+                    <button
+                      onClick={handleManualGeocode}
+                      disabled={geocoding || (!manualInput.area && !manualInput.city && !manualInput.pincode)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary/10 border border-primary/25
+                                 text-primary text-sm font-bold hover:bg-primary/20 disabled:opacity-40 transition-all"
+                    >
+                      {geocoding
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <Search className="w-3.5 h-3.5" />}
+                      {geocoding ? "Finding location…" : "Find Coordinates"}
+                    </button>
+                    <FieldNote>Click to convert the address above into geographical coordinates for your vehicle.</FieldNote>
+                  </div>
+
+                  {gpsError && (
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />{gpsError}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Detected address */}
+            {address && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl border border-success/25 bg-success/5 p-4 space-y-1"
+              >
+                <p className="text-xs font-bold text-success flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />Detected Address
+                </p>
+                <p className="text-sm text-base-content/70 leading-relaxed">{address}</p>
+              </motion.div>
+            )}
+
+            {/* Coordinates display */}
+            {hasCoords && (
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="rounded-2xl border border-base-300 bg-base-200/50 p-4"
+              >
+                <p className="text-xs font-bold text-base-content/60 mb-2">Selected Coordinates</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 rounded-xl bg-base-100 border border-base-300 text-center">
+                    <p className="text-xs text-base-content/40 mb-0.5">Latitude</p>
+                    <p className="text-sm font-bold text-primary font-mono">{coords.lat?.toFixed(6)}</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-base-100 border border-base-300 text-center">
+                    <p className="text-xs text-base-content/40 mb-0.5">Longitude</p>
+                    <p className="text-sm font-bold text-primary font-mono">{coords.lng?.toFixed(6)}</p>
+                  </div>
+                </div>
+                <FieldNote>These coordinates will be saved as your vehicle's current location visible to nearby customers.</FieldNote>
+              </motion.div>
+            )}
+
+            {/* Save button */}
+            <AnimatePresence>
+              {hasCoords && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                >
+                  {error && (
+                    <div className="mb-2 flex items-center gap-2 p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs font-semibold">
+                      <AlertTriangle className="w-3.5 h-3.5" />{error}
+                    </div>
+                  )}
+                  {saved && (
+                    <div className="mb-2 flex items-center gap-2 p-3 rounded-xl bg-success/10 border border-success/20 text-success text-xs font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5" />Location updated successfully!
+                    </div>
+                  )}
+                  <button
+                    onClick={handleSave}
+                    disabled={updating}
+                    className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl bg-primary text-primary-content
+                               text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-all shadow-sm"
+                  >
+                    {updating
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <MapPin className="w-4 h-4" />}
+                    {updating ? "Updating location…" : "Save Location"}
+                  </button>
+                  <FieldNote>Saving updates your location on the dispatch system. Customers searching for nearby drivers will see your updated position.</FieldNote>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
           </motion.div>
 
           {/* ── Info banner ──────────────────────────────────────────────────── */}

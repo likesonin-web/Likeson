@@ -109,10 +109,14 @@ const vehicleSchema = new Schema(
     photos: [{ type: String }],
 
     // ── GPS / Live Location (top-level — own write path, own index) ──────
+    // No default coordinates: a vehicle with no GPS fix yet should not
+    // resolve to a real place. A hardcoded real-world default here would
+    // make every freshly-added, not-yet-pinged vehicle appear physically
+    // located there for any nearby-vehicle query.
     gpsDeviceId: { type: String },
     location: {
       type:        { type: String, enum: ['Point'], default: 'Point' },
-      coordinates: { type: [Number], default: [80.648, 16.506] }, // [lng, lat]
+      coordinates: { type: [Number] }, // [lng, lat]
     },
     locationUpdatedAt: { type: Date },
     heading:           { type: Number, min: 0, max: 360 },
@@ -208,9 +212,17 @@ vehicleSchema.pre('save', function () {
 });
 
 // ── Post-save: sync owner cache ────────────────────────────────────────────────
-// Vehicle now lives in own collection — owner docs no longer hold embedded
-// vehicle data, but still keep small read-optimized caches (fleetInfo counts,
-// vehicleStatus snapshot) so dispatch reads / virtuals stay cheap & sync.
+// TransportPartner still keeps a small read-optimized fleetInfo count cache
+// (cheap to derive, doesn't drift meaningfully since it's just a count).
+//
+// SoloDriverPartner does NOT — its `vehicleStatus` embedded cache was
+// removed (see SoloDriverPartner model notes): it went stale and duplicated
+// this collection. The write below used to still push into that
+// nonexistent `vehicleStatus` path on every vehicle save; with the field
+// gone from the schema, Mongoose's default strict mode silently drops it,
+// so it was a dead write doing nothing but wasting a query. Removed —
+// SoloDriverPartner.vehicle (virtual populate) / getVehicle() read this
+// collection live instead.
 
 vehicleSchema.post('save', async function () {
   try {
@@ -228,18 +240,6 @@ vehicleSchema.post('save', async function () {
       await mongoose.model('TransportPartner').findByIdAndUpdate(this.ownerId, {
         'fleetInfo.totalVehicles':  totals?.total  ?? 0,
         'fleetInfo.activeVehicles': totals?.active ?? 0,
-      });
-    }
-
-    if (this.ownerType === 'SoloDriverPartner') {
-      await mongoose.model('SoloDriverPartner').findByIdAndUpdate(this.ownerId, {
-        vehicleStatus: {
-          hasVehicle:          true,
-          registrationNumber:  this.registrationNumber,
-          verificationStatus:  this.verificationStatus,
-          isActive:            this.status === 'active',
-          syncedAt:            new Date(),
-        },
       });
     }
   } catch (err) {

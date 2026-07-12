@@ -34,6 +34,12 @@
  * FIX 5 — autoAssignNearestDriver(): removed dead/unreachable "TP-only
  * match" branch inside the retry loop — nearestCandidate can never
  * return partnerType 'tp' (only solo/agency), so that branch never ran.
+ *
+ * FIX 6 — findNearbyDrivers(): UPDATED FOR NEW SOLO DRIVER SCHEMA. 
+ * Live GPS (`location`) and distance calculations are now executed directly 
+ * against the `SoloDriverPartner` collection. The removed `vehicleStatus` 
+ * cache is bypassed, and the live `Vehicle` doc is fetched manually by 
+ * `ownerId` to construct the result object.
  * ─────────────────────────────────────────────────────────────────────────
  *
  * 1. Nearby TP / Solo driver matching — pickup city/pincode match first;
@@ -98,13 +104,6 @@ const haversineKm = ([lng1, lat1], [lng2, lat2]) => {
 // (4) MINIMUM LEAD TIME
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * validateMinimumLeadTime — throws a plain Error (statusCode 400) if
- * scheduledAt is less than minHours from now. Accepts a string, number, or
- * Date (every real caller passes a raw string straight from req.body) and
- * ALWAYS returns the parsed Date on success, so callers can safely do
- * `scheduledDate = validateMinimumLeadTime(req.body.scheduledAt)`.
- */
 export const validateMinimumLeadTime = (scheduledAtInput, minHours = MIN_BOOKING_LEAD_HOURS) => {
   const scheduledDate = scheduledAtInput instanceof Date ? scheduledAtInput : new Date(scheduledAtInput);
 
@@ -132,9 +131,6 @@ export const validateMinimumLeadTime = (scheduledAtInput, minHours = MIN_BOOKING
 // (3) CANCELLATION REFUND RESOLUTION
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * resolveCancellationRefund
- */
 export const resolveCancellationRefund = (booking, cancelledBy) => {
   const totalAmount = booking.fareBreakdown?.totalAmount ?? 0;
 
@@ -195,37 +191,41 @@ export const findNearbyDrivers = async ({
 
   const zoneClauses = buildZoneOrClauses(pickupCity, pickupPincode);
 
-  const shapeSolo = async (vehicles) => {
-    const results = await Promise.all(
-      vehicles.map(async (vehicle) => {
-        if (excludeSoloIds.includes(String(vehicle.ownerId))) return null;
-        const sp = await SoloDriverPartner.findOne({
-          _id: vehicle.ownerId,
-          partnershipStatus: 'active',
-          isAvailable: true,
-          isOnboardingComplete: true,
-          'dispatch.status': 'Available',
-        })
-          .select('legalName partnerCode phone serviceZones rating dispatch user')
-          .populate('user', 'name phone')
-          .lean();
-        if (!sp) return null;
-        return {
-          partnerType: 'solo',
-          soloPartnerId: sp._id,
-          name: sp.legalName,
-          phone: sp.phone,
-          rating: sp.rating?.averageRating ?? 0,
-          vehicle: {
-            vehicleId: vehicle._id,
-            registrationNumber: vehicle.registrationNumber,
-            make: vehicle.make,
-            model: vehicle.model,
-          },
-          distanceKm: +haversineKm(pickupCoords, vehicle.location?.coordinates || [0, 0]).toFixed(2),
-        };
-      }),
-    );
+  // Directly shapes Solo Partners based on the updated schema
+  const shapeSolo = async (partners) => {
+    if (!partners || partners.length === 0) return [];
+    
+    // Fetch all associated vehicles in one batch
+    const partnerIds = partners.map(p => p._id);
+    const vehicles = await Vehicle.find({ ownerType: 'SoloDriverPartner', ownerId: { $in: partnerIds } }).lean();
+
+    const results = partners.map((sp) => {
+      if (excludeSoloIds.includes(String(sp._id))) return null;
+      
+      const vehicle = vehicles.find(v => String(v.ownerId) === String(sp._id));
+
+      return {
+        partnerType: 'solo',
+        soloPartnerId: sp._id,
+        name: sp.legalName,
+        phone: sp.phone,
+        rating: sp.rating?.averageRating ?? 0,
+        vehicle: vehicle ? {
+          vehicleId: vehicle._id,
+          registrationNumber: vehicle.registrationNumber,
+          make: vehicle.make,
+          model: vehicle.model,
+        } : {
+          vehicleId: null,
+          registrationNumber: 'N/A',
+          make: 'Unknown', model: 'Unknown'
+        },
+        // Calculate distance from the SoloDriverPartner's location field, not the vehicle
+        distanceKm: sp.location?.coordinates?.length === 2
+          ? +haversineKm(pickupCoords, sp.location.coordinates).toFixed(2)
+          : 0,
+      };
+    });
     return results.filter(Boolean);
   };
 
@@ -241,25 +241,25 @@ export const findNearbyDrivers = async ({
         phone: d.phone,
         rating: d.performance?.rating ?? 0,
         vehicle: d.assignedVehicleSnapshot,
-        distanceKm: +haversineKm(pickupCoords, d.location?.coordinates || [0, 0]).toFixed(2),
+        distanceKm: d.location?.coordinates?.length === 2 
+          ? +haversineKm(pickupCoords, d.location.coordinates).toFixed(2)
+          : 0,
       }));
   };
 
   let soloResults = [], agencyResults = [], tpResults = [];
   let strategy = null;
 
+  // STRATEGY A: Zone Match
   if (zoneClauses.length) {
     if (wantSolo) {
-      const matchedSoloIds = await SoloDriverPartner.find({
-        partnershipStatus: 'active', isAvailable: true, isOnboardingComplete: true,
+      const activeSolos = await SoloDriverPartner.find({
+        partnershipStatus: 'active', isAvailable: true, isOnboardingComplete: true, 'dispatch.status': 'Available',
         $or: zoneClauses,
-      }).select('_id').lean();
-      if (matchedSoloIds.length) {
-        const vehicles = await Vehicle.find({
-          ownerType: 'SoloDriverPartner', status: 'active', verificationStatus: 'verified',
-          ownerId: { $in: matchedSoloIds.map((p) => p._id) },
-        }).select('_id registrationNumber make model ownerId location').lean();
-        soloResults = await shapeSolo(vehicles);
+      }).select('legalName partnerCode phone serviceZones rating dispatch user location').populate('user', 'name phone').lean();
+      
+      if (activeSolos.length) {
+        soloResults = await shapeSolo(activeSolos);
       }
     }
     if (wantAgency) {
@@ -289,13 +289,18 @@ export const findNearbyDrivers = async ({
     }
   }
 
+  // STRATEGY B: 30km Radius Match
   if (!strategy) {
     if (wantSolo) {
-      const vehicles = await Vehicle.find({
-        ownerType: 'SoloDriverPartner', status: 'active', verificationStatus: 'verified',
+      // Geo-query directly on SoloDriverPartner.location per new schema
+      const activeSolos = await SoloDriverPartner.find({
+        partnershipStatus: 'active', isAvailable: true, isOnboardingComplete: true, 'dispatch.status': 'Available',
         location: { $geoWithin: { $centerSphere: [[lng, lat], radiusRad] } },
-      }).select('_id registrationNumber make model ownerId location').lean();
-      soloResults = await shapeSolo(vehicles);
+      }).select('legalName partnerCode phone serviceZones rating dispatch user location').populate('user', 'name phone').lean();
+      
+      if (activeSolos.length) {
+        soloResults = await shapeSolo(activeSolos);
+      }
     }
     if (wantAgency) {
       const drivers = await Driver.find({
@@ -316,12 +321,16 @@ export const findNearbyDrivers = async ({
     }
   }
 
+  // STRATEGY C: All Partners Fallback
   if (!strategy) {
     if (wantSolo) {
-      const vehicles = await Vehicle.find({
-        ownerType: 'SoloDriverPartner', status: 'active', verificationStatus: 'verified',
-      }).select('_id registrationNumber make model ownerId location').lean();
-      soloResults = await shapeSolo(vehicles);
+      const activeSolos = await SoloDriverPartner.find({
+        partnershipStatus: 'active', isAvailable: true, isOnboardingComplete: true, 'dispatch.status': 'Available',
+      }).select('legalName partnerCode phone serviceZones rating dispatch user location').populate('user', 'name phone').lean();
+      
+      if (activeSolos.length) {
+        soloResults = await shapeSolo(activeSolos);
+      }
     }
     if (wantAgency) {
       const drivers = await Driver.find({ isActive: true, isVerified: true, isBlocked: false, status: 'Available' })
@@ -351,16 +360,10 @@ export const findNearbyDrivers = async ({
   };
 };
 
-/**
- * findNearbySoloDrivers — Legacy wrapper
- */
 export const findNearbySoloDrivers = async (params) => {
   return findNearbyDrivers({ ...params, partnerType: 'solo' });
 };
 
-/**
- * findNearbyAgencyDrivers — Legacy wrapper ensuring calls for agency drivers work
- */
 export const findNearbyAgencyDrivers = async (params) => {
   return findNearbyDrivers({ ...params, partnerType: 'agency' });
 };
@@ -858,7 +861,7 @@ export default {
   resolveCancellationRefund,
   findNearbyDrivers,
   findNearbySoloDrivers, 
-  findNearbyAgencyDrivers, // <--- ADDED HERE
+  findNearbyAgencyDrivers,
   autoAssignNearestDriver,
   handleRideRejection,
   activateReturnRide,

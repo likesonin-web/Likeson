@@ -16,10 +16,6 @@ const rejectWith = (thunkAPI, error, fallback = 'Something went wrong') => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §A  PROFILE THUNKS
-// Routes: GET /me, PATCH /me, PATCH /me/contact, PATCH /me/address,
-//         PATCH /me/professional, POST /me/training-certificates,
-//         DELETE /me/training-certificates/:certId, PATCH /me/emergency,
-//         GET /me/settings, PATCH /me/settings, DELETE /me
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const fetchMyProfile = createAsyncThunk(
@@ -174,7 +170,6 @@ export const requestAccountDeletion = createAsyncThunk(
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §B  KYC THUNKS
-// Routes: GET /kyc, POST /kyc, POST /kyc/medical, POST /kyc/psv
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const fetchKycStatus = createAsyncThunk(
@@ -235,8 +230,6 @@ export const submitPsvBadge = createAsyncThunk(
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §C  VEHICLE THUNKS
-// Routes: GET /vehicle, PUT /vehicle, PATCH /vehicle/documents,
-//         PATCH /vehicle/features, PATCH /vehicle/location
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const fetchVehicle = createAsyncThunk(
@@ -311,7 +304,6 @@ export const updateVehicleLocation = createAsyncThunk(
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §D  BANK & SETTLEMENT THUNKS
-// Routes: GET /bank, POST /bank, GET /settlement
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const fetchBankDetails = createAsyncThunk(
@@ -356,8 +348,6 @@ export const fetchSettlementSummary = createAsyncThunk(
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §E  DISPATCH THUNKS
-// Routes: GET /dispatch/status, PATCH /dispatch/status, PATCH /dispatch/shift
-// NOTE: Old /availability thunks removed — router has no such routes.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const fetchDispatchStatus = createAsyncThunk(
@@ -372,14 +362,13 @@ export const fetchDispatchStatus = createAsyncThunk(
   }
 );
 
-// status: 'Available' | 'Offline' | 'On-Break'
 export const updateDispatchStatus = createAsyncThunk(
   'soloDriver/updateDispatchStatus',
   async (status, thunkAPI) => {
     try {
       const { data } = await API.patch(`${BASE}/dispatch/status`, { status });
       toast.success(data.message || `Status: ${status}`);
-      return data.data; // { status }
+      return data.data; 
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Status update failed');
       return rejectWith(thunkAPI, err, 'Failed to update dispatch status');
@@ -387,7 +376,6 @@ export const updateDispatchStatus = createAsyncThunk(
   }
 );
 
-// payload: { shiftType?, startTime?, endTime?, daysAvailable? }
 export const updateDispatchShift = createAsyncThunk(
   'soloDriver/updateDispatchShift',
   async (payload, thunkAPI) => {
@@ -404,7 +392,6 @@ export const updateDispatchShift = createAsyncThunk(
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §F  SERVICE ZONES THUNKS
-// Routes: GET /service-zones, POST /service-zones, DELETE /service-zones/:zoneId
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const fetchServiceZones = createAsyncThunk(
@@ -453,7 +440,7 @@ export const updateServiceZone = createAsyncThunk(
     try {
       const { data } = await API.patch(`${BASE}/service-zones/${zoneId}`, payload);
       toast.success(data.message || 'Service zone updated');
-      return data.data; // Returns the single updated zone object
+      return data.data;
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to update service zone');
       return rejectWith(thunkAPI, err, 'Failed to update service zone');
@@ -463,7 +450,6 @@ export const updateServiceZone = createAsyncThunk(
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §G  PRICING THUNKS
-// Routes: GET /pricing, PUT /pricing
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const fetchPricing = createAsyncThunk(
@@ -494,8 +480,6 @@ export const updatePricing = createAsyncThunk(
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §H  PERFORMANCE & REWARDS THUNKS
-// Routes: GET /performance, GET /rewards, GET /rewards/badges
-// NOTE: Old /stats and /rating thunks removed — router has no such routes.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const fetchPerformance = createAsyncThunk(
@@ -536,7 +520,6 @@ export const fetchRewardBadges = createAsyncThunk(
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §I  COMPLIANCE THUNKS
-// Routes: GET /compliance
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const fetchComplianceDashboard = createAsyncThunk(
@@ -553,11 +536,6 @@ export const fetchComplianceDashboard = createAsyncThunk(
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §J  SECURITY & NOTIFICATIONS THUNKS
-// Routes: GET /security/sessions, DELETE /security/sessions/:sessionId,
-//         GET /security/devices, DELETE /security/devices/:deviceId,
-//         POST /security/change-password,
-//         GET /notifications, PATCH /notifications/:id/read,
-//         PATCH /notifications/read-all
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const fetchSessions = createAsyncThunk(
@@ -672,14 +650,6 @@ export const markNotificationRead = createAsyncThunk(
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §K  ADMIN THUNKS
-// Routes: GET /admin/list, POST /admin/create, GET /admin/:id,
-//         PATCH /admin/:id/verify-kyc, PATCH /admin/:id/verify-vehicle,
-//         PATCH /admin/:id/verify-bank, PATCH /admin/:id/status,
-//         PATCH /admin/:id/block, PATCH /admin/:id/platform-fee,
-//         GET /admin/compliance-alerts, POST /admin/:id/notes,
-//         PATCH /admin/:id/rewards/award-badge,
-//         PATCH /admin/:id/rewards/adjust-coins
-// NOTE: adminCreateCompanionDriver removed — router has no /admin/:id/create-driver route.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const adminCreateSoloDriver = createAsyncThunk(
@@ -760,7 +730,7 @@ export const adminVerifyKyc = createAsyncThunk(
         action, rejectionReason,
       });
       toast.success(data.message || `KYC ${action}d`);
-      return { partnerId, ...data.data }; // { kycStatus, autoActivated, partnershipStatus }
+      return { partnerId, ...data.data };
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Action failed');
       return rejectWith(thunkAPI, err, 'KYC verification action failed');
@@ -776,7 +746,7 @@ export const adminVerifyVehicle = createAsyncThunk(
         action, rejectionReason,
       });
       toast.success(data.message || `Vehicle ${action}d`);
-      return { partnerId, ...data.data }; // { vehicleStatus, autoActivated, partnershipStatus }
+      return { partnerId, ...data.data };
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Action failed');
       return rejectWith(thunkAPI, err, 'Vehicle verification action failed');
@@ -790,7 +760,7 @@ export const adminVerifyBank = createAsyncThunk(
     try {
       const { data } = await API.patch(`${ADMIN}/${partnerId}/verify-bank`);
       toast.success(data.message || 'Bank account verified');
-      return { partnerId, ...data.data }; // { bankVerified, autoActivated, partnershipStatus }
+      return { partnerId, ...data.data };
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Verification failed');
       return rejectWith(thunkAPI, err, 'Bank verification failed');
@@ -861,7 +831,6 @@ export const adminUpdateNotes = createAsyncThunk(
   }
 );
 
-// payload: { partnerId, badgeId, name, description?, iconUrl? }
 export const adminAwardBadge = createAsyncThunk(
   'soloDriver/adminAwardBadge',
   async ({ partnerId, badgeId, name, description, iconUrl }, thunkAPI) => {
@@ -878,7 +847,6 @@ export const adminAwardBadge = createAsyncThunk(
   }
 );
 
-// payload: { partnerId, type: 'ADMIN_CREDIT'|'ADMIN_DEBIT', amount, description }
 export const adminAdjustCoins = createAsyncThunk(
   'soloDriver/adminAdjustCoins',
   async ({ partnerId, type, amount, description }, thunkAPI) => {
@@ -906,12 +874,12 @@ const initialState = {
   vehicle:       null,
   bankDetails:   null,
   settlement:    null,
-  dispatch:      null,   // replaces availability — GET /dispatch/status payload
+  dispatch:      null,
   serviceZones:  [],
   pricing:       null,
-  performance:   null,   // GET /performance
-  rewards:       null,   // GET /rewards
-  badges:        [],     // GET /rewards/badges
+  performance:   null,
+  rewards:       null,
+  badges:        [],
   compliance:    null,
   sessions:      [],
   devices:       [],
@@ -931,7 +899,6 @@ const initialState = {
   },
 
   loading: {
-    // Profile
     profile:               false,
     updateProfile:         false,
     updateContact:         false,
@@ -943,49 +910,38 @@ const initialState = {
     settings:              false,
     updateSettings:        false,
     deletionRequest:       false,
-    // KYC
     kyc:                   false,
     submitKyc:             false,
     submitMedical:         false,
     submitPsv:             false,
-    // Vehicle
     vehicle:               false,
     updateVehicle:         false,
     updateVehicleDocs:     false,
     updateVehicleFeatures: false,
     updateLocation:        false,
-    // Bank & Settlement
     bank:                  false,
     submitBank:            false,
     settlement:            false,
-    // Dispatch
     dispatch:              false,
     updateDispatchStatus:  false,
     updateDispatchShift:   false,
- // Service Zones
     serviceZones:          false,
     addZone:               false,
     removeZone:            false,
     updateZone:            false,
-    // Pricing
     pricing:               false,
     updatePricing:         false,
-    // Performance & Rewards
     performance:           false,
     rewards:               false,
     badges:                false,
-    // Compliance
     compliance:            false,
-    // Security
     sessions:              false,
     revokeSession:         false,
     devices:               false,
     removeDevice:          false,
     changePassword:        false,
-    // Notifications
     notifications:         false,
     markAllRead:           false,
-    // Admin
     adminCreate:           false,
     adminList:             false,
     adminDetail:           false,
@@ -1021,7 +977,6 @@ const soloDriverSlice = createSlice({
     resetSoloDriver() {
       return initialState;
     },
-    // Optimistic dispatch status toggle (e.g. Available ↔ Offline)
     setDispatchStatusOptimistic(state, action) {
       if (state.dispatch) state.dispatch.status = action.payload;
       if (state.profile)  state.profile.status  = action.payload;
@@ -1104,7 +1059,7 @@ const soloDriverSlice = createSlice({
       .addCase(fetchSettings.rejected,  setError('settings'))
       .addCase(fetchSettings.fulfilled, (state, action) => {
         state.loading.settings = false;
-        state.settings          = action.payload;
+        state.settings         = action.payload;
       })
 
       .addCase(updateSettings.pending,   setLoading('updateSettings'))
@@ -1123,7 +1078,7 @@ const soloDriverSlice = createSlice({
       .addCase(fetchKycStatus.rejected,  setError('kyc'))
       .addCase(fetchKycStatus.fulfilled, (state, action) => {
         state.loading.kyc = false;
-        state.kyc          = action.payload;
+        state.kyc         = action.payload;
       })
 
       .addCase(submitKyc.pending,   setLoading('submitKyc'))
@@ -1146,24 +1101,15 @@ const soloDriverSlice = createSlice({
       .addCase(fetchVehicle.rejected,  setError('vehicle'))
       .addCase(fetchVehicle.fulfilled, (state, action) => {
         state.loading.vehicle = false;
-        state.vehicle          = action.payload;
+        state.vehicle         = action.payload;
       })
 
-.addCase(updateVehicle.pending,   setLoading('updateVehicle'))
+      .addCase(updateVehicle.pending,   setLoading('updateVehicle'))
       .addCase(updateVehicle.rejected,  setError('updateVehicle'))
       .addCase(updateVehicle.fulfilled, (state, action) => {
         state.loading.updateVehicle = false;
         state.vehicle               = action.payload;
-        // CORRECTED: Sync the lightweight cache, not the whole document
-        if (state.profile) {
-          state.profile.vehicleStatus = {
-            ...state.profile.vehicleStatus,
-            hasVehicle: true,
-            registrationNumber: action.payload.registrationNumber,
-            verificationStatus: action.payload.verificationStatus,
-            isActive: action.payload.status === 'active'
-          };
-        }
+        // REMOVED state.profile.vehicleStatus syncing — the field was removed from the schema
       })
 
       .addCase(updateVehicleDocuments.pending,   setLoading('updateVehicleDocs'))
@@ -1175,7 +1121,6 @@ const soloDriverSlice = createSlice({
       .addCase(updateVehicleFeatures.fulfilled, (state, action) => {
         state.loading.updateVehicleFeatures = false;
         if (state.vehicle && action.payload) state.vehicle = { ...state.vehicle, ...action.payload };
-        // REMOVED: state.profile.vehicle sync (features aren't cached in vehicleStatus)
       })
 
       .addCase(updateVehicleLocation.pending,   setLoading('updateLocation'))
@@ -1183,7 +1128,7 @@ const soloDriverSlice = createSlice({
       .addCase(updateVehicleLocation.fulfilled, (state, action) => {
         state.loading.updateLocation = false;
         if (state.vehicle && action.payload) {
-          state.vehicle.location = { // CORRECTED: matched standalone schema ('location' not 'lastKnownLocation')
+          state.vehicle.location = { 
             type: 'Point',
             coordinates: [action.payload.lng, action.payload.lat],
           };
@@ -1197,7 +1142,7 @@ const soloDriverSlice = createSlice({
       .addCase(fetchBankDetails.rejected,  setError('bank'))
       .addCase(fetchBankDetails.fulfilled, (state, action) => {
         state.loading.bank = false;
-        state.bankDetails   = action.payload;
+        state.bankDetails  = action.payload;
       })
 
       .addCase(submitBankDetails.pending,   setLoading('submitBank'))
@@ -1208,7 +1153,7 @@ const soloDriverSlice = createSlice({
       .addCase(fetchSettlementSummary.rejected,  setError('settlement'))
       .addCase(fetchSettlementSummary.fulfilled, (state, action) => {
         state.loading.settlement = false;
-        state.settlement          = action.payload;
+        state.settlement         = action.payload;
       })
 
     // ── §E  Dispatch ───────────────────────────────────────────────────────
@@ -1216,14 +1161,13 @@ const soloDriverSlice = createSlice({
       .addCase(fetchDispatchStatus.rejected,  setError('dispatch'))
       .addCase(fetchDispatchStatus.fulfilled, (state, action) => {
         state.loading.dispatch = false;
-        state.dispatch          = action.payload;
+        state.dispatch         = action.payload;
       })
 
       .addCase(updateDispatchStatus.pending,   setLoading('updateDispatchStatus'))
       .addCase(updateDispatchStatus.rejected,  (state, action) => {
         state.loading.updateDispatchStatus = false;
         state.errors.updateDispatchStatus  = action.payload;
-        // Revert optimistic update if any
       })
       .addCase(updateDispatchStatus.fulfilled, (state, action) => {
         state.loading.updateDispatchStatus = false;
@@ -1244,21 +1188,21 @@ const soloDriverSlice = createSlice({
       .addCase(fetchServiceZones.rejected,  setError('serviceZones'))
       .addCase(fetchServiceZones.fulfilled, (state, action) => {
         state.loading.serviceZones = false;
-        state.serviceZones          = action.payload || [];
+        state.serviceZones         = action.payload || [];
       })
 
       .addCase(addServiceZone.pending,   setLoading('addZone'))
       .addCase(addServiceZone.rejected,  setError('addZone'))
       .addCase(addServiceZone.fulfilled, (state, action) => {
         state.loading.addZone = false;
-        state.serviceZones     = action.payload || [];
+        state.serviceZones    = action.payload || [];
       })
 
       .addCase(removeServiceZone.pending,   setLoading('removeZone'))
       .addCase(removeServiceZone.rejected,  setError('removeZone'))
       .addCase(removeServiceZone.fulfilled, (state, action) => {
         state.loading.removeZone = false;
-        state.serviceZones        = state.serviceZones.filter(
+        state.serviceZones       = state.serviceZones.filter(
           (z) => String(z._id) !== String(action.payload)
         );
       })
@@ -1280,7 +1224,7 @@ const soloDriverSlice = createSlice({
       .addCase(fetchPricing.rejected,  setError('pricing'))
       .addCase(fetchPricing.fulfilled, (state, action) => {
         state.loading.pricing = false;
-        state.pricing          = action.payload;
+        state.pricing         = action.payload;
       })
 
       .addCase(updatePricing.pending,   setLoading('updatePricing'))
@@ -1295,21 +1239,21 @@ const soloDriverSlice = createSlice({
       .addCase(fetchPerformance.rejected,  setError('performance'))
       .addCase(fetchPerformance.fulfilled, (state, action) => {
         state.loading.performance = false;
-        state.performance          = action.payload;
+        state.performance         = action.payload;
       })
 
       .addCase(fetchRewards.pending,   setLoading('rewards'))
       .addCase(fetchRewards.rejected,  setError('rewards'))
       .addCase(fetchRewards.fulfilled, (state, action) => {
         state.loading.rewards = false;
-        state.rewards          = action.payload;
+        state.rewards         = action.payload;
       })
 
       .addCase(fetchRewardBadges.pending,   setLoading('badges'))
       .addCase(fetchRewardBadges.rejected,  setError('badges'))
       .addCase(fetchRewardBadges.fulfilled, (state, action) => {
         state.loading.badges = false;
-        state.badges          = action.payload || [];
+        state.badges         = action.payload || [];
       })
 
     // ── §I  Compliance ─────────────────────────────────────────────────────
@@ -1317,7 +1261,7 @@ const soloDriverSlice = createSlice({
       .addCase(fetchComplianceDashboard.rejected,  setError('compliance'))
       .addCase(fetchComplianceDashboard.fulfilled, (state, action) => {
         state.loading.compliance = false;
-        state.compliance          = action.payload;
+        state.compliance         = action.payload;
       })
 
     // ── §J  Security & Notifications ───────────────────────────────────────
@@ -1325,14 +1269,14 @@ const soloDriverSlice = createSlice({
       .addCase(fetchSessions.rejected,  setError('sessions'))
       .addCase(fetchSessions.fulfilled, (state, action) => {
         state.loading.sessions = false;
-        state.sessions          = action.payload?.sessions || [];
+        state.sessions         = action.payload?.sessions || [];
       })
 
       .addCase(revokeSession.pending,   setLoading('revokeSession'))
       .addCase(revokeSession.rejected,  setError('revokeSession'))
       .addCase(revokeSession.fulfilled, (state, action) => {
         state.loading.revokeSession = false;
-        state.sessions               = state.sessions.filter(
+        state.sessions              = state.sessions.filter(
           (s) => String(s._id) !== String(action.payload)
         );
       })
@@ -1341,14 +1285,14 @@ const soloDriverSlice = createSlice({
       .addCase(fetchDevices.rejected,  setError('devices'))
       .addCase(fetchDevices.fulfilled, (state, action) => {
         state.loading.devices = false;
-        state.devices          = action.payload || [];
+        state.devices         = action.payload || [];
       })
 
       .addCase(removeDevice.pending,   setLoading('removeDevice'))
       .addCase(removeDevice.rejected,  setError('removeDevice'))
       .addCase(removeDevice.fulfilled, (state, action) => {
         state.loading.removeDevice = false;
-        state.devices               = state.devices.filter(
+        state.devices              = state.devices.filter(
           (d) => String(d._id) !== String(action.payload)
         );
       })
@@ -1381,8 +1325,8 @@ const soloDriverSlice = createSlice({
         const idx = state.notifications.list.findIndex((n) => String(n._id) === String(id));
         if (idx !== -1 && !state.notifications.list[idx].isRead) {
           state.notifications.list[idx].isRead = true;
-          state.notifications.list[idx].readAt  = new Date().toISOString();
-          state.notifications.unreadCount        = Math.max(0, state.notifications.unreadCount - 1);
+          state.notifications.list[idx].readAt = new Date().toISOString();
+          state.notifications.unreadCount      = Math.max(0, state.notifications.unreadCount - 1);
         }
       })
 
@@ -1429,16 +1373,15 @@ const soloDriverSlice = createSlice({
         }
       })
 
-    .addCase(adminVerifyVehicle.pending,   setLoading('adminVerifyVehicle'))
+      .addCase(adminVerifyVehicle.pending,   setLoading('adminVerifyVehicle'))
       .addCase(adminVerifyVehicle.rejected,  setError('adminVerifyVehicle'))
       .addCase(adminVerifyVehicle.fulfilled, (state, action) => {
         state.loading.adminVerifyVehicle = false;
-        const { vehicleStatus, autoActivated, partnershipStatus } = action.payload;
-        // CORRECTED: Target vehicleStatus, not vehicle
-        if (state.admin.selectedPartner && state.admin.selectedPartner.vehicleStatus) {
-          state.admin.selectedPartner.vehicleStatus.verificationStatus = vehicleStatus;
-          state.admin.selectedPartner.vehicleStatus.isActive           = vehicleStatus === 'verified';
-          if (autoActivated) state.admin.selectedPartner.partnershipStatus = partnershipStatus;
+        const { autoActivated, partnershipStatus } = action.payload;
+        // REMOVED mutating state.admin.selectedPartner.vehicleStatus 
+        // Vehicle is maintained in a completely standalone collection now.
+        if (state.admin.selectedPartner && autoActivated) {
+          state.admin.selectedPartner.partnershipStatus = partnershipStatus;
         }
       })
 
@@ -1532,7 +1475,6 @@ const soloDriverSlice = createSlice({
 
 const sd = (state) => state.soloDriver;
 
-// Partner selectors
 export const selectProfile           = (s) => sd(s).profile;
 export const selectSettings          = (s) => sd(s).settings;
 export const selectKyc               = (s) => sd(s).kyc;
@@ -1551,7 +1493,6 @@ export const selectDevices           = (s) => sd(s).devices;
 export const selectNotifications     = (s) => sd(s).notifications;
 export const selectUnreadCount       = (s) => sd(s).notifications.unreadCount;
 
-// Admin selectors
 export const selectAdminPartnerList      = (s) => sd(s).admin.list;
 export const selectAdminPagination       = (s) => sd(s).admin.pagination;
 export const selectAdminSelectedPartner  = (s) => sd(s).admin.selectedPartner;
@@ -1559,21 +1500,20 @@ export const selectAdminComplianceAlerts = (s) => sd(s).admin.complianceAlerts;
 export const selectAdminComplianceTotal  = (s) => sd(s).admin.complianceTotal;
 export const selectAdminLastCreated      = (s) => sd(s).admin.lastCreated;
 
-// Granular loading / error
 export const selectLoading = (key) => (s) => sd(s).loading[key] ?? false;
 export const selectError   = (key) => (s) => sd(s).errors[key]  ?? null;
 
-// Compound / derived
-export const selectDispatchStatus    = (s) => sd(s).dispatch?.status        ?? sd(s).profile?.status ?? null;
+export const selectDispatchStatus    = (s) => sd(s).dispatch?.status ?? sd(s).profile?.status ?? null;
 export const selectIsOnline          = (s) => sd(s).dispatch?.status === 'Available' ?? false;
 export const selectIsDispatchReady   = (s) => sd(s).dispatch?.isDispatchable ?? false;
 export const selectPartnershipStatus = (s) => sd(s).profile?.partnershipStatus ?? null;
 export const selectProfileCompletion = (s) => sd(s).profile?.profileCompletionPercent ?? 0;
+
 export const selectKycStatus         = (s) =>
   sd(s).kyc?.kyc?.verificationStatus  ?? sd(s).profile?.kyc?.verificationStatus ?? null;
  
-export const selectVehicleStatus     = (s) =>
-  sd(s).vehicle?.verificationStatus   ?? sd(s).profile?.vehicleStatus?.verificationStatus ?? null;
+// FIXED: Reads straight from the separated `state.vehicle` slice, abandoning the `profile.vehicleStatus` fallback
+export const selectVehicleStatus     = (s) => sd(s).vehicle?.verificationStatus ?? null;
 
 export const selectEffectivePlatformFee = (s) => {
   const override = sd(s).profile?.platformFeeOverride;
@@ -1588,6 +1528,7 @@ export const selectHasComplianceIssue = (s) => {
   return c ? (c.hasExpired || c.hasExpiring) : false;
 };
 
+// Returns coinBalance off the properly structured rewards schema 
 export const selectCoinBalance = (s) =>
   sd(s).rewards?.coinBalance ?? sd(s).profile?.rewards?.coinBalance ?? 0;
 

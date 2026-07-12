@@ -111,7 +111,6 @@ const fmtCurrency = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
 
-/** Pill badge */
 function StatusBadge({ status }) {
   return (
     <span className={`badge ${STATUS_COLORS[status] || 'badge-primary'} capitalize`}>
@@ -120,7 +119,6 @@ function StatusBadge({ status }) {
   );
 }
 
-/** Document viewer overlay */
 function DocViewer({ url, label, onClose }) {
   return (
     <AnimatePresence>
@@ -175,7 +173,6 @@ function DocViewer({ url, label, onClose }) {
   );
 }
 
-/** Doc field row */
 function DocField({ label, value, docUrl, onView }) {
   return (
     <div className="flex items-start justify-between py-2.5 border-b border-base-300/50 last:border-0 gap-2">
@@ -186,7 +183,7 @@ function DocField({ label, value, docUrl, onView }) {
       {docUrl && (
         <button
           onClick={() => onView(docUrl, label)}
-          className="flex-shrink-0 flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-semibold text-sm border border-primary/30 rounded-lg px-2.5 py-1 hover:bg-primary/5 transition-all"
+          className="flex-shrink-0 flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-semibold border border-primary/30 rounded-lg px-2.5 py-1 hover:bg-primary/5 transition-all"
         >
           <Eye className="w-3.5 h-3.5" /> View
         </button>
@@ -195,7 +192,6 @@ function DocField({ label, value, docUrl, onView }) {
   );
 }
 
-/** Section card */
 function SectionCard({ title, icon: Icon, children, className = '' }) {
   return (
     <motion.div variants={fadeUp} className={`card p-5 ${className}`}>
@@ -210,7 +206,6 @@ function SectionCard({ title, icon: Icon, children, className = '' }) {
   );
 }
 
-/** Confirm modal */
 function ConfirmModal({ title, message, onConfirm, onCancel, loading, danger = false, children }) {
   return (
     <AnimatePresence>
@@ -247,11 +242,10 @@ function ConfirmModal({ title, message, onConfirm, onCancel, loading, danger = f
   );
 }
 
-/** Inline field */
 function InfoRow({ label, value, className = '' }) {
   return (
     <div className={`flex flex-col gap-0.5 ${className}`}>
-      <span className="text-xs text-base-content/40 font-semibold text-sm uppercase tracking-wider">{label}</span>
+      <span className="text-xs text-base-content/40 font-semibold uppercase tracking-wider">{label}</span>
       <span className="text-sm text-base-content font-medium">{value ?? '—'}</span>
     </div>
   );
@@ -269,7 +263,6 @@ export default function SoloDriversManagement() {
   const selected     = useSelector(selectAdminSelectedPartner);
   const alerts       = useSelector(selectAdminComplianceAlerts);
   const alertsTotal  = useSelector(selectAdminComplianceTotal);
-  const lastCreated  = useSelector(selectAdminLastCreated);
 
   const loadingList    = useSelector(selectLoading('adminList'));
   const loadingDetail  = useSelector(selectLoading('adminDetail'));
@@ -396,7 +389,7 @@ export default function SoloDriversManagement() {
   const handleUpdateFee = async () => {
     await dispatch(adminUpdatePlatformFee({
       partnerId: selected._id,
-      platformFeeOverride: modalData.platformFeeOverride,
+      platformFeeOverride: modalData.platformFeeOverride === '' ? null : modalData.platformFeeOverride,
       settlementCycle: modalData.settlementCycle,
     }));
     closeModal();
@@ -439,15 +432,21 @@ export default function SoloDriversManagement() {
       street: payload.street, city: payload.city,
       state: payload.state, pinCode: payload.pinCode, country: 'India',
     };
+    
+    // Explicitly handle fee logic 
     if (payload.platformFeeType && payload.platformFeeValue) {
       payload.platformFeeOverride = {
         type: payload.platformFeeType,
         value: Number(payload.platformFeeValue),
       };
+    } else {
+      payload.platformFeeOverride = null;
     }
+
     payload.autoVerifyKyc     = payload.autoVerifyKyc === 'true';
     payload.autoVerifyVehicle = payload.autoVerifyVehicle === 'true';
     payload.autoVerifyBank    = payload.autoVerifyBank === 'true';
+    
     const res = await dispatch(adminCreateSoloDriver(payload));
     if (!res.error) {
       setView('list');
@@ -455,9 +454,8 @@ export default function SoloDriversManagement() {
     }
   };
 
-  // ── Stats cards ────────────────────────────────────────────────────────────
   const statsCardsData = [
-    { label: 'Total Partners',  value: pagination?.total  || 0, icon: Users,       color: 'text-primary' },
+    { label: 'Total Partners',  value: pagination?.total  || 0, icon: Users,        color: 'text-primary' },
     { label: 'Active',          value: partners.filter(p => p.partnershipStatus === 'active').length, icon: CheckCircle, color: 'text-success' },
     { label: 'Pending Review',  value: partners.filter(p => p.partnershipStatus === 'pending').length, icon: Clock, color: 'text-warning' },
     { label: 'Compliance Alerts', value: alertsTotal, icon: AlertTriangle, color: 'text-error' },
@@ -470,9 +468,8 @@ export default function SoloDriversManagement() {
   const renderList = () => (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
 
-      {/* Stats Row */}
       <motion.div variants={fadeUp} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statsCardsData.map((s, i) => (
+        {statsCardsData.map((s) => (
           <motion.div
             key={s.label}
             variants={fadeUp}
@@ -490,7 +487,6 @@ export default function SoloDriversManagement() {
         ))}
       </motion.div>
 
-      {/* Toolbar */}
       <motion.div variants={fadeUp} className="flex gap-3  items-center">
           <div className="relative flex w-full max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" />
@@ -555,7 +551,6 @@ export default function SoloDriversManagement() {
           </button>
       </motion.div>
 
-      {/* Table */}
       <motion.div variants={fadeUp} className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table w-full">
@@ -565,7 +560,6 @@ export default function SoloDriversManagement() {
                 <th className="font-bold py-3 px-4">Code / Phone</th>
                 <th className="font-bold py-3 px-4">Partnership Status</th>
                 <th className="font-bold py-3 px-4">KYC</th>
-                <th className="font-bold py-3 px-4">Vehicle</th>
                 <th className="font-bold py-3 px-4">Bank</th>
                 <th className="font-bold py-3 px-4">Dispatch</th>
                 <th className="font-bold py-3 px-4 text-right">Actions</th>
@@ -576,7 +570,7 @@ export default function SoloDriversManagement() {
                 {loadingList ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i} className="border-b border-base-200">
-                      {Array.from({ length: 8 }).map((_, j) => (
+                      {Array.from({ length: 7 }).map((_, j) => (
                         <td key={j} className="py-4 px-4">
                           <div className="skeleton h-4 rounded w-full" />
                         </td>
@@ -585,7 +579,7 @@ export default function SoloDriversManagement() {
                   ))
                 ) : partners.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-16 text-base-content/40">
+                    <td colSpan={7} className="text-center py-16 text-base-content/40">
                       <div className="flex flex-col items-center gap-3">
                         <Users className="w-12 h-12 opacity-20" />
                         <p className="text-sm font-medium">No partners found</p>
@@ -594,8 +588,7 @@ export default function SoloDriversManagement() {
                   </tr>
                 ) : (
               partners.map((p, idx) => {
-                    const dp = p.dispatch || p.driverProfile || {};
-                    const vStatus = p.vehicleStatus || {};
+                    const dp = p.dispatch || {};
                     return (
                       <motion.tr
                         key={p._id}
@@ -613,7 +606,7 @@ export default function SoloDriversManagement() {
                               </div>
                             </div>
                             <div>
-                              <p className="font-semibold text-sm text-sm text-base-content leading-tight">{p.legalName}</p>
+                              <p className="font-semibold text-sm text-base-content leading-tight">{p.legalName}</p>
                               <p className="text-xs text-base-content/40">{p.email || p.user?.email}</p>
                             </div>
                             {p.user?.isBlocked && (
@@ -627,16 +620,8 @@ export default function SoloDriversManagement() {
                         </td>
                         <td className="py-3 px-4"><StatusBadge status={p.partnershipStatus} /></td>
                         <td className="py-3 px-4">
-                          <span className={`text-xs font-semibold text-sm ${VERIFIED_COLORS[p.kyc?.verificationStatus] || ''}`}>
+                          <span className={`text-xs font-semibold ${VERIFIED_COLORS[p.kyc?.verificationStatus] || ''}`}>
                             {KYC_STATUS_LABELS[p.kyc?.verificationStatus] || '—'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`text-xs font-semibold text-sm ${VERIFIED_COLORS[vStatus.verificationStatus] || ''}`}>
-                            {vStatus.registrationNumber || '—'}
-                            {vStatus.verificationStatus === 'verified' && ' ✅'}
-                            {vStatus.verificationStatus === 'rejected' && ' ❌'}
-                            {['pending', 'under-review'].includes(vStatus.verificationStatus) && ' ⏳'}
                           </span>
                         </td>
                         <td className="py-3 px-4">
@@ -648,7 +633,7 @@ export default function SoloDriversManagement() {
                           }
                         </td>
                         <td className="py-3 px-4">
-                          <div className={`flex items-center gap-1.5 text-xs font-semibold text-sm ${
+                          <div className={`flex items-center gap-1.5 text-xs font-semibold ${
                             dp.status === 'Available' ? 'text-success' :
                             dp.status === 'On-Trip' ? 'text-info' :
                             dp.status === 'On-Break' ? 'text-warning' : 'text-base-content/40'
@@ -678,7 +663,6 @@ export default function SoloDriversManagement() {
           </table>
         </div>
 
-        {/* Pagination */}
         {pagination && pagination.totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-base-300">
             <p className="text-xs text-base-content/40">
@@ -692,7 +676,7 @@ export default function SoloDriversManagement() {
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-xs font-semibold text-sm px-2">
+              <span className="text-xs font-semibold px-2">
                 Page {pagination.page} of {pagination.totalPages}
               </span>
               <button
@@ -734,14 +718,12 @@ export default function SoloDriversManagement() {
     }
     if (!selected) return null;
 
-const p = selected;
+    const p = selected;
     const u = p.user || {};
-    const dp = p.dispatch || p.driverProfile || {};
+    const dp = p.dispatch || {};
 
     return (
       <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5">
-
-        {/* Header card */}
         <motion.div variants={fadeUp} className="card p-5">
           <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
             <div className="flex items-center gap-4">
@@ -753,7 +735,6 @@ const p = selected;
                   <h2 className="text-xl font-black text-base-content">{p.legalName}</h2>
                   <StatusBadge status={p.partnershipStatus} />
                   {u.isBlocked && <span className="badge badge-error">Blocked</span>}
-                  {dp.isPaused && <span className="badge badge-warning">Paused</span>}
                 </div>
                 <div className="flex items-center gap-3 mt-1 flex-wrap text-xs text-base-content/50">
                   <span className="font-mono font-bold text-primary">{p.partnerCode}</span>
@@ -783,13 +764,12 @@ const p = selected;
             </div>
           </div>
 
-          {/* Quick stats */}
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mt-5 pt-4 border-t border-base-300">
             {[
               { label: 'Total Rides', value: p.stats?.totalRidesCompleted || 0 },
               { label: 'Rating', value: `${(p.rating?.averageRating || 0).toFixed(1)} ⭐` },
               { label: 'Earnings', value: fmtCurrency(p.stats?.totalEarnings) },
-              { label: 'Coins', value: u.coins || 0 },
+              { label: 'Coins', value: p.rewards?.coinBalance || 0 },
               { label: 'Profile %', value: `${p.profileCompletionPercent || 0}%` },
             ].map(s => (
               <div key={s.label} className="text-center">
@@ -800,7 +780,6 @@ const p = selected;
           </div>
         </motion.div>
 
-        {/* Tabs */}
         <motion.div variants={fadeUp} className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
           {TABS.map((t) => (
             <button
@@ -818,7 +797,6 @@ const p = selected;
           ))}
         </motion.div>
 
-        {/* Tab content */}
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -862,7 +840,6 @@ const p = selected;
         </p>
 
         <form onSubmit={handleCreate} className="space-y-6">
-          {/* Personal */}
           <fieldset className="space-y-4">
             <legend className="text-xs font-bold text-base-content/50 uppercase tracking-widest mb-2 flex items-center gap-2">
               <UserCheck className="w-4 h-4" /> Personal Details
@@ -870,19 +847,19 @@ const p = selected;
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
                 { name:'name',        label:'Full Name *',        placeholder:'Ramesh Kumar' },
-                { name:'legalName',   label:'Legal Name *',       placeholder:'As per Aadhaar' },
+                { name:'legalName',   label:'Legal Name *',       placeholder:'As per Gov ID' },
                 { name:'displayName', label:'Display Name',       placeholder:'Display name on app' },
                 { name:'email',       label:'Email *',            placeholder:'ramesh@example.com', type:'email' },
                 { name:'phone',       label:'Phone *',            placeholder:'9876543210', type:'tel' },
                 { name:'dateOfBirth', label:'Date of Birth',      type:'date' },
               ].map(f => (
                 <div key={f.name}>
-                  <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">{f.label}</span></label>
+                  <label className="label py-1"><span className="label-text text-xs font-semibold">{f.label}</span></label>
                   <input name={f.name} type={f.type || 'text'} placeholder={f.placeholder} className="input-field w-full text-sm" />
                 </div>
               ))}
               <div>
-                <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">Gender</span></label>
+                <label className="label py-1"><span className="label-text text-xs font-semibold">Gender</span></label>
                 <select name="gender" className="input-field w-full text-sm">
                   <option value="">Select gender</option>
                   {['Male','Female','Other','Prefer Not to Say'].map(g => <option key={g} value={g}>{g}</option>)}
@@ -891,7 +868,6 @@ const p = selected;
             </div>
           </fieldset>
 
-          {/* Address */}
           <fieldset className="space-y-4">
             <legend className="text-xs font-bold text-base-content/50 uppercase tracking-widest mb-2 flex items-center gap-2">
               <MapPin className="w-4 h-4" /> Residential Address
@@ -904,14 +880,13 @@ const p = selected;
                 { name:'pinCode', label:'PIN Code', placeholder:'520001' },
               ].map(f => (
                 <div key={f.name}>
-                  <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">{f.label}</span></label>
+                  <label className="label py-1"><span className="label-text text-xs font-semibold">{f.label}</span></label>
                   <input name={f.name} type="text" placeholder={f.placeholder} className="input-field w-full text-sm" />
                 </div>
               ))}
             </div>
           </fieldset>
 
-          {/* KYC */}
           <fieldset className="space-y-4">
             <legend className="text-xs font-bold text-base-content/50 uppercase tracking-widest mb-2 flex items-center gap-2">
               <Shield className="w-4 h-4" /> KYC Details
@@ -920,25 +895,24 @@ const p = selected;
               {[
                 { name:'drivingLicenceNumber', label:'DL Number *', placeholder:'AP0920210012345' },
                 { name:'drivingLicenceExpiry', label:'DL Expiry *', type:'date' },
-                { name:'aadhaarNumber',        label:'Aadhaar (12 digits)', placeholder:'XXXXXXXXXXXX', maxLength:12 },
+                { name:'aadhaarNumber',        label:'Aadhaar (12 digits)', placeholder:'Enter 12 digits', maxLength:12 },
                 { name:'panNumber',            label:'PAN Number', placeholder:'ABCDE1234F' },
               ].map(f => (
                 <div key={f.name}>
-                  <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">{f.label}</span></label>
+                  <label className="label py-1"><span className="label-text text-xs font-semibold">{f.label}</span></label>
                   <input name={f.name} type={f.type || 'text'} placeholder={f.placeholder} maxLength={f.maxLength} className="input-field w-full text-sm" />
                 </div>
               ))}
               <div className="sm:col-span-2">
                 <label className="label py-1 flex items-center gap-2">
                   <input type="checkbox" name="autoVerifyKyc" value="true" className="checkbox checkbox-primary checkbox-sm" />
-                  <span className="label-text text-xs font-semibold text-sm">Auto-verify KYC (requires DL + Aadhaar)</span>
+                  <span className="label-text text-xs font-semibold">Auto-verify KYC (requires DL + Aadhaar)</span>
                 </label>
                 <p className="text-xs text-base-content/40 ml-6">Skip manual KYC review — partner can go online immediately after vehicle + bank verification.</p>
               </div>
             </div>
           </fieldset>
 
-          {/* Vehicle */}
           <fieldset className="space-y-4">
             <legend className="text-xs font-bold text-base-content/50 uppercase tracking-widest mb-2 flex items-center gap-2">
               <Car className="w-4 h-4" /> Vehicle Details
@@ -953,12 +927,12 @@ const p = selected;
                 { name:'seatingCapacity',    label:'Seating Capacity', type:'number', placeholder:'4' },
               ].map(f => (
                 <div key={f.name}>
-                  <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">{f.label}</span></label>
+                  <label className="label py-1"><span className="label-text text-xs font-semibold">{f.label}</span></label>
                   <input name={f.name} type={f.type || 'text'} placeholder={f.placeholder} className="input-field w-full text-sm" />
                 </div>
               ))}
               <div>
-                <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">Vehicle Type</span></label>
+                <label className="label py-1"><span className="label-text text-xs font-semibold">Vehicle Type</span></label>
                 <select name="vehicleType" className="input-field w-full text-sm">
                   <option value="">Select type</option>
                   {['Sedan','SUV','Van','Minivan','Wheelchair-Van','Tempo-Traveller','Hatchback','Auto'].map(t => (
@@ -969,13 +943,12 @@ const p = selected;
               <div className="sm:col-span-2">
                 <label className="label py-1 flex items-center gap-2">
                   <input type="checkbox" name="autoVerifyVehicle" value="true" className="checkbox checkbox-primary checkbox-sm" />
-                  <span className="label-text text-xs font-semibold text-sm">Auto-verify Vehicle (requires registration number)</span>
+                  <span className="label-text text-xs font-semibold">Auto-verify Vehicle (requires registration number)</span>
                 </label>
               </div>
             </div>
           </fieldset>
 
-          {/* Bank */}
           <fieldset className="space-y-4">
             <legend className="text-xs font-bold text-base-content/50 uppercase tracking-widest mb-2 flex items-center gap-2">
               <CreditCard className="w-4 h-4" /> Bank Details
@@ -989,12 +962,12 @@ const p = selected;
                 { name:'upiId',             label:'UPI ID (optional)', placeholder:'ramesh@upi' },
               ].map(f => (
                 <div key={f.name}>
-                  <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">{f.label}</span></label>
+                  <label className="label py-1"><span className="label-text text-xs font-semibold">{f.label}</span></label>
                   <input name={f.name} type="text" placeholder={f.placeholder} className="input-field w-full text-sm" />
                 </div>
               ))}
               <div>
-                <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">Account Type</span></label>
+                <label className="label py-1"><span className="label-text text-xs font-semibold">Account Type</span></label>
                 <select name="accountType" className="input-field w-full text-sm">
                   <option value="Savings">Savings</option>
                   <option value="Current">Current</option>
@@ -1003,33 +976,32 @@ const p = selected;
               <div className="sm:col-span-2">
                 <label className="label py-1 flex items-center gap-2">
                   <input type="checkbox" name="autoVerifyBank" value="true" className="checkbox checkbox-primary checkbox-sm" />
-                  <span className="label-text text-xs font-semibold text-sm">Auto-verify Bank (requires full bank details + valid IFSC)</span>
+                  <span className="label-text text-xs font-semibold">Auto-verify Bank (requires full bank details + valid IFSC)</span>
                 </label>
               </div>
             </div>
           </fieldset>
 
-          {/* Business / Platform Fee */}
           <fieldset className="space-y-4">
             <legend className="text-xs font-bold text-base-content/50 uppercase tracking-widest mb-2 flex items-center gap-2">
               <Wallet className="w-4 h-4" /> Business & Fee Settings
             </legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">Business Type</span></label>
+                <label className="label py-1"><span className="label-text text-xs font-semibold">Business Type</span></label>
                 <select name="businessType" className="input-field w-full text-sm">
                   <option value="individual">Individual</option>
                   <option value="proprietorship">Proprietorship</option>
                 </select>
               </div>
               <div>
-                <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">Settlement Cycle</span></label>
+                <label className="label py-1"><span className="label-text text-xs font-semibold">Settlement Cycle</span></label>
                 <select name="settlementCycle" className="input-field w-full text-sm">
                   {['Daily','Weekly','Bi-Weekly','Monthly'].map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
-                <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">Platform Fee Type</span></label>
+                <label className="label py-1"><span className="label-text text-xs font-semibold">Platform Fee Type</span></label>
                 <select name="platformFeeType" className="input-field w-full text-sm">
                   <option value="">Use Global Config</option>
                   <option value="percentage">Percentage (%)</option>
@@ -1038,17 +1010,16 @@ const p = selected;
                 <p className="text-xs text-base-content/40 mt-1">Leave blank to use global platform config.</p>
               </div>
               <div>
-                <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">Platform Fee Value</span></label>
+                <label className="label py-1"><span className="label-text text-xs font-semibold">Platform Fee Value</span></label>
                 <input name="platformFeeValue" type="number" min="0" step="0.01" placeholder="e.g. 12 for 12% or 40 for ₹40" className="input-field w-full text-sm" />
               </div>
               <div className="sm:col-span-2">
-                <label className="label py-1"><span className="label-text text-xs font-semibold text-sm">Internal Notes (admin only)</span></label>
+                <label className="label py-1"><span className="label-text text-xs font-semibold">Internal Notes (admin only)</span></label>
                 <textarea name="internalNotes" rows={2} placeholder="Internal notes about this partner..." className="input-field w-full text-sm resize-none" />
               </div>
             </div>
           </fieldset>
 
-          {/* Submit */}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={() => setView('list')} className="btn btn-ghost flex-1">Cancel</button>
             <button type="submit" className="btn btn-primary flex-1 gap-2" disabled={loadingCreate}>
@@ -1114,7 +1085,7 @@ const p = selected;
                   {a.expiringDocs?.map((doc) => (
                     <div
                       key={doc.label}
-                      className={`flex items-center gap-1.5 text-xs font-semibold text-sm px-2.5 py-1 rounded-lg border ${
+                      className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border ${
                         doc.isExpired
                           ? 'bg-error/10 text-error border-error/30'
                           : doc.daysLeft <= 7
@@ -1142,7 +1113,6 @@ const p = selected;
 
   const renderModals = () => (
     <AnimatePresence>
-      {/* Approve KYC */}
       {modal === 'approveKyc' && (
         <ConfirmModal
           title="Approve KYC"
@@ -1153,7 +1123,6 @@ const p = selected;
         />
       )}
 
-      {/* Reject KYC */}
       {modal === 'rejectKyc' && (
         <ConfirmModal
           title="Reject KYC"
@@ -1172,22 +1141,20 @@ const p = selected;
         </ConfirmModal>
       )}
 
-      {/* Approve Vehicle */}
       {modal === 'approveVehicle' && (
         <ConfirmModal
           title="Approve Vehicle"
-          message="This will verify the partner's vehicle. Auto-activation applies if KYC and bank are also verified."
+          message="Approve this driver's primary vehicle verification link. (Full vehicle data exists in Global Vehicles)."
           onConfirm={() => handleVerifyVehicle('approve')}
           onCancel={closeModal}
           loading={loadingVehicle}
         />
       )}
 
-      {/* Reject Vehicle */}
       {modal === 'rejectVehicle' && (
         <ConfirmModal
           title="Reject Vehicle"
-          message="Provide a reason. The partner must re-submit their vehicle for verification."
+          message="Reject this driver's vehicle linkage. The partner must re-submit or resolve document issues."
           onConfirm={() => handleVerifyVehicle('reject')}
           onCancel={closeModal}
           loading={loadingVehicle}
@@ -1202,7 +1169,6 @@ const p = selected;
         </ConfirmModal>
       )}
 
-      {/* Verify Bank */}
       {modal === 'verifyBank' && (
         <ConfirmModal
           title="Verify Bank Account"
@@ -1213,7 +1179,6 @@ const p = selected;
         />
       )}
 
-      {/* Update Status */}
       {modal === 'status' && (
         <ConfirmModal
           title="Update Partnership Status"
@@ -1252,7 +1217,6 @@ const p = selected;
         </ConfirmModal>
       )}
 
-      {/* Block */}
       {modal === 'block' && (
         <ConfirmModal
           title="Block Account"
@@ -1284,7 +1248,6 @@ const p = selected;
         </ConfirmModal>
       )}
 
-      {/* Unblock */}
       {modal === 'unblock' && (
         <ConfirmModal
           title="Unblock Account"
@@ -1295,11 +1258,10 @@ const p = selected;
         />
       )}
 
-      {/* Platform Fee */}
       {modal === 'platformFee' && (
         <ConfirmModal
           title="Update Platform Fee & Settlement"
-          message="Override the global platform fee for this partner. Leave blank to revert to global config."
+          message="Override the global platform fee for this partner. Set to 'Use Global' to revert to default platform rules."
           onConfirm={handleUpdateFee}
           onCancel={closeModal}
           loading={loadingFee}
@@ -1310,14 +1272,17 @@ const p = selected;
                 <label className="text-xs font-bold text-base-content/50 uppercase tracking-wider block mb-1">Fee Type</label>
                 <select
                   className="input-field w-full text-sm"
-                  onChange={(e) => setModalData(d => ({
-                    ...d,
-                    platformFeeOverride: e.target.value
-                      ? { ...(d.platformFeeOverride || {}), type: e.target.value }
-                      : null,
-                  }))}
+                  onChange={(e) => setModalData(d => {
+                    const newType = e.target.value;
+                    return {
+                      ...d,
+                      platformFeeOverride: newType === "" 
+                        ? "" 
+                        : { ...(d.platformFeeOverride || {}), type: newType }
+                    };
+                  })}
                 >
-                  <option value="">Use Global</option>
+                  <option value="">Use Global Config</option>
                   <option value="percentage">Percentage (%)</option>
                   <option value="fixed">Fixed (₹)</option>
                 </select>
@@ -1330,12 +1295,15 @@ const p = selected;
                   step="0.01"
                   className="input-field w-full text-sm"
                   placeholder="e.g. 12"
+                  disabled={modalData.platformFeeOverride === ""}
                   onChange={(e) => setModalData(d => ({
                     ...d,
-                    platformFeeOverride: {
-                      ...(d.platformFeeOverride || { type: 'percentage' }),
-                      value: parseFloat(e.target.value),
-                    },
+                    platformFeeOverride: d.platformFeeOverride === ""
+                      ? ""
+                      : {
+                          ...(d.platformFeeOverride || { type: 'percentage' }),
+                          value: parseFloat(e.target.value),
+                        },
                   }))}
                 />
               </div>
@@ -1356,7 +1324,6 @@ const p = selected;
         </ConfirmModal>
       )}
 
-      {/* Notes */}
       {modal === 'notes' && (
         <ConfirmModal
           title="Update Admin Notes"
@@ -1376,7 +1343,6 @@ const p = selected;
         </ConfirmModal>
       )}
 
-      {/* Award Badge */}
       {modal === 'awardBadge' && (
         <ConfirmModal
           title="Award Badge"
@@ -1416,7 +1382,6 @@ const p = selected;
         </ConfirmModal>
       )}
 
-      {/* Adjust Coins */}
       {modal === 'adjustCoins' && (
         <ConfirmModal
           title="Adjust Coins Balance"
@@ -1459,7 +1424,7 @@ const p = selected;
               />
             </div>
             <p className="text-xs text-base-content/40">
-              Current balance: <strong>{selected?.user?.coins || 0} coins</strong>
+              Current balance: <strong>{selected?.rewards?.coinBalance || 0} coins</strong>
             </p>
           </div>
         </ConfirmModal>
@@ -1473,13 +1438,9 @@ const p = selected;
 
   return (
     <div className="min-h-screen bg-base-100">
-      {/* Document Viewer Overlay */}
       <DocViewer url={docViewer?.url} label={docViewer?.label} onClose={() => setDocViewer(null)} />
-
-      {/* Modals */}
       {renderModals()}
 
-      {/* Top bar */}
       <motion.div
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1519,7 +1480,6 @@ const p = selected;
         </div>
       </motion.div>
 
-      {/* Main */}
       <div className="container-custom py-6">
         <AnimatePresence mode="wait">
           {view === 'list'       && <motion.div key="list"       initial="hidden" animate="show" exit="exit" variants={fadeUp}>{renderList()}</motion.div>}
@@ -1536,7 +1496,6 @@ const p = selected;
 // TAB COMPONENTS
 // ══════════════════════════════════════════════════════════════════════════════
 
-// ── Overview Tab ──────────────────────────────────────────────────────────────
 function TabOverview({ p, u, dp, onViewDoc }) {
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -1560,7 +1519,7 @@ function TabOverview({ p, u, dp, onViewDoc }) {
           <DocField label="WhatsApp" value={p.whatsappNumber} onView={onViewDoc} />
           <DocField label="Email" value={p.email} onView={onViewDoc} />
           <div className="pt-3 mt-3 border-t border-base-300/50">
-            <p className="text-xs text-base-content/40 font-semibold text-sm uppercase tracking-wider mb-2">Address</p>
+            <p className="text-xs text-base-content/40 font-semibold uppercase tracking-wider mb-2">Address</p>
             <p className="text-sm text-base-content">
               {[p.address?.street, p.address?.city, p.address?.state, p.address?.pinCode, p.address?.country]
                 .filter(Boolean).join(', ') || '—'}
@@ -1586,9 +1545,7 @@ function TabOverview({ p, u, dp, onViewDoc }) {
           <DocField label="Email Verified" value={u.isEmailVerified ? '✅ Yes' : '❌ No'} onView={onViewDoc} />
           <DocField label="Phone Verified" value={u.isPhoneVerified ? '✅ Yes' : '❌ No'} onView={onViewDoc} />
           <DocField label="Last Login" value={fmtDate(u.lastLoginAt)} onView={onViewDoc} />
-          <DocField label="Login Count" value={u.loginCount} onView={onViewDoc} />
           <DocField label="Referral Code" value={u.referralCode} onView={onViewDoc} />
-          <DocField label="Coins (User wallet)" value={u.coins} onView={onViewDoc} />
         </div>
       </SectionCard>
 
@@ -1601,7 +1558,7 @@ function TabOverview({ p, u, dp, onViewDoc }) {
           <InfoRow label="Settlement Cycle" value={p.settlementCycle} />
           <InfoRow label="Platform Fee" value={
             p.platformFeeOverride
-              ? `${p.platformFeeOverride.type === 'percentage' ? p.platformFeeOverride.value + '%' : '₹' + p.platformFeeOverride.value} (override)`
+              ? `${p.platformFeeOverride.type === 'percentage' ? p.platformFeeOverride.value + '%' : '₹' + p.platformFeeOverride.value} (Override)`
               : 'Global Config'
           } />
           <InfoRow label="Partnership Status" value={p.partnershipStatus} />
@@ -1609,7 +1566,6 @@ function TabOverview({ p, u, dp, onViewDoc }) {
           <InfoRow label="Onboarding Complete" value={p.isOnboardingComplete ? '✅ Yes' : '❌ No'} />
           <InfoRow label="Profile Completion" value={`${p.profileCompletionPercent || 0}%`} />
           <InfoRow label="Is Blocked" value={u.isBlocked ? '🚫 Yes' : '✅ No'} />
-          <InfoRow label="Is Paused" value={dp.isPaused ? `⏸️ Until ${fmtDate(dp.pausedUntil)}` : '✅ No'} />
         </div>
       </SectionCard>
 
@@ -1619,7 +1575,7 @@ function TabOverview({ p, u, dp, onViewDoc }) {
             {p.trainingCertificates.map((cert, i) => (
               <div key={i} className="flex items-center justify-between py-2 border-b border-base-300/50 last:border-0">
                 <div>
-                  <p className="text-sm font-semibold text-sm text-base-content">{cert.name}</p>
+                  <p className="text-sm font-semibold text-base-content">{cert.name}</p>
                   <p className="text-xs text-base-content/40">{cert.issuedBy} · {fmtDate(cert.issuedAt)} · Expires: {fmtDate(cert.expiresAt)}</p>
                 </div>
                 {cert.documentUrl && (
@@ -1639,7 +1595,6 @@ function TabOverview({ p, u, dp, onViewDoc }) {
   );
 }
 
-// ── KYC Tab ───────────────────────────────────────────────────────────────────
 function TabKyc({ p, onView, onApprove, onReject }) {
   const kyc = p.kyc || {};
   const verified = kyc.verificationStatus === 'verified' || kyc.verificationStatus === 'Verified';
@@ -1648,7 +1603,6 @@ function TabKyc({ p, onView, onApprove, onReject }) {
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5">
-      {/* Status banner */}
       <motion.div
         variants={fadeUp}
         className={`card p-4 border ${
@@ -1697,7 +1651,7 @@ function TabKyc({ p, onView, onApprove, onReject }) {
         </SectionCard>
 
         <SectionCard title="Aadhaar" icon={UserCheck}>
-          <DocField label="Aadhaar (masked)" value={kyc.aadhaarLast4 ? `XXXX XXXX ${kyc.aadhaarLast4}` : '—'} onView={onView} />
+          <DocField label="Aadhaar (masked)" value={kyc.maskedAadhaar || (kyc.aadhaarLast4 ? `XXXX XXXX ${kyc.aadhaarLast4}` : '—')} onView={onView} />
           <DocField label="Aadhaar Verified" value={kyc.aadhaarVerified ? '✅ Yes' : '❌ No'} onView={onView} />
           {kyc.aadhaarFrontUrl && <DocField label="Aadhaar Front" value="Uploaded" docUrl={kyc.aadhaarFrontUrl} onView={onView} />}
           {kyc.aadhaarBackUrl  && <DocField label="Aadhaar Back"  value="Uploaded" docUrl={kyc.aadhaarBackUrl}  onView={onView} />}
@@ -1735,91 +1689,46 @@ function TabKyc({ p, onView, onApprove, onReject }) {
   );
 }
 
-// ── Vehicle Tab ───────────────────────────────────────────────────────────────
 function TabVehicle({ p, onView, onApprove, onReject }) {
-  // Use p.vehicleStatus from SoloDriverPartner root, merging with driverProfile.assignedVehicleSnapshot
-  const vStatus = p.vehicleStatus || {};
-  const vSnap = p.driverProfile?.assignedVehicleSnapshot || {};
-  
-  const verified = vStatus.verificationStatus === 'verified';
-  const rejected = vStatus.verificationStatus === 'rejected';
-  const pending  = ['pending', 'under-review'].includes(vStatus.verificationStatus);
-
+  // Vehicle management has been moved strictly to a standalone collection
+  // The UI gracefully acts as a redirect or quick-action interface
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5">
-      {/* Status banner */}
-      <motion.div
-        variants={fadeUp}
-        className={`card p-4 border ${
-          verified ? 'border-success/40 bg-success/5' :
-          rejected ? 'border-error/40 bg-error/5' :
-          pending  ? 'border-warning/40 bg-warning/5' : 'border-base-300'
-        }`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${verified ? 'bg-success/10' : rejected ? 'bg-error/10' : 'bg-warning/10'}`}>
-              {verified ? <CheckCircle className="w-5 h-5 text-success" /> :
-               rejected ? <XCircle className="w-5 h-5 text-error" /> :
-               <Clock className="w-5 h-5 text-warning" />}
-            </div>
-            <div>
-              <p className="font-bold text-base-content">
-                Vehicle {vStatus.verificationStatus ? vStatus.verificationStatus.charAt(0).toUpperCase() + vStatus.verificationStatus.slice(1) : 'Not submitted'}
-              </p>
-              <p className="text-xs text-base-content/40">
-                {verified ? `Verified (via Global Vehicles list)` :
-                 rejected ? `Rejected` : 'Awaiting verification'}
-              </p>
-            </div>
-          </div>
-          {!verified && (
-            <div className="flex gap-2">
-              {(pending || vStatus.registrationNumber) && (
-                <button onClick={onApprove} className="btn btn-success btn-sm gap-2">
-                  <CheckCircle className="w-4 h-4" /> Approve
-                </button>
-              )}
-              <button onClick={onReject} className="btn btn-error btn-sm gap-2">
-                <XCircle className="w-4 h-4" /> Reject
-              </button>
-            </div>
-          )}
-        </div>
-      </motion.div>
-
       <div className="alert alert-info text-sm mb-4 border-info/20 bg-info/5">
-        <Info className="w-4 h-4 shrink-0" />
+        <Info className="w-5 h-5 shrink-0" />
         <div>
-          <h3 className="font-semibold text-sm">Standalone Vehicle Data</h3>
-          <p className="text-base-content/70 text-sm mt-0.5">
-            Vehicles are now managed in a standalone, global collection. This tab shows the cached snapshot assigned to this driver. To view full vehicle documents (RC, Insurance, photos), please navigate to the global <strong>Vehicles Tab</strong>.
+          <h3 className="font-semibold text-sm">Global Vehicle Management</h3>
+          <p className="text-base-content/70 text-xs mt-0.5 leading-relaxed">
+            Vehicle details, embedded caching, and nested status tracking have been decoupled from the driver profile to prevent data duplication. 
+            To view full vehicle specifications, registration copies, insurance documents, and photos, please navigate to the standalone <strong>Vehicles</strong> portal.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SectionCard title="Cached Vehicle Snapshot" icon={Car}>
-          <DocField label="Registration Number" value={vStatus.registrationNumber || vSnap.registrationNumber} onView={onView} />
-          <DocField label="Vehicle Code" value={vSnap.vehicleCode} onView={onView} />
-          <DocField label="Make" value={vSnap.make} onView={onView} />
-          <DocField label="Model" value={vSnap.model} onView={onView} />
-          <DocField label="Type" value={vSnap.vehicleType} onView={onView} />
-          <DocField label="Color" value={vSnap.color} onView={onView} />
-          <DocField label="Is Active (Cache)" value={vStatus.isActive ? '✅ Yes' : '❌ No'} onView={onView} />
-        </SectionCard>
-      </div>
+      <motion.div variants={fadeUp} className="card p-6 border border-base-300 text-center">
+        <Car className="w-12 h-12 text-base-content/20 mx-auto mb-3" />
+        <h3 className="font-bold text-lg text-base-content mb-1">Verify Driver's Primary Vehicle Link</h3>
+        <p className="text-sm text-base-content/50 mb-6 max-w-md mx-auto">
+          If you have reviewed the driver's vehicle in the Global Vehicles tab, you can quickly approve or reject the linkage authorization here.
+        </p>
+        <div className="flex justify-center gap-3">
+          <button onClick={onApprove} className="btn btn-success gap-2">
+            <CheckCircle className="w-4 h-4" /> Approve Vehicle Link
+          </button>
+          <button onClick={onReject} className="btn btn-error gap-2">
+            <XCircle className="w-4 h-4" /> Reject Link
+          </button>
+        </div>
+      </motion.div>
     </motion.div>
   );
 }
 
-// ── Bank Tab ──────────────────────────────────────────────────────────────────
 function TabBank({ p, onView, onVerify }) {
   const b = p.bankDetails || {};
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5">
-      {/* Status banner */}
       <motion.div
         variants={fadeUp}
         className={`card p-4 border ${b.isVerified ? 'border-success/40 bg-success/5' : 'border-warning/40 bg-warning/5'}`}
@@ -1849,7 +1758,7 @@ function TabBank({ p, onView, onVerify }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SectionCard title="Bank Account Details" icon={CreditCard}>
           <DocField label="Account Holder" value={b.accountHolderName} onView={onView} />
-          <DocField label="Account (masked)" value={b.accountLast4 ? `XXXX XXXX XXXX ${b.accountLast4}` : '—'} onView={onView} />
+          <DocField label="Account (masked)" value={b.maskedAccount || (b.accountLast4 ? `XXXX XXXX XXXX ${b.accountLast4}` : '—')} onView={onView} />
           <DocField label="IFSC Code" value={b.ifscCode} onView={onView} />
           <DocField label="Bank Name" value={b.bankName} onView={onView} />
           <DocField label="Account Type" value={b.accountType} onView={onView} />
@@ -1860,7 +1769,6 @@ function TabBank({ p, onView, onVerify }) {
 
         <SectionCard title="Settlement Summary" icon={Wallet}>
           <DocField label="Settlement Cycle" value={p.settlementCycle} onView={onView} />
-          <DocField label="Preferred Method" value={p.settlement?.preferredMethod} onView={onView} />
           <div className="mt-3 pt-3 border-t border-base-300/50 space-y-2">
             <InfoRow label="Total Earnings" value={fmtCurrency(p.stats?.totalEarnings)} />
             <InfoRow label="Platform Fee Paid" value={fmtCurrency(p.stats?.totalPlatformFeePaid)} />
@@ -1872,11 +1780,9 @@ function TabBank({ p, onView, onVerify }) {
   );
 }
 
-// ── Performance Tab ───────────────────────────────────────────────────────────
 function TabPerformance({ p }) {
   const stats = p.stats || {};
   const rating = p.rating || {};
-  const dPerf = p.performance || p.driverProfile?.performance || p.stats || {};
 
   const metrics = [
     { label: 'Total Rides',       value: stats.totalRidesCompleted  || 0, icon: Activity,    color: 'text-primary' },
@@ -1885,11 +1791,10 @@ function TabPerformance({ p }) {
     { label: 'Rating',            value: `${(rating.averageRating || 0).toFixed(1)} ⭐ (${rating.totalRatings || 0})`, icon: Star, color: 'text-accent' },
     { label: 'Total Earnings',    value: fmtCurrency(stats.totalEarnings),       icon: Wallet,      color: 'text-success' },
     { label: 'Platform Fee Paid', value: fmtCurrency(stats.totalPlatformFeePaid), icon: TrendingUp,  color: 'text-info'    },
-    { label: 'Total Distance',    value: `${(dPerf.totalDistanceKm || 0).toFixed(1)} km`, icon: MapPin, color: 'text-secondary' },
-    { label: 'Cancel Rate',       value: `${(dPerf.cancellationRate || 0).toFixed(1)}%`, icon: BarChart3, color: 'text-error'  },
+    { label: 'Total Distance',    value: `${(stats.totalDistanceKm || 0).toFixed(1)} km`, icon: MapPin, color: 'text-secondary' },
+    { label: 'Hours Worked',      value: `${(stats.totalHoursWorked || 0).toFixed(1)} hrs`, icon: Clock, color: 'text-error'  },
     { label: 'On-Time Arrival',   value: `${(stats.onTimeArrivalRate || 100).toFixed(1)}%`, icon: Clock, color: 'text-success' },
     { label: 'Avg Pickup Time',   value: `${(stats.averagePickupTimeMinutes || 0).toFixed(1)} min`, icon: Zap, color: 'text-info'   },
-    { label: 'Monthly Rides',     value: dPerf.monthlyRides         || 0, icon: PieChart,   color: 'text-primary' },
     { label: 'Last Ride',         value: fmtDate(stats.lastRideAt),      icon: Calendar,   color: 'text-base-content/60' },
   ];
 
@@ -1900,49 +1805,37 @@ function TabPerformance({ p }) {
           <motion.div key={s.label} variants={fadeUp} className="stat-card">
             <div className="flex items-center gap-2 mb-2">
               <s.icon className={`w-4 h-4 ${s.color}`} />
-              <span className="text-xs text-base-content/40 font-semibold text-sm uppercase tracking-wider">{s.label}</span>
+              <span className="text-xs text-base-content/40 font-semibold uppercase tracking-wider">{s.label}</span>
             </div>
             <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
           </motion.div>
         ))}
-      </motion.div>
-
-      <motion.div variants={fadeUp} className="card p-5">
-        <h3 className="font-bold text-sm text-base-content/60 uppercase tracking-wider mb-4">Performance Metrics</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <InfoRow label="Performance Tier" value={dPerf.performanceTier} />
-          <InfoRow label="Warning Count" value={dPerf.warningCount} />
-          <InfoRow label="Complaints" value={dPerf.complaintsCount} />
-          <InfoRow label="Compliments" value={dPerf.complimentsCount} />
-        </div>
       </motion.div>
     </motion.div>
   );
 }
 
-// ── Rewards Tab ───────────────────────────────────────────────────────────────
 function TabRewards({ p, onAwardBadge, onAdjustCoins }) {
-  const r = p.rewards || p.driverProfile?.rewards || {};
+  const r = p.rewards || {};
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5">
       <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Coin Balance',   value: p.user?.coins || 0, icon: Coins,    color: 'text-accent'   },
-          { label: 'Total Earned',   value: r.totalCoinsEarned   || 0, icon: TrendingUp, color: 'text-success' },
-          { label: 'Total Redeemed', value: r.totalCoinsRedeem || 0, icon: Wallet,  color: 'text-warning'  },
-          { label: 'Reward Tier',    value: r.tier               || 'Bronze', icon: Award, color: 'text-primary' },
+          { label: 'Coin Balance',   value: r.coinBalance       || 0, icon: Coins,      color: 'text-accent'   },
+          { label: 'Total Earned',   value: r.totalCoinsEarned  || 0, icon: TrendingUp, color: 'text-success' },
+          { label: 'Total Redeemed', value: r.totalCoinsRedeem  || 0, icon: Wallet,     color: 'text-warning'  },
+          { label: 'Reward Tier',    value: r.tier              || 'Bronze', icon: Award, color: 'text-primary' },
         ].map((s) => (
           <motion.div key={s.label} variants={fadeUp} className="stat-card">
             <div className="flex items-center gap-2 mb-2">
               <s.icon className={`w-4 h-4 ${s.color}`} />
-              <span className="text-xs text-base-content/40 font-semibold text-sm uppercase tracking-wider">{s.label}</span>
+              <span className="text-xs text-base-content/40 font-semibold uppercase tracking-wider">{s.label}</span>
             </div>
             <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
           </motion.div>
         ))}
       </motion.div>
 
-      {/* Actions */}
       <motion.div variants={fadeUp} className="flex gap-3">
         <button onClick={onAwardBadge} className="btn btn-primary btn-sm gap-2">
           <Award className="w-4 h-4" /> Award Badge
@@ -1952,7 +1845,6 @@ function TabRewards({ p, onAwardBadge, onAdjustCoins }) {
         </button>
       </motion.div>
 
-      {/* Badges */}
       <motion.div variants={fadeUp} className="card p-5">
         <h3 className="font-bold text-sm text-base-content/60 uppercase tracking-wider mb-4">Earned Badges ({r.badges?.length || 0})</h3>
         {!r.badges?.length ? (
@@ -1975,16 +1867,15 @@ function TabRewards({ p, onAwardBadge, onAdjustCoins }) {
         )}
       </motion.div>
 
-      {/* Coin transactions */}
       {r.coinTransactions?.length > 0 && (
         <motion.div variants={fadeUp} className="card p-5">
           <h3 className="font-bold text-sm text-base-content/60 uppercase tracking-wider mb-4">Recent Coin Transactions</h3>
           <div className="space-y-2">
-            {r.coinTransactions.slice(-10).reverse().map((tx, i) => (
+            {[...r.coinTransactions].reverse().slice(0, 10).map((tx, i) => (
               <div key={i} className="flex items-center justify-between py-2 border-b border-base-300/50 last:border-0">
                 <div>
-                  <p className="text-sm font-semibold text-sm text-base-content">{tx.description}</p>
-                  <p className="text-xs text-base-content/40">{tx.type} · {fmtDate(tx.createdAt)}</p>
+                  <p className="font-semibold text-sm text-base-content">{tx.description}</p>
+                  <p className="text-xs text-base-content/40">{tx.type} · {fmtDate(tx.createdAt || new Date())}</p>
                 </div>
                 <div className="text-right">
                   <p className={`font-black text-sm ${['EARN','BONUS','ADMIN_CREDIT'].includes(tx.type) ? 'text-success' : 'text-error'}`}>
@@ -2001,9 +1892,8 @@ function TabRewards({ p, onAwardBadge, onAdjustCoins }) {
   );
 }
 
-// ── Dispatch Tab ──────────────────────────────────────────────────────────────
 function TabDispatch({ p }) {
-  const dp = p.dispatch || p.driverProfile || {};
+  const dp = p.dispatch || {};
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5">
@@ -2019,29 +1909,19 @@ function TabDispatch({ p }) {
               }`}>{dp.status || 'Offline'}</span>
             </div>
             <DocField label="Current Ride" value={dp.currentRide ? String(dp.currentRide) : 'None'} onView={() => {}} />
-            <DocField label="Is Blocked" value={dp.isBlocked ? '🚫 Yes' : '✅ No'} onView={() => {}} />
-            <DocField label="Is Paused" value={dp.isPaused ? `⏸️ Until ${fmtDate(dp.pausedUntil)}` : '✅ No'} onView={() => {}} />
-            <DocField label="Pause Reason" value={dp.pauseReason} onView={() => {}} />
+            <DocField label="Shift Type" value={dp.shiftType} onView={() => {}} />
+            <DocField label="Shift Times" value={`${dp.shiftStart} to ${dp.shiftEnd}`} onView={() => {}} />
+            <DocField label="Days Available" value={dp.daysAvailable?.join(', ')} onView={() => {}} />
           </div>
         </SectionCard>
 
         <SectionCard title="Live Location" icon={MapPin}>
           <div className="space-y-0">
-            <DocField label="Longitude" value={dp.location?.coordinates?.[0]} onView={() => {}} />
-            <DocField label="Latitude"  value={dp.location?.coordinates?.[1]} onView={() => {}} />
-            <DocField label="Heading"   value={dp.location?.heading !== undefined ? `${dp.location.heading}°` : '—'} onView={() => {}} />
-            <DocField label="Speed"     value={dp.location?.speedKmh !== undefined ? `${dp.location.speedKmh} km/h` : '—'} onView={() => {}} />
-            <DocField label="Last Updated" value={fmtDate(dp.location?.updatedAt)} onView={() => {}} />
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Shift Preferences" icon={Calendar}>
-          <div className="space-y-0">
-<DocField label="Shift Type"      value={dp.shift?.shiftType || dp.shiftType}       onView={() => {}} />
-            <DocField label="Start Time"      value={dp.shift?.startTime || dp.shiftStart}       onView={() => {}} />
-            <DocField label="End Time"        value={dp.shift?.endTime || dp.shiftEnd}         onView={() => {}} />
-            <DocField label="Days Available"  value={dp.shift?.daysAvailable?.join(', ') || dp.daysAvailable?.join(', ')} onView={() => {}} />
-            <DocField label="Next Available"  value={fmtDate(dp.shift?.nextAvailableAt || dp.nextAvailableAt)} onView={() => {}} />
+            <DocField label="Longitude" value={p.location?.coordinates?.[0]} onView={() => {}} />
+            <DocField label="Latitude"  value={p.location?.coordinates?.[1]} onView={() => {}} />
+            <DocField label="Heading"   value={p.location?.heading !== undefined ? `${p.location.heading}°` : '—'} onView={() => {}} />
+            <DocField label="Speed"     value={p.location?.speedKmh !== undefined ? `${p.location.speedKmh} km/h` : '—'} onView={() => {}} />
+            <DocField label="Last Updated" value={fmtDate(p.location?.updatedAt)} onView={() => {}} />
           </div>
         </SectionCard>
 
@@ -2053,7 +1933,7 @@ function TabDispatch({ p }) {
               {p.serviceZones.map((z, i) => (
                 <div key={i} className="flex items-center justify-between py-2 border-b border-base-300/50 last:border-0">
                   <div>
-                    <p className="text-sm font-semibold text-sm text-base-content">{z.city}, {z.state}</p>
+                    <p className="font-semibold text-sm text-base-content">{z.city}, {z.state}</p>
                     <p className="text-xs text-base-content/40">{z.radiusKm}km radius · {z.pinCodes?.join(', ')}</p>
                   </div>
                   <span className={`text-xs font-bold ${z.isActive ? 'text-success' : 'text-base-content/40'}`}>
@@ -2065,11 +1945,11 @@ function TabDispatch({ p }) {
           )}
         </SectionCard>
 
-        <SectionCard title="Pricing Preferences" icon={Wallet} className="lg:col-span-2">
+        <SectionCard title="Pricing Preferences" icon={Wallet}>
           {!p.pricing ? (
             <p className="text-sm text-base-content/40">No pricing configured.</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <InfoRow label="Base Fare" value={fmtCurrency(p.pricing.baseFare)} />
               <InfoRow label="Per KM" value={fmtCurrency(p.pricing.baseFarePerKm)} />
               <InfoRow label="Minimum Fare" value={fmtCurrency(p.pricing.minimumFare)} />
@@ -2077,11 +1957,6 @@ function TabDispatch({ p }) {
               <InfoRow label="Free Waiting" value={`${p.pricing.freeWaitingMinutes} min`} />
               <InfoRow label="Night Surcharge" value={`${p.pricing.nightSurchargePercent}%`} />
               <InfoRow label="Wheelchair Surcharge" value={fmtCurrency(p.pricing.wheelchairSurcharge)} />
-              <InfoRow label="Platform Fee (effective)" value={
-                p.platformFeeOverride
-                  ? `${p.platformFeeOverride.type === 'percentage' ? p.platformFeeOverride.value + '%' : '₹' + p.platformFeeOverride.value} (override)`
-                  : 'Global Config'
-              } />
             </div>
           )}
         </SectionCard>
@@ -2090,7 +1965,6 @@ function TabDispatch({ p }) {
   );
 }
 
-// ── Actions Tab ───────────────────────────────────────────────────────────────
 function TabActions({ p, onFee, onNotes, onStatus, onBlock }) {
   const isUserBlocked = p.user?.isBlocked;
   
@@ -2134,7 +2008,7 @@ function TabActions({ p, onFee, onNotes, onStatus, onBlock }) {
           <motion.div key={a.title} variants={fadeUp} whileHover={{ y: -3 }} className="card p-5">
             <div className="flex   items-start gap-4">
               <div className="p-3 rounded-2xl bg-base-200 flex-shrink-0">
-                <a.icon className="w-5 h-5 text-base-content/70 text-sm" />
+                <a.icon className="w-5 h-5 text-base-content/70" />
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="font-bold text-base-content text-sm mb-1">{a.title}</h4>
@@ -2148,7 +2022,6 @@ function TabActions({ p, onFee, onNotes, onStatus, onBlock }) {
         ))}
       </div>
 
-      {/* Current Settings Overview */}
       <motion.div variants={fadeUp} className="card p-5 mt-5">
         <h3 className="font-bold text-sm text-base-content/60 uppercase tracking-wider mb-4">Current Account Settings</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -2158,12 +2031,11 @@ function TabActions({ p, onFee, onNotes, onStatus, onBlock }) {
           <InfoRow label="Settlement Cycle" value={p.settlementCycle} />
           <InfoRow label="Platform Fee" value={
             p.platformFeeOverride
-              ? `${p.platformFeeOverride.type === 'percentage' ? p.platformFeeOverride.value + '%' : '₹' + p.platformFeeOverride.value}`
+              ? `${p.platformFeeOverride.type === 'percentage' ? p.platformFeeOverride.value + '%' : '₹' + p.platformFeeOverride.value} (Override)`
               : 'Global Config'
           } />
           <InfoRow label="Onboarding" value={p.isOnboardingComplete ? '✅ Complete' : '❌ Incomplete'} />
           <InfoRow label="KYC Status" value={p.kyc?.verificationStatus} />
-          <InfoRow label="Vehicle Status" value={(p.vehicleStatus || p.vehicle)?.verificationStatus} />
           <InfoRow label="Bank Verified" value={p.bankDetails?.isVerified ? '✅ Yes' : '❌ No'} />
           <InfoRow label="Created By" value={p.createdBy?.name || p.createdBy} />
           <InfoRow label="Last Updated" value={fmtDate(p.updatedAt)} />

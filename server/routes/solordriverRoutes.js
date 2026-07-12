@@ -8,7 +8,7 @@ import Vehicle                              from '../models/Vehicle.js';
 import User                                 from '../models/User.js';
 import Notification                         from '../models/Notification.js';
 import SystemLog                            from '../models/SystemLog.js';
-import Wallet                               from '../models/Wallet.js';
+import PartnerWallet                        from '../models/PartnerWallet.js';
 import cache                                from '../middleware/cache.js';
 import { invalidateKey, invalidatePattern } from '../utils/cacheInvalidation.js';
 import sendEmail                            from '../utils/sendEmail.js';
@@ -86,6 +86,10 @@ const requireActive = (req, res, next) => {
   next();
 };
 
+// requireKyc — gate for actions that shouldn't run before KYC clears.
+// Was previously defined but never wired to any route; now applied on
+// the vehicle and bank-details write routes (§9/§10), which are the
+// actions that actually need a KYC-cleared partner behind them.
 const requireKyc = (req, res, next) => {
   if (!req.soloPartner?.kyc?.isVerified) {
     return res.status(403).json({ success: false, message: 'KYC verification required.', kycStatus: req.soloPartner?.kyc?.verificationStatus });
@@ -131,6 +135,23 @@ const buildActor = (req) => ({
   platform:  req.deviceInfo?.platform || 'unknown',
 });
 
+// ── §6b  PII Masking Helpers ──────────────────────────────────────────────────
+// Sensitive numbers (aadhaarNumber, kyc.panNumber, bankDetails.accountNumber)
+// are `select:false` in the schema, so plain finds already omit them by
+// default — no explicit `.select('-...')` or `delete` is needed for that.
+// The bug across the old handlers was the *opposite* direction: masking
+// code that tried to read `partner.bankDetails.accountNumber.slice(-4)` or
+// `partner.kyc.aadhaarNumber` to build a masked display value — but since
+// those fields are never present on a plain find, that code was dead and
+// silently produced NO masked value at all (not even last-4). Build masks
+// from the *last4 fields instead*, which are normal (selected) fields.
+
+const maskAadhaar = (partner) =>
+  partner?.kyc?.aadhaarLast4 ? `XXXX XXXX ${partner.kyc.aadhaarLast4}` : null;
+
+const maskAccount = (bankDetails) =>
+  bankDetails?.accountLast4 ? `XXXX XXXX XXXX ${bankDetails.accountLast4}` : null;
+
 // ════════════════════════════════════════════════════════════════════════════
 // §7  PROFILE ROUTES
 // ════════════════════════════════════════════════════════════════════════════
@@ -143,12 +164,19 @@ router.get('/me', ...partnerGuard,
       .populate('user', 'name email phone avatar role referralCode coins isEmailVerified isPhoneVerified')
       .lean();
     if (!partner) return res.status(404).json({ success: false, message: 'Profile not found' });
-    if (partner.kyc?.aadhaarNumber) delete partner.kyc.aadhaarNumber;
-    if (partner.bankDetails?.accountNumber) {
-      partner.bankDetails.maskedAccount = `XXXX${partner.bankDetails.accountLast4 || ''}`;
-      delete partner.bankDetails.accountNumber;
+
+    // aadhaarNumber / kyc.panNumber / bankDetails.accountNumber are
+    // select:false, so they're already absent here — these deletes are
+    // just defense-in-depth in case a future query adds `+field`.
+    if (partner.kyc) {
+      delete partner.kyc.aadhaarNumber;
+      delete partner.kyc.panNumber;
+      partner.kyc.maskedAadhaar = maskAadhaar(partner);
     }
-    if (partner.panNumber) delete partner.panNumber;
+    if (partner.bankDetails) {
+      delete partner.bankDetails.accountNumber;
+      partner.bankDetails.maskedAccount = maskAccount(partner.bankDetails);
+    }
     res.json({ success: true, data: partner });
   })
 );
@@ -350,9 +378,13 @@ router.get('/kyc', ...partnerGuard,
       .findById(req.soloPartner._id)
       .select('kyc medicalFitness profileCompletionPercent isOnboardingComplete partnershipStatus')
       .lean();
-    if (partner.kyc?.aadhaarNumber) {
-      partner.kyc.maskedAadhaar = `XXXX XXXX ${partner.kyc.aadhaarLast4 || ''}`;
+    // aadhaarNumber / panNumber are select:false and already absent; build
+    // the masked value from aadhaarLast4 unconditionally instead of
+    // gating on the (never-present) full number.
+    if (partner.kyc) {
       delete partner.kyc.aadhaarNumber;
+      delete partner.kyc.panNumber;
+      partner.kyc.maskedAadhaar = maskAadhaar(partner);
     }
     res.json({ success: true, data: partner });
   })
@@ -378,8 +410,6 @@ router.post('/kyc', ...partnerGuard,
     const dlExpiry = new Date(drivingLicenceExpiry);
 
     const kycUpdate = {
-      'kyc.aadhaarFrontUrl':       aadhaarFrontUrl,
-      'kyc.aadhaarBackUrl':        aadhaarBackUrl,
       'kyc.drivingLicenceNumber':  drivingLicenceNumber?.toUpperCase().trim(),
       'kyc.drivingLicenceExpiry':  dlExpiry,
       'kyc.drivingLicenceDocUrl':  drivingLicenceDocUrl,
@@ -387,10 +417,12 @@ router.post('/kyc', ...partnerGuard,
       'kyc.verificationStatus':    'pending',
       'kyc.submittedAt':           new Date(),
     };
-    if (aadhaarNumber)   kycUpdate['kyc.aadhaarNumber'] = aadhaarNumber;
+    // aadhaarFrontUrl/aadhaarBackUrl only set once each, was duplicated before.
+    if (aadhaarNumber)   kycUpdate['kyc.aadhaarNumber']   = aadhaarNumber;
     if (aadhaarFrontUrl) kycUpdate['kyc.aadhaarFrontUrl'] = aadhaarFrontUrl;
-    if (panNumber)       kycUpdate['kyc.panNumber'] = panNumber.toUpperCase();
-    if (panCardUrl)      kycUpdate['kyc.panCardUrl'] = panCardUrl;
+    if (aadhaarBackUrl)  kycUpdate['kyc.aadhaarBackUrl']  = aadhaarBackUrl;
+    if (panNumber)       kycUpdate['kyc.panNumber']       = panNumber.toUpperCase();
+    if (panCardUrl)      kycUpdate['kyc.panCardUrl']      = panCardUrl;
 
     const partner = await SoloDriverPartner.findByIdAndUpdate(
       req.soloPartner._id,
@@ -470,7 +502,7 @@ router.get('/vehicle', ...partnerGuard,
   })
 );
 
-router.put('/vehicle', ...partnerGuard,
+router.put('/vehicle', ...partnerGuard, requireKyc,
   asyncHandler(async (req, res) => {
     const { registrationNumber, make, model, year, color, vehicleType, seatingCapacity } = req.body;
     const errors = [];
@@ -479,7 +511,16 @@ router.put('/vehicle', ...partnerGuard,
     if (!model)       errors.push('Vehicle model required');
     if (!vehicleType) errors.push('Vehicle type required');
 
-    const validTypes = ['Sedan', 'SUV', 'Van', 'Minivan', 'Wheelchair-Van', 'Tempo-Traveller', 'Hatchback', 'Auto'];
+    // Matches Vehicle.vehicleType's shared platform-wide enum (§ Vehicle
+    // model) instead of a narrower local list that would reject valid
+    // types like 'Bike', 'E-Rickshaw', 'Mortuary-Van', etc.
+    const validTypes = [
+      'Bike', 'Scooter', 'Auto', 'E-Rickshaw',
+      'Hatchback', 'Sedan', 'SUV', 'MUV', 'Crossover',
+      'Van', 'Minivan', 'Tempo-Traveller', 'Minibus',
+      'Wheelchair-Van', 'Mortuary-Van',
+      'Bus', 'Truck', 'Pickup',
+    ];
     if (vehicleType && !validTypes.includes(vehicleType))
       errors.push(`vehicleType must be one of: ${validTypes.join(', ')}`);
     if (errors.length) return res.status(422).json({ success: false, message: 'Validation failed', errors });
@@ -494,13 +535,15 @@ router.put('/vehicle', ...partnerGuard,
     };
     Object.keys(vehicleData).forEach(k => vehicleData[k] === undefined && delete vehicleData[k]);
 
-    // Upsert vehicle doc — Vehicle.post-save syncs vehicleStatus cache on SoloDriverPartner
+    // Upsert vehicle doc. SoloDriverPartner keeps no vehicle cache field —
+    // this is the single source of truth, read live via GET /vehicle or
+    // SoloDriverPartner.populate('vehicle').
     const vehicle = await Vehicle.findOneAndUpdate(
       { ownerType: 'SoloDriverPartner', ownerId: req.soloPartner._id },
       { $set: vehicleData, $setOnInsert: { ownerType: 'SoloDriverPartner', ownerId: req.soloPartner._id } },
       { new: true, upsert: true, runValidators: true }
     );
-    await vehicle.save(); // triggers post-save → syncs SoloDriverPartner.vehicleStatus
+    await vehicle.save(); // re-triggers post-save (verificationHistory append, etc.)
 
     await invalidateSdpCache(req.soloPartner._id);
     createAuditLog({ level: 'info', category: 'user', message: `Solo partner updated vehicle: ${registrationNumber}`, actor: buildActor(req) });
@@ -577,10 +620,12 @@ router.patch('/vehicle/location', ...partnerGuard, requireActive,
     };
     if (gpsDeviceId) vehicleUpdate.gpsDeviceId = gpsDeviceId;
 
-    await Vehicle.findOneAndUpdate(
+    const vehicle = await Vehicle.findOneAndUpdate(
       { ownerType: 'SoloDriverPartner', ownerId: req.soloPartner._id },
-      { $set: vehicleUpdate }
+      { $set: vehicleUpdate },
+      { new: true }
     );
+    if (!vehicle) return res.status(404).json({ success: false, message: 'Vehicle not found. Add a vehicle before sending location pings.' });
 
     res.json({ success: true, message: 'Location updated', data: { lng: longitude, lat: latitude, updatedAt: now } });
   })
@@ -594,15 +639,19 @@ router.get('/bank', ...partnerGuard,
   cache(120, (req) => CK.bankDetails(req.soloPartner._id)),
   asyncHandler(async (req, res) => {
     const partner = await SoloDriverPartner.findById(req.soloPartner._id).select('bankDetails').lean();
-    if (partner.bankDetails?.accountNumber) {
-      partner.bankDetails.maskedAccount = `XXXX XXXX XXXX ${partner.bankDetails.accountNumber.slice(-4)}`;
+    // accountNumber is select:false and already absent from `partner` here —
+    // the old code tried `.accountNumber.slice(-4)`, which is always
+    // undefined, so maskedAccount was silently never set. Build it from
+    // accountLast4 (a normal, selected field) instead.
+    if (partner.bankDetails) {
       delete partner.bankDetails.accountNumber;
+      partner.bankDetails.maskedAccount = maskAccount(partner.bankDetails);
     }
     res.json({ success: true, data: partner });
   })
 );
 
-router.post('/bank', ...partnerGuard,
+router.post('/bank', ...partnerGuard, requireKyc,
   asyncHandler(async (req, res) => {
     const { accountHolderName, accountNumber, ifscCode, bankName, upiId, upiName, accountType, cancelledChequeUrl } = req.body;
     const errors = [];
@@ -1126,19 +1175,24 @@ router.get('/performance', ...partnerGuard,
   })
 );
 
+// Coins live on SoloDriverPartner.rewards (coinBalance / totalCoinsEarned /
+// totalCoinsRedeem — see model §1 rewardsSchema), written by the model's
+// earnCoins()/redeemCoins() methods. This previously populated `user`
+// and read `user.coins` / `user.coinsEarned` / `user.coinsRedeemed` —
+// fields the coin methods never touch, so this always returned stale/zero
+// values regardless of actual balance. Read straight off `rewards` instead.
 router.get('/rewards', ...partnerGuard,
   asyncHandler(async (req, res) => {
     const partner = await SoloDriverPartner
       .findById(req.soloPartner._id)
-      .populate('user', 'coins coinsEarned coinsRedeemed')
       .select('rewards')
       .lean();
     res.json({
       success: true,
       data: {
-        coinBalance:   partner.user?.coins || 0,
-        coinsEarned:   partner.user?.coinsEarned || 0,
-        coinsRedeemed: partner.user?.coinsRedeemed || 0,
+        coinBalance:   partner.rewards?.coinBalance || 0,
+        coinsEarned:   partner.rewards?.totalCoinsEarned || 0,
+        coinsRedeemed: partner.rewards?.totalCoinsRedeem || 0,
         tier:          partner.rewards?.tier || 'Bronze',
         badges:        partner.rewards?.badges || [],
       },
@@ -1163,11 +1217,10 @@ router.get('/admin/list', ...adminGuard,
     const { status, kycStatus, vehicleStatus, city, state, search, sortBy, sortOrder } = req.query;
 
     const filter = {};
-    if (status)        filter.partnershipStatus                   = status;
-    if (kycStatus)     filter['kyc.verificationStatus']           = kycStatus;
-    if (vehicleStatus) filter['vehicleStatus.verificationStatus'] = vehicleStatus;
-    if (city)          filter['serviceZones.city']                = new RegExp(city, 'i');
-    if (state)         filter['serviceZones.state']               = new RegExp(state, 'i');
+    if (status)    filter.partnershipStatus         = status;
+    if (kycStatus) filter['kyc.verificationStatus'] = kycStatus;
+    if (city)      filter['serviceZones.city']      = new RegExp(city, 'i');
+    if (state)     filter['serviceZones.state']     = new RegExp(state, 'i');
     if (search) {
       filter.$or = [
         { legalName:   new RegExp(search, 'i') },
@@ -1178,10 +1231,25 @@ router.get('/admin/list', ...adminGuard,
       ];
     }
 
+    // Vehicle verification status lives on the standalone Vehicle
+    // collection, not on SoloDriverPartner — query it directly, then
+    // constrain by owner _id.
+    if (vehicleStatus) {
+      const matchingVehicles = await Vehicle.find({
+        ownerType:          'SoloDriverPartner',
+        verificationStatus: vehicleStatus,
+      }).select('ownerId').lean();
+      const ownerIds = matchingVehicles.map(v => v.ownerId);
+      filter._id = { $in: ownerIds };
+    }
+
     const sort = { [sortBy || 'createdAt']: sortOrder === 'asc' ? 1 : -1 };
     const [partners, total] = await Promise.all([
       SoloDriverPartner.find(filter).sort(sort).skip(skip).limit(limit)
-        .select('-kyc.aadhaarNumber -bankDetails.accountNumber -panNumber -adminNotes -internalNotes')
+        // kyc.aadhaarNumber / kyc.panNumber / bankDetails.accountNumber are
+        // select:false already; panNumber no longer exists at top level
+        // (moved into kyc — see model), so excluding it there was a no-op.
+        .select('-kyc.aadhaarNumber -kyc.panNumber -bankDetails.accountNumber -adminNotes -internalNotes')
         .populate('user', 'name email phone avatar isEmailVerified isPhoneVerified isBlocked')
         .lean(),
       SoloDriverPartner.countDocuments(filter),
@@ -1259,7 +1327,9 @@ router.post('/admin/create', ...adminGuard,
 
     const newPartner = await SoloDriverPartner.create(partnerPayload);
 
-    // Vehicle — standalone Vehicle doc (triggers post-save → syncs vehicleStatus cache)
+    // Vehicle — standalone Vehicle doc. No cache field to sync on
+    // SoloDriverPartner anymore; read it back live via GET /vehicle or
+    // SoloDriverPartner.populate('vehicle').
     let newVehicle = null;
     if (registrationNumber) {
       newVehicle = await Vehicle.create({
@@ -1272,10 +1342,16 @@ router.post('/admin/create', ...adminGuard,
         verificationStatus: 'pending',
         createdBy:          req.user._id,
       });
-      await newVehicle.save(); // triggers vehicleStatus sync
     }
 
-    await Wallet.create({ user: newUser._id, balance: 0, createdBy: req.user._id });
+    // PartnerWallet, not the generic Wallet model — SoloDriverPartner
+    // .getWallet() (model §5) looks up PartnerWallet keyed on
+    // { partner: user, partnerRole: 'solodriverpartner' }. Creating in
+    // `Wallet` instead put money in a collection the partner's own
+    // getWallet() would never find.
+    await PartnerWallet.create({
+      partner: newUser._id, partnerRole: 'solodriverpartner', balance: 0, createdBy: req.user._id,
+    });
 
     // Welcome email
     sendEmail({
@@ -1328,9 +1404,18 @@ router.get('/admin/:id', ...adminGuard,
       .lean();
 
     if (!partner) return res.status(404).json({ success: false, message: 'Partner not found' });
-    if (partner.bankDetails?.accountNumber) {
-      partner.bankDetails.maskedAccount = `XXXX${partner.bankDetails.accountNumber.slice(-4)}`;
+
+    // accountNumber is select:false and already absent; build the masked
+    // display value from accountLast4 instead of the (never-present) full
+    // number, same fix as GET /me and GET /bank.
+    if (partner.bankDetails) {
       delete partner.bankDetails.accountNumber;
+      partner.bankDetails.maskedAccount = maskAccount(partner.bankDetails);
+    }
+    if (partner.kyc) {
+      delete partner.kyc.aadhaarNumber;
+      delete partner.kyc.panNumber;
+      partner.kyc.maskedAadhaar = maskAadhaar(partner);
     }
     res.json({ success: true, data: partner });
   })
@@ -1376,7 +1461,9 @@ router.patch('/admin/:id/verify-kyc', ...adminGuard,
 
 /**
  * PATCH /admin/:id/verify-vehicle
- * Vehicle.save() triggers post-save → syncs vehicleStatus cache on SoloDriverPartner automatically.
+ * Updates the live Vehicle doc directly. SoloDriverPartner has no cache
+ * field to sync anymore — GET /admin/:id/vehicle (or populate('vehicle'))
+ * always reads current state straight from this collection.
  */
 router.patch('/admin/:id/verify-vehicle', ...adminGuard,
   asyncHandler(async (req, res) => {
@@ -1395,7 +1482,7 @@ router.patch('/admin/:id/verify-vehicle', ...adminGuard,
     if (approved) vehicle.verifiedAt = new Date();
     vehicle.verifiedBy = req.user._id;
     if (!approved) vehicle.rejectionReason = rejectionReason;
-    await vehicle.save(); // ← triggers post-save → SoloDriverPartner.vehicleStatus synced automatically
+    await vehicle.save();
 
     const partner = await SoloDriverPartner.findById(id).populate('user', 'name email');
     if (partner) {
@@ -1615,6 +1702,12 @@ router.patch('/admin/:id/rewards/award-badge', ...adminGuard,
   })
 );
 
+// Rewrote to use the model's own coin ledger (rewards.coinBalance +
+// rewards.coinTransactions, model §5 earnCoins/redeemCoins) instead of
+// User.coins. The old version adjusted User.coins/coinsEarned/coinsRedeemed
+// directly — a different field the model's coin methods never write to —
+// so admin adjustments and partner-earned coins lived in two places that
+// never reconciled, and no ledger entry was recorded for admin actions.
 router.patch('/admin/:id/rewards/adjust-coins', ...adminGuard,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
@@ -1624,19 +1717,25 @@ router.patch('/admin/:id/rewards/adjust-coins', ...adminGuard,
     if (isNaN(amt) || amt <= 0) return res.status(422).json({ success: false, message: 'amount must be positive' });
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid partner ID' });
 
-    const partner = await SoloDriverPartner.findById(id).populate('user', 'name email coins');
+    const partner = await SoloDriverPartner.findById(id).populate('user', 'name email');
     if (!partner) return res.status(404).json({ success: false, message: 'Partner not found' });
 
-    const delta      = type === 'ADMIN_CREDIT' ? amt : -amt;
-    const newBalance = Math.max(0, (partner.user.coins || 0) + delta);
+    if (type === 'ADMIN_DEBIT' && partner.rewards.coinBalance < amt) {
+      return res.status(422).json({ success: false, message: `Insufficient coins. Balance: ${partner.rewards.coinBalance}, Requested: ${amt}` });
+    }
 
-    await User.findByIdAndUpdate(partner.user._id, {
-      $set: { coins: newBalance },
-      $inc: { coinsEarned: type === 'ADMIN_CREDIT' ? amt : 0, coinsRedeemed: type === 'ADMIN_DEBIT' ? amt : 0 },
+    partner.rewards.coinBalance += type === 'ADMIN_CREDIT' ? amt : -amt;
+    if (type === 'ADMIN_CREDIT') partner.rewards.totalCoinsEarned += amt;
+    else                         partner.rewards.totalCoinsRedeem += amt;
+    partner.rewards.coinTransactions.push({
+      type, amount: amt, balance: partner.rewards.coinBalance,
+      description: description || `Admin ${type === 'ADMIN_CREDIT' ? 'credit' : 'debit'}`,
+      createdBy: req.user._id,
     });
+    await partner.save();
 
-    createAuditLog({ level: 'info', category: 'user', message: `Admin ${type} ${amt} coins for: ${partner.user.email}`, actor: buildActor(req), metadata: { type, amount: amt, description, newBalance } });
-    res.json({ success: true, message: 'Coins adjusted', data: { newBalance } });
+    createAuditLog({ level: 'info', category: 'user', message: `Admin ${type} ${amt} coins for: ${partner.user.email}`, actor: buildActor(req), metadata: { type, amount: amt, description, newBalance: partner.rewards.coinBalance } });
+    res.json({ success: true, message: 'Coins adjusted', data: { newBalance: partner.rewards.coinBalance } });
   })
 );
 
