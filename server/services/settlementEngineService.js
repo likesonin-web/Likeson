@@ -41,7 +41,7 @@ import PartnerSettlement from '../models/PartnerSettlement.js';
 import BookingPartnerAllocation from '../models/BookingPartnerAllocation.js';
 import PartnerCollectionLiability from '../models/PartnerCollectionLiability.js';
 import PlatformPricingConfig from '../models/PlatformPricingConfig.js';
-import { computePartnerAllocations } from './allocationEngineService.js';
+import { computePartnerAllocations } from './allocationEngine.service.js';
 import { applyRecovery } from './recoveryEngineService.js';
 import User from '../models/User.js';
 

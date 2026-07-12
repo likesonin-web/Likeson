@@ -1,26 +1,26 @@
 import mongoose from 'mongoose';
+import PlatformPricingConfig from '../models/PlatformPricingConfig.js';
 
 /**
- * allocationEngineService — creates BookingPartnerAllocation docs the moment
- * a booking hits 'completed'. Display-only earning (pending/settled totals),
- * NOT wallet credit. Wallet credit still happens on the batch settlement
- * cron per settlementCycle — that part is unchanged.
+ * allocationEngineService.js
  *
- * Payment routing rule (per business decision):
- *   bookingType === 'doctor_online'  -> paymentSource 'ONLINE'
- *   everything else                  -> paymentSource 'PAY_AT_SERVICE'
+ * Two entry points:
+ *   computeDoctorHospitalAllocations() — doctor/hospital leg only, used by BOTH
+ *     createAllocationsForBooking() (display-only, instant) and
+ *     computePartnerAllocations() (real settlement, via settlementEngine.service.js).
+ *     Single source of truth: DoctorProfile.resolveEffectivePricing().
  *
- * Called from THREE places (belt-and-braces — don't rely on a single hook):
- *   1. Booking.js post-save hook (fires when .save() transitions to 'completed')
- *   2. bookingRouter.js explicit calls after every route that flips status
- *      to 'completed' — REQUIRED for routes using findByIdAndUpdate, since
- *      that bypasses Mongoose document middleware entirely.
- *   3. Idempotent either way — idempotencyKey + existing-check below means
- *      duplicate calls are always safe no-ops.
+ *   computePartnerAllocations() — FULL allocation set (doctor/hospital/CA/
+ *     transport/lab) for a completed booking. Returns partnerId as the
+ *     PROFILE id (DoctorProfile._id / Hospital._id / etc), never a User id —
+ *     settlementEngine.service.js resolves User id itself via
+ *     resolveUserIdFromProfile(). This is what processBookingSettlement()
+ *     calls at step 4.
+ *
+ *   createAllocationsForBooking() — display-only BookingPartnerAllocation
+ *     rows created the instant a booking completes (NOT wallet credit).
  */
 
-// Which partner role is the cash collector per bookingType (PAY_AT_SERVICE only).
-// Adjust freely — this is the one place that encodes "who physically holds the cash."
 const CASH_COLLECTOR_BY_TYPE = {
   full_care_ride:      'driver',
   patient_transport:   'driver',
@@ -32,13 +32,157 @@ const CASH_COLLECTOR_BY_TYPE = {
   diagnostic_home:     'lab_partner',
 };
 
-import { computeDoctorHospitalAllocations } from './allocationEngineService.js';
-import PlatformPricingConfig from '../models/PlatformPricingConfig.js';
+// ── Platform fee resolution helper ───────────────────────────────────────────
+function resolvePlatformFeeAmount(baseAmount, feeObj) {
+  if (!feeObj || baseAmount <= 0) return 0;
+  if (feeObj.type === 'percentage') return +(baseAmount * (feeObj.value / 100)).toFixed(2);
+  return Math.min(feeObj.value, baseAmount); // never let fee exceed the base
+}
 
+// ── Doctor / Hospital leg — SINGLE SOURCE OF TRUTH ───────────────────────────
+/**
+ * computeDoctorHospitalAllocations
+ *
+ * Reads DoctorProfile.resolveEffectivePricing() (which already resolves
+ * doctor-owner vs hospital-manager via the doctor's primaryHospital).
+ *
+ * CRITICAL FIX: previously, when hospital-manager pricing gave doctorShare=0
+ * (no explicit honorarium set), NOTHING was allocated — not even the
+ * hospital's share — because the caller only ever looked at doctorShare.
+ * Now: hospital gets grossHospitalShare whenever it's > 0, independent of
+ * whether doctor also gets something. This fixes bookings exactly like
+ * yours: doctorShare=0, hospitalShare=700 → hospital allocation of 700 now
+ * gets created; doctor allocation is correctly skipped (they earned 0).
+ */
+export async function computeDoctorHospitalAllocations(booking, pricingConfig, session = null) {
+  if (!booking.doctor) return [];
+
+  const DoctorProfile = mongoose.model('DoctorProfile');
+
+  const consultationType = booking.consultationType || 'inPerson';
+  const isFollowUp = booking.bookingType === 'follow_up';
+
+  let pricing;
+  try {
+    pricing = await DoctorProfile.resolveEffectivePricing(
+      booking.doctor,
+      consultationType,
+      isFollowUp,
+      0, // followUpFeeOverride — falls back to pricingSource.followUpFee
+      session
+    );
+  } catch (err) {
+    console.error(`[allocationEngine] resolveEffectivePricing failed for doctor ${booking.doctor}: ${err.message}`);
+    return [];
+  }
+
+  const { source, pricingOwnerId, calculated, platformFee: overrideFee } = pricing;
+  const { doctorShare, grossHospitalShare } = calculated;
+
+  const allocations = [];
+
+  if (source === 'doctor') {
+    // doctor-owner hospital type — doctor owns pricing, hospital never paid.
+    if (doctorShare > 0) {
+      const fee = overrideFee ?? pricingConfig?.doctor?.platformFee ?? null;
+      allocations.push({
+        partnerId:   booking.doctor,      // DoctorProfile._id
+        partnerRole: 'doctor',
+        grossAmount: doctorShare,
+        platformFee: resolvePlatformFeeAmount(doctorShare, fee),
+        taxAmount:   0,
+        tdsAmount:   0,
+      });
+    }
+  } else {
+    // hospital-manager — hospital gets its share regardless of doctorShare.
+    if (grossHospitalShare > 0) {
+      const fee = overrideFee ?? pricingConfig?.hospital?.platformFee ?? null;
+      allocations.push({
+        partnerId:   pricingOwnerId,      // Hospital._id
+        partnerRole: 'hospital',
+        grossAmount: grossHospitalShare,
+        platformFee: resolvePlatformFeeAmount(grossHospitalShare, fee),
+        taxAmount:   0,
+        tdsAmount:   0,
+      });
+    }
+    if (doctorShare > 0) {
+      allocations.push({
+        partnerId:   booking.doctor,
+        partnerRole: 'doctor',
+        grossAmount: doctorShare,
+        platformFee: 0, // platform fee already taken on hospital side under hospital-manager
+        taxAmount:   0,
+        tdsAmount:   0,
+      });
+    }
+  }
+
+  return allocations;
+}
+
+// ── Full allocation set — used by settlementEngine.service.js ───────────────
+export async function computePartnerAllocations(booking, pricingConfig, session = null) {
+  const allocations = [];
+
+  const dhAllocs = await computeDoctorHospitalAllocations(booking, pricingConfig, session);
+  allocations.push(...dhAllocs);
+
+  const fb = booking.fareBreakdown || {};
+
+  if (booking.careAssistant && fb.careAssistantFee > 0) {
+    allocations.push({
+      partnerId:   booking.careAssistant,
+      partnerRole: 'care_assistant',
+      grossAmount: fb.careAssistantFee,
+      platformFee: 0,
+      taxAmount:   0,
+      tdsAmount:   0,
+    });
+  }
+
+  if (fb.transportFee > 0) {
+    if (booking.solodriverpartner) {
+      allocations.push({
+        partnerId:   booking.solodriverpartner,
+        partnerRole: 'solodriverpartner',
+        grossAmount: fb.transportFee,
+        platformFee: 0,
+        taxAmount:   0,
+        tdsAmount:   0,
+      });
+    } else if (booking.transportPartner) {
+      allocations.push({
+        partnerId:   booking.transportPartner,
+        partnerRole: 'transportpartner',
+        grossAmount: fb.transportFee,
+        platformFee: 0,
+        taxAmount:   0,
+        tdsAmount:   0,
+      });
+    }
+  }
+
+  if (booking.labPartner && ((fb.diagnosticFee || 0) + (fb.homeCollectionFee || 0)) > 0) {
+    allocations.push({
+      partnerId:   booking.labPartner,
+      partnerRole: 'lab_partner',
+      grossAmount: (fb.diagnosticFee || 0) + (fb.homeCollectionFee || 0),
+      platformFee: 0,
+      taxAmount:   0,
+      tdsAmount:   0,
+    });
+  }
+
+  return allocations;
+}
+
+// ── Display-only allocation rows on booking completion (unchanged logic, fixed import) ──
 export async function createAllocationsForBooking(bookingId, session = null) {
-  const Booking                   = mongoose.model('Booking');
-  const BookingPartnerAllocation  = mongoose.model('BookingPartnerAllocation');
-  const Hospital                  = mongoose.model('Hospital');
+  const Booking                  = mongoose.model('Booking');
+  const BookingPartnerAllocation = mongoose.model('BookingPartnerAllocation');
+  const Hospital                 = mongoose.model('Hospital');
 
   let bookingQuery = Booking.findById(bookingId)
     .select('bookingType consultationType doctor hospital careAssistant transportPartner solodriverpartner labPartner fareBreakdown status')
@@ -50,8 +194,6 @@ export async function createAllocationsForBooking(bookingId, session = null) {
     return [];
   }
 
-  // Guard: only allocate for bookings actually completed. Prevents accidental
-  // early allocation if this is ever called from a non-completion path.
   if (booking.status !== 'completed') {
     console.warn(`[allocationEngine] booking ${bookingId} status is '${booking.status}', not 'completed' — skipping`);
     return [];
@@ -61,13 +203,6 @@ export async function createAllocationsForBooking(bookingId, session = null) {
   const paymentSource = booking.bookingType === 'doctor_online' ? 'ONLINE' : 'PAY_AT_SERVICE';
   const collectorRole = CASH_COLLECTOR_BY_TYPE[booking.bookingType] || null;
 
-  // Fallback: if pricing engine hasn't filled per-role shares yet but totalAmount
-  // exists, don't silently produce zero earning — attribute totalAmount to the
-  // single primary partner for that bookingType. Prevents "no allocation created"
-  // when fareBreakdown is only partially populated at completion time.
-// Doctor/hospital shares NO LONGER read from fb here — resolveEffectivePricing()
-  // is now the single source of truth (see candidates block below). Fallback stays
-  // only for roles that still rely on fareBreakdown.
   const hasAnyShare = (fb.careAssistantFee || fb.transportFee || fb.diagnosticFee) > 0;
   if (!hasAnyShare && fb.totalAmount > 0) {
     const primaryRole = CASH_COLLECTOR_BY_TYPE[booking.bookingType];
@@ -76,12 +211,8 @@ export async function createAllocationsForBooking(bookingId, session = null) {
     else if (primaryRole === 'lab_partner') fb.diagnosticFee = fb.totalAmount;
   }
 
- // ── Resolve candidate partner legs: {partnerRole, partnerId(User), partnerProfileId, grossAmount} ──
   const candidates = [];
 
-  // Doctor + Hospital legs — ONE source of truth now: DoctorProfile.resolveEffectivePricing()
-  // via computeDoctorHospitalAllocations, same function settlementEngineService uses.
-  // platformFee/taxAmount computed here too (Q4) — pending earning already shows net, not gross.
   if (booking.doctor) {
     const pricingConfig = await PlatformPricingConfig.getGlobal();
     const dhAllocs = await computeDoctorHospitalAllocations(booking, pricingConfig, session);
@@ -118,8 +249,6 @@ export async function createAllocationsForBooking(bookingId, session = null) {
     candidates.push({ partnerRole: 'care_assistant', profileModel: 'CareAssistantProfile', profileId: booking.careAssistant, grossAmount: fb.careAssistantFee });
   }
 
-  // Transport leg — solo partner takes priority over agency (mirrors Driver.js note:
-  // agency driver has NO wallet, money always goes to TransportPartner.user).
   if (fb.transportFee > 0) {
     if (booking.solodriverpartner) {
       candidates.push({ partnerRole: 'solodriverpartner', profileModel: 'SoloDriverPartner', profileId: booking.solodriverpartner, grossAmount: fb.transportFee });
@@ -138,7 +267,7 @@ export async function createAllocationsForBooking(bookingId, session = null) {
   }
 
   if (candidates.length === 0) {
-    console.warn(`[allocationEngine] booking ${bookingId} completed but no candidates found — check fareBreakdown/partner refs`, {
+    console.warn(`[allocationEngine] booking ${bookingId} completed but no candidates found`, {
       bookingType: booking.bookingType, fareBreakdown: fb,
       hasDoctor: !!booking.doctor, hasHospital: !!booking.hospital,
       hasCareAssistant: !!booking.careAssistant, hasTransport: !!(booking.solodriverpartner || booking.transportPartner),
@@ -147,10 +276,9 @@ export async function createAllocationsForBooking(bookingId, session = null) {
     return [];
   }
 
-  // ── Resolve profileId -> User._id (partnerId) for roles that need a profile lookup ──
   const resolved = [];
   for (const c of candidates) {
-    let partnerId = c.partnerId; // hospital already resolved above
+    let partnerId = c.partnerId;
     if (!partnerId && c.profileModel) {
       const Model = mongoose.model(c.profileModel);
       let q = Model.findById(c.profileId).select('user').lean();
@@ -158,7 +286,7 @@ export async function createAllocationsForBooking(bookingId, session = null) {
       const doc = await q;
       if (!doc?.user) {
         console.warn(`[allocationEngine] ${c.profileModel} ${c.profileId} has no linked User — skipping this leg`);
-        continue; // no linked User account — skip, can't wallet-credit
+        continue;
       }
       partnerId = doc.user;
     }
@@ -182,15 +310,12 @@ export async function createAllocationsForBooking(bookingId, session = null) {
       partnerProfileId: r.profileId,
       partnerRole: r.partnerRole,
       bookingType: booking.bookingType,
-grossAmount: r.grossAmount,
+      grossAmount: r.grossAmount,
       platformFee: r.platformFee ?? 0,
       taxAmount: r.taxAmount ?? 0,
       tdsAmount: 0,
       recoveryDeduction: 0,
-      // Fix (Q4): doctor/hospital legs now carry real platformFee/taxAmount from
-      // resolveEffectivePricing at creation time — pending earning shown to partner
-      // already reflects the cut, not gross. Other roles unchanged (fee=0 until settle).
-      netPayable: Math.max(0, +(r.grossAmount - (r.platformFee ?? 0) - (r.taxAmount ?? 0)).toFixed(2)), // no deductions applied yet — settlement job recalculates at settle time
+      netPayable: Math.max(0, +(r.grossAmount - (r.platformFee ?? 0) - (r.taxAmount ?? 0)).toFixed(2)),
       subscriptionAbsorbed: 0,
       paymentSource,
       isCashCollector: isCollector,
@@ -200,7 +325,6 @@ grossAmount: r.grossAmount,
     };
   });
 
-  // Idempotent insert — skip any that already exist (e.g. hook + explicit call both firing).
   const existing = await BookingPartnerAllocation.find({
     idempotencyKey: { $in: docsToInsert.map(d => d.idempotencyKey) },
   }).select('idempotencyKey').lean();
