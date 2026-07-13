@@ -570,33 +570,27 @@ export const resolveKmRate = async (userId) => {
   if (!sub) return { ratePerKm: configRate, source: "default" };
 
   const planRate = sub.limits?.transportRatePerKm;
-  if (planRate != null && planRate > 0)
-    return { ratePerKm: planRate, source: "subscription" };
 
-  if (sub.plan) {
-    const plan = await SubscriptionPlan.findById(sub.plan)
-      .select("planType transport customOptions")
-      .lean();
+  // FIX: no more re-digging into SubscriptionPlan doc as a fallback.
+  // sub.limits was snapshotted at subscribe time (snapshotLimits) and IS
+  // the source of truth for whether transport is a benefit on THIS sub.
+  // null = no transport benefit at all (fixed plan w/o transport, or
+  // custom plan w/o transport option chosen) → ALWAYS platform default,
+  // regardless of plan type (fixed or custom).
+  if (planRate == null) return { ratePerKm: configRate, source: "default" };
 
-    if (plan?.planType === "custom" && Array.isArray(plan.customOptions)) {
-      const transportOpt = plan.customOptions.find(
-        (o) => o.optionKey === "transport",
-      );
-      if (transportOpt && transportOpt.quantity >= 0) {
-        const slabs = config?.customPlanOptions?.transport?.kmSlabs ?? [];
-        const slabIdx = Math.max(
-          0,
-          Math.min(Math.floor(transportOpt.quantity), slabs.length - 1),
-        );
-        const slab = slabs[slabIdx];
-        if (slab?.pricePerKm > 0)
-          return { ratePerKm: slab.pricePerKm, source: "subscription" };
-      }
-      return { ratePerKm: configRate, source: "default" };
-    }
+  // Fixed-plan flat rate, snapshotted >0 → benefit applies.
+  if (planRate > 0) return { ratePerKm: planRate, source: "subscription" };
 
-    if (plan?.transport?.ratePerKm > 0)
-      return { ratePerKm: plan.transport.ratePerKm, source: "subscription" };
+  // Custom-plan sentinel -1 → resolve slab live from config using
+  // ridesPerMonth quantity chosen at plan-creation time.
+  if (planRate === -1) {
+    const slabs = config?.customPlanOptions?.transport?.kmSlabs ?? [];
+    const qty = sub.limits?.transportRidesPerMonth ?? 0;
+    const slabIdx = Math.max(0, Math.min(Math.floor(qty), slabs.length - 1));
+    const slab = slabs[slabIdx];
+    if (slab?.pricePerKm > 0)
+      return { ratePerKm: slab.pricePerKm, source: "subscription" };
   }
 
   return { ratePerKm: configRate, source: "default" };

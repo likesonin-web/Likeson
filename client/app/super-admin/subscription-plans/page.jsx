@@ -13,7 +13,7 @@ import {
   Stethoscope, Truck, Pill, X, HeartPulse,
   CheckCircle2, IndianRupee, Minus, Activity,
   Zap, Crown, Star, Settings, Package, Clock, BadgeCheck,
-  FlaskConical, UserCheck, Percent, Sparkles, TrendingUp,
+  FlaskConical, Percent, Sparkles, TrendingUp,
   TrendingDown, Users, Shield, RefreshCw,
   AlertTriangle, Bell, Eye,
   Layers, Target, BarChart2, PieChart as PieChartIcon,
@@ -54,6 +54,19 @@ import {
   selectAdminExpireStaleLoading,
   clearCronResults,
 } from '@/store/slices/subscriptionSlice';
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  NOTE ON CARE ASSISTANT
+//  Fixed plans (the 6 admin-authored catalog tiers managed on this page) carry
+//  NO Care Assistant subscription benefit or quota — SubscriptionPlan.js keeps
+//  those schema fields for legacy display only, and every CA booking on a
+//  fixed plan is charged at the platform rate at booking time.
+//  Care Assistant quota/pricing is configured EXCLUSIVELY on per-customer
+//  Custom Plans (via customOptions[]), which are built by customers through
+//  the subscription flow — never through this admin route
+//  (POST/PUT /subscriptions/admin/plans always forces planType: 'fixed').
+//  Accordingly, this component has no Care Assistant fields, pills, or rows.
+// ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  TIER CONFIG
@@ -216,6 +229,8 @@ function SLabel({ children, icon: Icon }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  FORM DEFAULT + FLATTEN + UNFLATTEN
+//  Fixed-plan fields ONLY. Care Assistant intentionally omitted — it is not
+//  part of the fixed-plan benefit set (see note near top of file).
 // ─────────────────────────────────────────────────────────────────────────────
 const DEFAULT_FORM = () => ({
   // Identity
@@ -264,12 +279,6 @@ const DEFAULT_FORM = () => ({
   'transport.ratePerKm': '',
   'transport.isApplicable': true,
   'transport.ridesPerMonth': 0,
-  // Care Assistant
-  'careAssistant.included': false,
-  'careAssistant.isDedicated': false,
-  'careAssistant.serviceType': 'None',
-  'careAssistant.visitsPerMonth': 0,
-  'careAssistant.note': '',
   // Support
   'support.tier': 'Standard',
   'support.priorityAppointmentScheduling': false,
@@ -323,11 +332,6 @@ function flattenPlan(plan) {
     'transport.ratePerKm': plan.transport?.ratePerKm ?? '',
     'transport.isApplicable': plan.transport?.isApplicable ?? true,
     'transport.ridesPerMonth': plan.transport?.ridesPerMonth ?? 0,
-    'careAssistant.included': plan.careAssistant?.included ?? false,
-    'careAssistant.isDedicated': plan.careAssistant?.isDedicated ?? false,
-    'careAssistant.serviceType': plan.careAssistant?.serviceType ?? 'None',
-    'careAssistant.visitsPerMonth': plan.careAssistant?.visitsPerMonth ?? 0,
-    'careAssistant.note': plan.careAssistant?.note ?? '',
     'support.tier': plan.support?.tier ?? 'Standard',
     'support.priorityAppointmentScheduling': plan.support?.priorityAppointmentScheduling ?? false,
     'features.noHiddenCharges': plan.features?.noHiddenCharges ?? true,
@@ -399,13 +403,6 @@ function unflattenForm(f) {
       isApplicable: f['transport.isApplicable'],
       ridesPerMonth: Number(f['transport.ridesPerMonth'] || 0),
     },
-    careAssistant: {
-      included: f['careAssistant.included'],
-      isDedicated: f['careAssistant.isDedicated'],
-      serviceType: f['careAssistant.serviceType'],
-      visitsPerMonth: Number(f['careAssistant.visitsPerMonth'] || 0),
-      note: f['careAssistant.note'],
-    },
     support: {
       tier: f['support.tier'],
       priorityAppointmentScheduling: f['support.priorityAppointmentScheduling'],
@@ -433,7 +430,6 @@ function PlanCard({ plan, onEdit, onDelete, onClick, index, viewMode }) {
   const pharmDisc = plan.pharmacy?.discountMax ?? 0;
   const diagDisc = plan.diagnostics?.discountPercent ?? 0;
   const maxMembers = plan.membership?.maxMembers ?? 1;
-  const careAssist = plan.careAssistant?.included ?? false;
   const homeSample = plan.diagnostics?.homeSampleCollection ?? false;
   const hasTransport = plan.transport?.isApplicable ?? false;
   const ratePerKm = plan.transport?.ratePerKm ?? null;
@@ -442,7 +438,6 @@ function PlanCard({ plan, onEdit, onDelete, onClick, index, viewMode }) {
     { icon: Stethoscope, val: consults === -1 ? '∞' : `${consults}/mo`, active: consults !== 0, label: 'Consult' },
     { icon: Pill,        val: `${pharmDisc}%`,  active: pharmDisc > 0,  label: 'Pharma'  },
     { icon: Microscope,  val: `${diagDisc}%`,   active: diagDisc > 0,   label: 'Diag'    },
-    { icon: UserCheck,   val: careAssist ? 'Yes' : '—', active: careAssist, label: 'CA'  },
     { icon: Home,        val: homeSample ? '1×/cycle' : '—', active: homeSample, label: 'HomeLab' },
     { icon: Users,       val: maxMembers, active: true, label: 'Members'    },
   ];
@@ -603,8 +598,6 @@ function PlanModal({ plan, onClose, onEdit }) {
     { icon: Home,        label: 'Home Sample Collection', val: plan.diagnostics?.homeSampleCollection ? '1× free per billing cycle' : 'Not included', active: plan.diagnostics?.homeSampleCollection ?? false },
     { icon: Truck,       label: 'Transport Rate',      val: plan.transport?.isApplicable ? (plan.transport?.ratePerKm ? `₹${plan.transport.ratePerKm}/km` : 'N/A') : 'Not applicable', active: plan.transport?.isApplicable ?? false },
     { icon: Truck,       label: 'Rides/Month',         val: plan.transport?.ridesPerMonth ? `${plan.transport.ridesPerMonth} rides` : 'Unlimited', active: plan.transport?.isApplicable ?? false },
-    { icon: UserCheck,   label: 'Care Assistant',      val: plan.careAssistant?.serviceType ?? 'None', active: plan.careAssistant?.included ?? false },
-    { icon: UserCheck,   label: 'CA Visits/Month',     val: plan.careAssistant?.visitsPerMonth ? `${plan.careAssistant.visitsPerMonth}/mo` : 'Unlimited', active: plan.careAssistant?.included ?? false },
     { icon: Users,       label: 'Max Members',         val: `${plan.membership?.maxMembers ?? 1} member(s)`, active: true },
     { icon: Clock,       label: 'Free Trial',          val: plan.freeTrial?.enabled ? `${plan.freeTrial.durationDays} days` : 'Not available', active: plan.freeTrial?.enabled ?? false },
     { icon: BadgeCheck,  label: 'Support Tier',        val: plan.support?.tier ?? 'Standard', active: true },
@@ -691,6 +684,14 @@ function PlanModal({ plan, onClose, onEdit }) {
                 </p>
               </div>
             )}
+
+            {/* Care Assistant note — fixed plans never carry this benefit */}
+            <div className="mt-3 p-2.5 rounded-xl bg-base-200 border border-base-300">
+              <p className="text-[10px] text-base-content/40 font-semibold leading-snug">
+                Care Assistant isn't part of fixed plans. Bookings on this tier are charged the
+                platform rate at booking time — CA quotas only exist on customer-built Custom Plans.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col gap-4">
@@ -791,7 +792,7 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
           <motion.div
             initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
             transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed right-0 top-0 h-full w-full max-w-[520px] z-[101] flex flex-col bg-base-100 border-l border-base-300 shadow-[−32px_0_80px_rgba(0,0,0,0.28)]"
+            className="fixed right-0 top-0 h-screen w-full max-w-[520px] z-[101] flex flex-col bg-base-100 border-l border-base-300 shadow-[-32px_0_80px_rgba(0,0,0,0.28)]"
           >
             {/* Header */}
             <div className="relative overflow-hidden flex-shrink-0 px-6 py-5"
@@ -875,10 +876,10 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                         value={form.idealFor} onChange={e => set('idealFor', e.target.value)}
                         placeholder="Expecting mothers, NRI families…" />
                       <Toggle label="Custom Plan Type"
-                        desc="Check only for ad-hoc customer-built plans; leave off for the 6 standard admin tiers."
+                        desc="Leave off — this drawer creates the 6 standard admin tiers only. Custom plans are built by customers through the subscription flow, not here."
                         checked={form.planType === 'custom'} onChange={v => set('planType', v ? 'custom' : 'fixed')} />
                       <Toggle label="Visible to Customer Only"
-                        desc="Hidden from global pricing page. Auto-true for custom plans."
+                        desc="Hidden from global pricing page. Fixed plans should normally leave this off."
                         checked={form.visibleToCustomerOnly} onChange={v => set('visibleToCustomerOnly', v)} />
                     </div>
                   </motion.div>
@@ -1046,46 +1047,6 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                       )}
                     </div>
 
-                    {/* Care Assistant */}
-                    <div className="p-4 rounded-xl bg-base-200 border border-base-300 space-y-4">
-                      <SLabel icon={UserCheck}>Care Assistant</SLabel>
-                      <Toggle label="Include Care Assistant" checked={form['careAssistant.included']}
-                        onChange={v => set('careAssistant.included', v)} />
-                      {form['careAssistant.included'] && (
-                        <>
-                          <Toggle label="Dedicated Assistant"
-                            desc="Exclusively assigned — Pregnant Women Care."
-                            checked={form['careAssistant.isDedicated']}
-                            onChange={v => {
-                              set('careAssistant.isDedicated', v);
-                              set('careAssistant.serviceType', v ? 'Dedicated' : 'Standard');
-                            }} />
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-base-content/40">Service Type</label>
-                            <div className="flex gap-2">
-                              {['None', 'Standard', 'Dedicated'].map(st => (
-                                <button key={st} type="button"
-                                  onClick={() => set('careAssistant.serviceType', st)}
-                                  className={`flex-1 py-2 rounded-xl text-xs font-bold border-2 transition-all ${
-                                    form['careAssistant.serviceType'] === st
-                                      ? 'border-primary bg-primary/5 text-primary'
-                                      : 'border-base-300 bg-base-100 text-base-content hover:border-primary/40'
-                                  }`}>
-                                  {st}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          <Stepper label="Visits/month" desc="0 = unlimited/per-admin. Used for custom plan quota."
-                            value={form['careAssistant.visitsPerMonth']}
-                            onChange={v => set('careAssistant.visitsPerMonth', v)} min={0} max={30} />
-                          <TxtInput label="Note" desc="Special rules for this tier's CA."
-                            value={form['careAssistant.note']}
-                            onChange={e => set('careAssistant.note', e.target.value)} />
-                        </>
-                      )}
-                    </div>
-
                     {/* Support */}
                     <div className="p-4 rounded-xl bg-base-200 border border-base-300 space-y-3">
                       <SLabel icon={BadgeCheck}>Support Tier</SLabel>
@@ -1111,6 +1072,16 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                         desc="Fast-tracked slot booking for this plan tier."
                         checked={form['support.priorityAppointmentScheduling']}
                         onChange={v => set('support.priorityAppointmentScheduling', v)} />
+                    </div>
+
+                    {/* Care Assistant — informational only, not editable here */}
+                    <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-base-200 border border-base-300">
+                      <Info size={13} className="text-base-content/35 flex-shrink-0 mt-0.5" />
+                      <p className="text-[10px] text-base-content/40 leading-snug">
+                        Care Assistant isn't configured here. Fixed plans have no CA quota or benefit —
+                        every CA booking on a fixed tier is charged the platform rate at booking time.
+                        CA quotas are set per-customer on Custom Plans only.
+                      </p>
                     </div>
                   </motion.div>
                 )}
@@ -1660,6 +1631,20 @@ const SubscriptionManagement = () => {
             The <code className="font-mono text-[9px]">homeCollectionUsedOnce</code> flag in UserSubscription tracks usage.
             It resets to <code className="font-mono text-[9px]">false</code> automatically on each subscription renewal via the auto-renew cron.
             The diagnostic booking route calls <code className="font-mono text-[9px]">POST /subscriptions/use-home-sample-collection</code> to guard and flip the flag after payment.
+          </p>
+        </div>
+      </motion.div>
+
+      {/* ── Care Assistant Scope Banner ── */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }}
+        className="flex items-start gap-3 p-4 rounded-xl border border-base-300 bg-base-200/60">
+        <Info size={14} className="text-base-content/35 flex-shrink-0 mt-0.5" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-black text-base-content/70 mb-0.5">Care Assistant Isn't a Fixed-Plan Benefit</p>
+          <p className="text-[10px] text-base-content/40 leading-relaxed">
+            None of the 6 fixed tiers managed here carry a Care Assistant quota — every CA booking on a fixed plan
+            is charged the platform rate at booking time. CA quota and pricing are configured per-customer on
+            Custom Plans only, which customers build themselves through the subscription flow.
           </p>
         </div>
       </motion.div>

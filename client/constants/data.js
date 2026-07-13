@@ -32,11 +32,11 @@ import { FcInvite } from "react-icons/fc";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const NAV_LINKS = [
-  { name: "Order Medicines",  href: "/pharmacy/buy-medicines", icon: Pill       },
-  { name: "Book a Doctor",    href: "/doctors",                icon: UserRound  },
-  { name: "Locate Hospitals", href: "/hospitals",              icon: Hospital   },
-  { name: "Get Membership",   href: "/membership",             icon: Gem        },
-  { name: "Lab Diagnostics",  href: "/diagnostics",            icon: Microscope },
+  { name: "Buy Medicines",  href: "/pharmacy/buy-medicines", icon: Pill       },
+  { name: "Find a Doctor",  href: "/doctors",                icon: UserRound  },
+  { name: "Find Hospitals", href: "/hospitals",              icon: Hospital   },
+  { name: "Membership",     href: "/membership",             icon: Gem        },
+  { name: "Lab Tests",      href: "/diagnostics",            icon: Microscope },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -47,90 +47,90 @@ export const SUPER_ADMIN_DASHBOARD_LINKS = [
 
   // ── 1. Overview & Analytics ───────────────────────────────────────────────
   {
-    title: "Overview & Analytics",
+    title: "Overview",
     icons: <LayoutPanelTop size={18} />,
     links: [
-      { name: "Dashboard Overview", href: "/super-admin/dashboard",   icon: <LayoutDashboard size={15} /> },
-      { name: "Platform Insights",  href: "/super-admin/analytics",   icon: <AreaChart size={15} />       },
-      { name: "Referral Engine",    href: "/super-admin/referral",    icon: <FcInvite size={15} />        },
-      { name: "Pricing Models",     href: "/super-admin/pricing",     icon: <CircleDollarSign size={15} />},
-      { name: "Wallet Ledgers",     href: "/super-admin/wallet",      icon: <WalletCards size={15} />     },
-      { name: "Landing Page (Hero)",href: "/super-admin/hero-page",   icon: <PanelsTopLeft size={15} />   },
+      { name: "Dashboard",       href: "/super-admin/dashboard",   icon: <LayoutDashboard size={15} /> },
+      { name: "Analytics",       href: "/super-admin/analytics",   icon: <AreaChart size={15} />       },
+      { name: "Referrals",       href: "/super-admin/referral",    icon: <FcInvite size={15} />        },
+      { name: "Pricing",         href: "/super-admin/pricing",     icon: <CircleDollarSign size={15} />},
+      { name: "Wallets",         href: "/super-admin/wallet",      icon: <WalletCards size={15} />     },
+      { name: "Home Page Setup", href: "/super-admin/hero-page",   icon: <PanelsTopLeft size={15} />   },
     ],
   },
 
   // ── 2. User Management ────────────────────────────────────────────────────
   {
-    title: "User Management",
+    title: "Users & Staff",
     icons: <Users size={18} />,
     links: [
-      { name: "User Directory",     href: "/super-admin/users",           icon: <Users size={15} />      },
-      { name: "Audience Analytics", href: "/super-admin/users/analytics", icon: <AreaChart size={15} />  },
-      { name: "Access Control",     href: "/super-admin/permissions",     icon: <ShieldAlert size={15} />},
-      { name: "Staff Directory",    href: "/super-admin/employees",       icon: <Contact2 size={15} />   },
+      { name: "All Users",       href: "/super-admin/users",           icon: <Users size={15} />      },
+      { name: "User Stats",      href: "/super-admin/users/analytics", icon: <AreaChart size={15} />  },
+      { name: "Permissions",     href: "/super-admin/permissions",     icon: <ShieldAlert size={15} />},
+      { name: "Employees",       href: "/super-admin/employees",       icon: <Contact2 size={15} />   },
     ],
   },
 
   // ── 3. Partner Network ────────────────────────────────────────────────────
   {
-    title: "Partner Network",
+    title: "Partners",
     icons: <Handshake size={18} />,
     links: [
-      { name: "Fleet Partners",       href: "/super-admin/partners/transport",      icon: <Truck size={15} />      },
-      { name: "Independent Drivers",  href: "/super-admin/partners/solor-driver",   icon: <Car size={15} />        },
-      { name: "Gig Caregivers",       href: "/super-admin/partners/care-assistants",icon: <Users2 size={15} />     },
-      { name: "Diagnostic Labs",      href: "/super-admin/partners/labs",           icon: <Microscope size={15} /> },
+      { name: "Transport Partners", href: "/super-admin/partners/transport",      icon: <Truck size={15} />      },
+      { name: "Solo Drivers",       href: "/super-admin/partners/solor-driver",   icon: <Car size={15} />        },
+      { name: "Care Assistants",    href: "/super-admin/partners/care-assistants",icon: <Users2 size={15} />     },
+      { name: "Labs",               href: "/super-admin/partners/labs",           icon: <Microscope size={15} /> },
       
     ],
   },
 
   // ── 4. Pharmacy & Supply Chain ────────────────────────────────────────────
   {
-    title: "Pharmacy & Supply Chain",
+    title: "Pharmacy & Stock",
     icons: <Tablets size={18} />,
     links: [
-      { name: "Store Locations",   href: "/super-admin/pharmacy",   icon: <Store size={15} />       },
-      { name: "Product Catalogue", href: "/super-admin/medicines",  icon: <Tablets size={15} />     },
-      { name: "Inventory Levels",  href: "/super-admin/inventory",  icon: <Package size={15} />     },
-      { name: "Fulfillment Orders",href: "/super-admin/orders",     icon: <ShoppingCart size={15} />},
+      { name: "Pharmacies", href: "/super-admin/pharmacy",   icon: <Store size={15} />       },
+      { name: "Medicines",  href: "/super-admin/medicines",  icon: <Tablets size={15} />     },
+      { name: "Inventory",  href: "/super-admin/inventory",  icon: <Package size={15} />     },
+      { name: "Orders",     href: "/super-admin/orders",     icon: <ShoppingCart size={15} />},
     ],
   },
 
   // ── 5. Clinical Network ───────────────────────────────────────────────────
   {
-    title: "Clinical Network",
+    title: "Hospitals & Doctors",
     icons: <Hospital size={18} />,
     links: [
-      { name: "Hospital Affiliates",    href: "/super-admin/hospitals",        icon: <Hospital size={15} />      },
-      { name: "Physician Directory",    href: "/super-admin/doctors",          icon: <UserCog size={15} />       },
-      { name: "Clinical Appointments",  href: "/super-admin/appointments",     icon: <CalendarClock size={15} /> },
-      { name: "Consultation Management",href: "/super-admin/consultations",    icon: <Activity size={15} />      },
-      { name: "Medical Specialties",    href: "/super-admin/specialties",      icon: <Stethoscope size={15} />   },
-      { name: "Blood Bank",             href: "/super-admin/blood-bank",       icon: <Droplets size={15} />      },
+      { name: "Hospitals",     href: "/super-admin/hospitals",        icon: <Hospital size={15} />      },
+      { name: "Doctors",       href: "/super-admin/doctors",          icon: <UserCog size={15} />       },
+      { name: "Appointments",  href: "/super-admin/appointments",     icon: <CalendarClock size={15} /> },
+      { name: "Consultations", href: "/super-admin/consultations",    icon: <Activity size={15} />      },
+      { name: "Specialties",   href: "/super-admin/specialties",      icon: <Stethoscope size={15} />   },
+      { name: "Blood Bank",    href: "/super-admin/blood-bank",       icon: <Droplets size={15} />      },
     ],
   },
 
   // ── 6. Booking Engine ─────────────────────────────────────────────────────
   {
-    title: "Booking Engine",
+    title: "Bookings",
     icons: <CalendarCheck size={18} />,
     links: [
-      { name: "Master Calendar",   href: "/super-admin/bookings",      icon: <CalendarCheck size={15} />},
-      { name: "Provider Schedules",href: "/super-admin/schedules",     icon: <CalendarDays size={15} /> },
-      { name: "Time Slots",        href: "/super-admin/availability",  icon: <Clock size={15} />        },
+      { name: "All Bookings", href: "/super-admin/bookings",      icon: <CalendarCheck size={15} />},
+      { name: "Schedules",    href: "/super-admin/schedules",     icon: <CalendarDays size={15} /> },
+      { name: "Availability", href: "/super-admin/availability",  icon: <Clock size={15} />        },
     ],
   },
 
   // ── 7. Financials & Ledger ────────────────────────────────────────────────
   {
-    title: "Financials & Ledger",
+    title: "Finances",
     icons: <CircleDollarSign size={18} />,
     links: [
-      { name: "Payment Gateway",   href: "/super-admin/payments",      icon: <Landmark size={15} />           },
-      { name: "Transaction Ledger",href: "/super-admin/transactions",  icon: <ArrowLeftRight size={15} />     },
-      { name: "Client Invoices",   href: "/super-admin/invoices",      icon: <ReceiptIndianRupee size={15} /> },
-      { name: "Refund Processing", href: "/super-admin/refunds",       icon: <Undo2 size={15} />              },
-      { name: "Accounting Console",href: "/super-admin/accounting",    icon: <FileBarChart size={15} />       }, // <-- ADDED HERE
+      { name: "Payments",     href: "/super-admin/payments",      icon: <Landmark size={15} />           },
+      { name: "Transactions", href: "/super-admin/transactions",  icon: <ArrowLeftRight size={15} />     },
+      { name: "Invoices",     href: "/super-admin/invoices",      icon: <ReceiptIndianRupee size={15} /> },
+      { name: "Refunds",      href: "/super-admin/refunds",       icon: <Undo2 size={15} />              },
+      { name: "Accounting",   href: "/super-admin/accounting",    icon: <FileBarChart size={15} />       }, 
     ],
   },
 
@@ -139,47 +139,47 @@ export const SUPER_ADMIN_DASHBOARD_LINKS = [
     title: "Subscriptions",
     icons: <Gem size={18} />,
     links: [
-      { name: "Plan Tiers",        href: "/super-admin/subscription-plans", icon: <ListChecks size={15} />},
-      { name: "Subscriber Base",   href: "/super-admin/subscriptions",      icon: <Gem size={15} />      },
-      { name: "Recurring Billing", href: "/super-admin/billing",            icon: <CreditCard size={15} />},
+      { name: "Plans",       href: "/super-admin/subscription-plans", icon: <ListChecks size={15} />},
+      { name: "Subscribers", href: "/super-admin/subscriptions",      icon: <Gem size={15} />      },
+      { name: "Billing",     href: "/super-admin/billing",            icon: <CreditCard size={15} />},
     ],
   },
 
   // ── 9. Growth & Marketing ─────────────────────────────────────────────────
   {
-    title: "Growth & Marketing",
+    title: "Marketing",
     icons: <Target size={18} />,
     links: [
-      { name: "Ad Campaigns",    href: "/super-admin/ads",       icon: <Presentation size={15} /> },
-      { name: "App Banners",     href: "/super-admin/banners",   icon: <ImageIcon size={15} />    },
-      { name: "Discount Codes",  href: "/super-admin/coupons",   icon: <TicketPercent size={15} />},
-      { name: "Marketing Hub",   href: "/super-admin/campaigns", icon: <Target size={15} />       },
+      { name: "Ads",       href: "/super-admin/ads",       icon: <Presentation size={15} /> },
+      { name: "Banners",   href: "/super-admin/banners",   icon: <ImageIcon size={15} />    },
+      { name: "Coupons",   href: "/super-admin/coupons",   icon: <TicketPercent size={15} />},
+      { name: "Campaigns", href: "/super-admin/campaigns", icon: <Target size={15} />       },
     ],
   },
 
   // ── 10. Content & Communications ──────────────────────────────────────────
   {
-    title: "Content & Communications",
+    title: "Content & Alerts",
     icons: <LifeBuoy size={18} />,
     links: [
-      { name: "Platform Announcements", href: "/super-admin/marquee",  icon: <Megaphone size={15} />            },
-      { name: "Legal & Compliance",     href: "/super-admin/legal",          icon: <Scale size={15} />                },
-      { name: "Knowledge Base",         href: "/super-admin/faq",            icon: <FileQuestion size={15} />         },
-      { name: "Push Notifications",     href: "/super-admin/notifications",  icon: <Bell size={15} />                 },
-      { name: "Compliance Alerts",      href: "/super-admin/compliance/alerts", icon: <AlertTriangle size={15} />     },
-      { name: "Audit Trails",           href: "/super-admin/logs",           icon: <ScrollText size={15} />           },
+      { name: "Announcements", href: "/super-admin/marquee",           icon: <Megaphone size={15} />         },
+      { name: "Legal",         href: "/super-admin/legal",             icon: <Scale size={15} />             },
+      { name: "FAQs",          href: "/super-admin/faq",               icon: <FileQuestion size={15} />      },
+      { name: "Notifications", href: "/super-admin/notifications",     icon: <Bell size={15} />              },
+      { name: "Alerts",        href: "/super-admin/compliance/alerts", icon: <AlertTriangle size={15} />     },
+      { name: "Activity Logs", href: "/super-admin/logs",              icon: <ScrollText size={15} />        },
     ],
   },
 
   // ── 11. System Settings ───────────────────────────────────────────────────
   {
-    title: "System Settings",
+    title: "Settings",
     icons: <Settings2 size={18}/>,
     links: [
-      { name: "Global Preferences", href: "/super-admin/settings/general",       icon: <Globe2 size={15} />      },
-      { name: "Chat Config",        href: "/chat",          icon: <MessageCircle size={15} />},
-      { name: "Security Policies",  href: "/super-admin/settings/security",      icon: <ShieldCheck size={15} /> },
-      { name: "Third-Party APIs",   href: "/super-admin/settings/integrations",  icon: <Terminal size={15} />    },
+      { name: "General Settings",  href: "/super-admin/settings/general",      icon: <Globe2 size={15} />      },
+      { name: "Customer Support ",     href: "/support",                              icon: <MessageCircle size={15} />},
+      { name: "Security Settings", href: "/super-admin/settings/security",     icon: <ShieldCheck size={15} /> },
+      { name: "Integrations",      href: "/super-admin/settings/integrations", icon: <Terminal size={15} />    },
     ],
   },
 ];
@@ -191,12 +191,12 @@ export const SUPER_ADMIN_DASHBOARD_LINKS = [
 export const SUPER_ADMIN_DASHBOARD_TOP_RIGHT_LINKS = [
   { name: "Home", icon: <LayoutDashboard size={15} /> },
   {
-    name: "Quick Actions",
+    name: "Quick Links",
     icon: <Briefcase size={15} />,
     links: [
-      { name: "Hospitals", href: "/super-admin/hospitals",  icon: <Hospital size={15} /> },
-      { name: "Pharmacies",href: "/super-admin/pharmacies", icon: <Store size={15} />    },
-      { name: "Users",     href: "/super-admin/users",      icon: <Users size={15} />    },
+      { name: "Hospitals",  href: "/super-admin/hospitals",  icon: <Hospital size={15} /> },
+      { name: "Pharmacies", href: "/super-admin/pharmacies", icon: <Store size={15} />    },
+      { name: "Users",      href: "/super-admin/users",      icon: <Users size={15} />    },
     ],
   },
 ];
@@ -208,19 +208,19 @@ export const SUPER_ADMIN_DASHBOARD_TOP_RIGHT_LINKS = [
 export const SUPER_ADMIN_DASHBOARD_SEARCH_LINKS = [
   // Common Destinations
   [
-    { name: "Dashboard",       href: "/super-admin/dashboard",   icon: <LayoutDashboard size={15} /> },
-    { name: "Product Catalog", href: "/super-admin/medicines",   icon: <Tablets size={15} />         },
-    { name: "Master Calendar", href: "/super-admin/bookings",    icon: <CalendarCheck size={15} />   },
-    { name: "Helpdesk",        href: "/super-admin/support",     icon: <LifeBuoy size={15} />        },
-    { name: "Ad Campaigns",    href: "/super-admin/ads",         icon: <Presentation size={15} />    },
-    { name: "App Banners",     href: "/super-admin/banners",     icon: <ImageIcon size={15} />       },
-    { name: "Discount Codes",  href: "/super-admin/coupons",     icon: <TicketPercent size={15} />   },
+    { name: "Dashboard", href: "/super-admin/dashboard",   icon: <LayoutDashboard size={15} /> },
+    { name: "Medicines", href: "/super-admin/medicines",   icon: <Tablets size={15} />         },
+    { name: "Bookings",  href: "/super-admin/bookings",    icon: <CalendarCheck size={15} />   },
+    { name: "Support",   href: "/super-admin/support",     icon: <LifeBuoy size={15} />        },
+    { name: "Ads",       href: "/super-admin/ads",         icon: <Presentation size={15} />    },
+    { name: "Banners",   href: "/super-admin/banners",     icon: <ImageIcon size={15} />       },
+    { name: "Coupons",   href: "/super-admin/coupons",     icon: <TicketPercent size={15} />   },
   ],
   // Creation Actions
   [
-    { name: "Add New Medicine",  href: "/super-admin/medicines/create", icon: <Plus size={15} />         },
-    { name: "Create Coupon",     href: "/super-admin/coupons/create",   icon: <TicketPercent size={15} />},
-    { name: "New Announcement",  href: "/super-admin/announcements",    icon: <Megaphone size={15} />    },
+    { name: "Add Medicine",      href: "/super-admin/medicines/create", icon: <Plus size={15} />         },
+    { name: "Add Coupon",        href: "/super-admin/coupons/create",   icon: <TicketPercent size={15} />},
+    { name: "Add Announcement",  href: "/super-admin/announcements",    icon: <Megaphone size={15} />    },
   ],
 ];
 
@@ -229,8 +229,8 @@ export const SUPER_ADMIN_DASHBOARD_SEARCH_LINKS = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const PROFILE_LINKS = [
-  { name: "My Profile",       href: "/super-admin/profile",           icon: <UserRound size={15} />  },
-  { name: "Activity Log",     href: "/super-admin/activity-log",      icon: <HeartPulse size={15} /> },
+  { name: "Profile",  href: "/super-admin/profile",      icon: <UserRound size={15} />  },
+  { name: "Activity", href: "/super-admin/activity-log", icon: <HeartPulse size={15} /> },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

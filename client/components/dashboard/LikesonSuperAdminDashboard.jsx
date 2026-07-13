@@ -51,10 +51,6 @@ const bellRingingVariant = {
 };
 
 // ── ThemeToggle ────────────────────────────────────────────────────────────
-/**
- * Safely handles theme flipping.
- * Uses resolvedTheme to track system vs explicit choices cleanly.
- */
 const ThemeToggle = memo(function ThemeToggle() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -129,8 +125,7 @@ const SidebarSection = memo(function SidebarSection({
     if (isParentActive && !isOpen && isSidebarOpen) {
       onToggle(section.title);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isParentActive, isSidebarOpen]);
+  }, [isParentActive, isSidebarOpen, isOpen, onToggle, section.title]);
 
   return (
     <div className="mb-2">
@@ -198,7 +193,7 @@ const SuperAdminDashboard = ({ children }) => {
   const [openMenus,     setOpenMenus]     = useState({});
   const [searchQuery,   setSearchQuery]   = useState("");
   const [isSearchOpen,  setIsSearchOpen]  = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false); // Mobile & Desktop explicit menu fix
+  const [isProfileOpen, setIsProfileOpen] = useState(false); 
 
   // Init: collapse sidebar on mobile + fetch notifications
   useEffect(() => {
@@ -236,9 +231,15 @@ const SuperAdminDashboard = ({ children }) => {
     return user?.avatar || avatars[user?.role] || avatars.customer;
   }, [user]);
 
-  // ── FIX: Explicit check for the root/welcome paths ───────────────────────
+  // Routing Checks
   const isWelcomeRoute = useMemo(
     () => ["/", "/super-admin", "/super-admin/"].includes(pathname),
+    [pathname]
+  );
+  
+  // Check if route is related to support
+  const isSupportRoute = useMemo(
+    () => pathname.includes("support"),
     [pathname]
   );
 
@@ -318,7 +319,8 @@ const SuperAdminDashboard = ({ children }) => {
             </AnimatePresence>
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 rounded-lg bg-base-300/50 hover:text-primary transition-all"
+              // CORRECTED: Removed lg:hidden here so it shows on desktop too!
+              className="p-2 rounded-lg bg-base-300/50 hover:text-primary transition-all flex-shrink-0"
               aria-label="Toggle Sidebar"
             >
               {isSidebarOpen ? <PanelLeftClose size={18} /> : <Menu size={18} />}
@@ -352,142 +354,149 @@ const SuperAdminDashboard = ({ children }) => {
             {!isSidebarOpen && (
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="p-2 hover:bg-base-200 rounded-lg"
+                // This header backup menu button STAYS hidden on lg screens
+                // because the sidebar (at w-20) already has its own button on lg screens
+                className="p-2 hover:bg-base-200 rounded-lg lg:hidden"
                 aria-label="Open Sidebar"
               >
                 <Menu size={20} />
               </button>
             )}
 
-            <div className="hidden xl:flex items-center gap-6">
-              {SUPER_ADMIN_DASHBOARD_TOP_RIGHT_LINKS.map((item, i) => (
-                <div key={i} className="group relative">
-                  <button className="flex items-center gap-2 text-[10px] font-black text-base-content/40 hover:text-primary transition-all uppercase tracking-widest">
-                    {item.icon} {item.name}
-                  </button>
-                  {item.links && (
-                    <div className="absolute left-0 top-full pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300">
-                      <div className="w-56 bg-base-200 border border-base-300 p-2 rounded-2xl shadow-2xl">
-                        {item.links.map((sub, si) => (
-                          <Link
-                            key={si}
-                            href={sub.href}
-                            className="flex items-center gap-3 p-3 text-[10px] font-bold uppercase text-base-content/50 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
-                          >
-                            {sub.icon} {sub.name}
-                          </Link>
-                        ))}
+            {/* Hide when in a support route */}
+            {!isSupportRoute && (
+              <div className="hidden xl:flex items-center gap-6">
+                {SUPER_ADMIN_DASHBOARD_TOP_RIGHT_LINKS.map((item, i) => (
+                  <div key={i} className="group relative">
+                    <button className="flex items-center gap-2 text-[10px] font-black text-base-content/40 hover:text-primary transition-all uppercase tracking-widest">
+                      {item.icon} {item.name}
+                    </button>
+                    {item.links && (
+                      <div className="absolute left-0 top-full pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300">
+                        <div className="w-56 bg-base-200 border border-base-300 p-2 rounded-2xl shadow-2xl">
+                          {item.links.map((sub, si) => (
+                            <Link
+                              key={si}
+                              href={sub.href}
+                              className="flex items-center gap-3 p-3 text-[10px] font-bold uppercase text-base-content/50 hover:bg-primary/10 hover:text-primary rounded-xl transition-all"
+                            >
+                              {sub.icon} {sub.name}
+                            </Link>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Right — search · theme · bell · avatar */}
-          <div className="flex items-center gap-3 sm:gap-5">
-
-            {/* Command search trigger */}
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="flex items-center gap-3 px-4 py-2 bg-base-200/50 border border-base-300 rounded-xl text-base-content/40 hover:border-primary/50 transition-all group"
-            >
-              <Search size={14} className="group-hover:text-primary" />
-              <span className="text-[9px] font-black uppercase tracking-widest hidden md:inline">
-                Command Panel{" "}
-                <span className="ml-2 opacity-30">⌘K</span>
-              </span>
-            </button>
-
-            {/* Theme Toggle Module */}
-            <ThemeToggle />
-
-            {/* Notifications */}
-            <Link href="/super-admin/notifications">
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="relative">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-xl text-base-content/60 hover:bg-base-200"
-                >
-                  <motion.div
-                    variants={bellRingingVariant}
-                    animate={unreadCount > 0 ? "ring" : "idle"}
-                  >
-                    <Bell size={20} />
-                  </motion.div>
-                  {unreadCount > 0 && (
-                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-primary rounded-full border-2 border-base-100 animate-pulse" />
-                  )}
-                </Button>
-              </motion.div>
-            </Link>
-
-            {/* State-Controlled Profile Dropdown */}
-            <div className="relative">
+          {/* Hide when in a support route */}
+          {!isSupportRoute && (
+            <div className="flex items-center gap-3 sm:gap-5">
+              {/* Command search trigger */}
               <button
-                onClick={() => setIsProfileOpen((prev) => !prev)}
-                className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary to-primary-focus p-[2px] cursor-pointer shadow-xl transition-transform hover:scale-105 block focus:outline-none"
-                aria-label="Toggle profile menu"
+                onClick={() => setIsSearchOpen(true)}
+                className="flex items-center gap-3 px-4 py-2 bg-base-200/50 border border-base-300 rounded-xl text-base-content/40 hover:border-primary/50 transition-all group"
               >
-                <img
-                  src={roleAvatar}
-                  alt="Profile"
-                  className="w-full h-full rounded-[10px] object-cover bg-base-300"
-                />
+                <Search size={14} className="group-hover:text-primary" />
+                <span className="text-[9px] font-black uppercase tracking-widest hidden md:inline">
+                  Command Panel{" "}
+                  <span className="ml-2 opacity-30">⌘K</span>
+                </span>
               </button>
 
-              {/* Click outside backdrop container specifically designed for mobile closing */}
-              {isProfileOpen && (
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => setIsProfileOpen(false)} 
-                />
-              )}
+              {/* Theme Toggle Module */}
+              <ThemeToggle />
 
-              <AnimatePresence>
-                {isProfileOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 top-full pt-4 z-50 origin-top-right"
+              {/* Notifications */}
+              <Link href="/super-admin/notifications">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="relative">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-xl text-base-content/60 hover:bg-base-200"
                   >
-                    <div className="w-64 bg-base-200 border border-base-300 rounded-3xl shadow-2xl p-2 backdrop-blur-2xl">
-                      <div className="px-4 py-4 border-b border-base-300 mb-2 bg-primary/5 rounded-2xl">
-                        <p className="text-xs font-black uppercase tracking-tight truncate">
-                          {user?.name || "Administrator"}
-                        </p>
-                        <p className="text-[9px] text-primary font-black uppercase mt-1 tracking-[0.2em]">
-                          Super Admin Protocol
-                        </p>
-                      </div>
-                      {PROFILE_LINKS.map((pl, pi) => (
-                        <Link
-                          key={pi}
-                          href={pl.href}
-                          onClick={() => setIsProfileOpen(false)}
-                          className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase text-base-content/60 hover:bg-base-100 hover:text-primary rounded-xl transition-all"
-                        >
-                          {pl.icon} {pl.name}
-                        </Link>
-                      ))}
-                      <button
-                        onClick={() => {
-                          setIsProfileOpen(false);
-                          handleLogout();
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-[11px] font-black text-error border-t border-base-300 mt-2 rounded-xl hover:bg-error/10 uppercase tracking-widest"
-                      >
-                        <LogOut size={14} /> Logout 
-                      </button>
-                    </div>
-                  </motion.div>
+                    <motion.div
+                      variants={bellRingingVariant}
+                      animate={unreadCount > 0 ? "ring" : "idle"}
+                    >
+                      <Bell size={20} />
+                    </motion.div>
+                    {unreadCount > 0 && (
+                      <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-primary rounded-full border-2 border-base-100 animate-pulse" />
+                    )}
+                  </Button>
+                </motion.div>
+              </Link>
+
+              {/* State-Controlled Profile Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsProfileOpen((prev) => !prev)}
+                  className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary to-primary-focus p-[2px] cursor-pointer shadow-xl transition-transform hover:scale-105 block focus:outline-none"
+                  aria-label="Toggle profile menu"
+                >
+                  <img
+                    src={roleAvatar}
+                    alt="Profile"
+                    className="w-full h-full rounded-[10px] object-cover bg-base-300"
+                  />
+                </button>
+
+                {/* Click outside backdrop container specifically designed for mobile closing */}
+                {isProfileOpen && (
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setIsProfileOpen(false)} 
+                  />
                 )}
-              </AnimatePresence>
+
+                <AnimatePresence>
+                  {isProfileOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 top-full pt-4 z-50 origin-top-right"
+                    >
+                      <div className="w-64 bg-base-200 border border-base-300 rounded-3xl shadow-2xl p-2 backdrop-blur-2xl">
+                        <div className="px-4 py-4 border-b border-base-300 mb-2 bg-primary/5 rounded-2xl">
+                          <p className="text-xs font-black uppercase tracking-tight truncate">
+                            {user?.name || "Administrator"}
+                          </p>
+                          <p className="text-[9px] text-primary font-black uppercase mt-1 tracking-[0.2em]">
+                            Super Admin Protocol
+                          </p>
+                        </div>
+                        {PROFILE_LINKS.map((pl, pi) => (
+                          <Link
+                            key={pi}
+                            href={pl.href}
+                            onClick={() => setIsProfileOpen(false)}
+                            className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase text-base-content/60 hover:bg-base-100 hover:text-primary rounded-xl transition-all"
+                          >
+                            {pl.icon} {pl.name}
+                          </Link>
+                        ))}
+                        <button
+                          onClick={() => {
+                            setIsProfileOpen(false);
+                            handleLogout();
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-[11px] font-black text-error border-t border-base-300 mt-2 rounded-xl hover:bg-error/10 uppercase tracking-widest"
+                        >
+                          <LogOut size={14} /> Logout 
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
-          </div>
+          )}
         </header>
 
         {/* Page content */}
@@ -510,13 +519,10 @@ const SuperAdminDashboard = ({ children }) => {
           >
             <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/5 blur-[150px] rounded-full pointer-events-none" />
             
-            {/* ── FIX: Apply Render Check ── */}
             {isWelcomeRoute ? <WelcomePage /> : children}
             
           </motion.div>
         </section>
-
-       
       </main>
 
       {/* ── Command / Search overlay ───────────────────────────────────── */}

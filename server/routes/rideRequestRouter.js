@@ -26,6 +26,11 @@ import {
   CARE_RIDE_RADIUS_M,
   RIDE_STATUSES_ACTIVE,
 } from "./bookingRouterShared.js";
+import RidePaymentIntent from "../models/RidePaymentIntent.js";
+import Wallet from "../models/Wallet.js";
+import { razorpay, resolveKmRate, verifyRazorpaySignature, createRazorpayOrder } from "./bookingRouterShared.js";
+
+const INTENT_TTL_MIN = 20;
 import { hashOtp } from "./bookingRouterShared.js";
 import { autoAssignNearestDriver, recordPartnerTripCompletion } from "../services/partnerAssignmentEngine.service.js";
 const router = express.Router();
@@ -447,326 +452,169 @@ const broadcastRideStatus = async ({
   }
 };
 
-// ═════════════════════════════════════════════════════════════════════════════
-// CUSTOMER — POST /api/ride-requests/customer
-// ═════════════════════════════════════════════════════════════════════════════
 
-router.post("/customer", protect, authorize("customer"), async (req, res) => {
+
+// ═══════════════════════════════════════════════════════════════
+// POST /ride-requests/quote  (customer OR care_assistant)
+// Validates booking, computes fare off booking.customer's subscription,
+// creates a pending intent + (if fee>0) a Razorpay order. NO ride yet.
+// ═══════════════════════════════════════════════════════════════
+router.post("/quote", protect, authorize("customer", "care_assistant"), async (req, res) => {
   try {
-    const {
-      pickupLocation,
-      destinationLocation,
-      scheduledAt,
-      bookingId,
-      notes,
-    } = req.body;
-    const locErr = validateLocations(pickupLocation, destinationLocation);
-    if (locErr)
-      return res.status(400).json({ success: false, message: locErr });
+    const { bookingId, bookingCode, pickupLocation, destinationLocation, scheduledAt, notes } = req.body;
 
-    if (bookingId) {
-      if (!isValidObjId(bookingId))
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid bookingId" });
-      const booking = await Booking.findOne({
-        _id: bookingId,
-        customer: req.user._id,
-      })
-        .select("_id")
-        .lean();
-      if (!booking)
-        return res
-          .status(404)
-          .json({ success: false, message: "Booking not found or not yours" });
-      const activeRide = await Ride.findOne({
-        booking: bookingId,
-        status: { $in: RIDE_STATUSES_ACTIVE },
-      })
-        .select("_id")
-        .lean();
-      if (activeRide)
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "Active ride already exists on this booking",
-          });
+    // FIX: accept EITHER bookingId (Mongo _id) OR bookingCode (human code).
+    if (!bookingId && !bookingCode)
+      return res.status(400).json({ success: false, message: "bookingId or bookingCode required" });
+
+    const locErr = validateLocations(pickupLocation, destinationLocation);
+    if (locErr) return res.status(400).json({ success: false, message: locErr });
+
+    // Prefer valid ObjectId match; else fall back to bookingCode lookup.
+    const bookingFilter =
+      bookingId && isValidObjId(bookingId) ? { _id: bookingId } : { bookingCode };
+
+    let booking, requesterRole;
+    if (req.user.role === "customer") {
+      booking = await Booking.findOne({ ...bookingFilter, customer: req.user._id }).select("_id customer bookingCode scheduledAt").lean();
+      if (!booking) return res.status(404).json({ success: false, message: "Booking not found or not yours" });
+      requesterRole = "customer";
+    } else {
+      const profile = await CareAssistantProfile.findOne({ user: req.user._id }).select("_id").lean();
+      if (!profile) return res.status(404).json({ success: false, message: "Care assistant profile not found" });
+      booking = await Booking.findOne({ ...bookingFilter, careAssistant: profile._id, status: { $in: ["confirmed", "in_progress"] } })
+        .select("_id customer bookingCode scheduledAt").lean();
+      if (!booking) return res.status(404).json({ success: false, message: "Booking not found or not assigned to you" });
+      requesterRole = "care_assistant";
     }
 
-    const pickupGeo = buildGeo(pickupLocation);
-    const dropoffGeo = buildGeo(destinationLocation);
-    const [pLng, pLat] = pickupLocation.coordinates;
+    const activeRide = await Ride.findOne({ booking: booking._id, status: { $in: RIDE_STATUSES_ACTIVE } }).select("_id").lean();
+    if (activeRide) return res.status(400).json({ success: false, message: "Active ride already exists on this booking" });
 
-    const { ratePerKm, source: rateSource } = await resolveCareRideKmRate(
-      req.user._id,
-    );
-    const distKm = haversineKm(
-      pickupLocation.coordinates,
-      destinationLocation.coordinates,
-    );
+    // FARE — always keyed off booking.customer's own subscription, regardless of who's requesting.
+    const { ratePerKm, source: rateSource } = await resolveKmRate(booking.customer);
+    const distKm = haversineKm(pickupLocation.coordinates, destinationLocation.coordinates);
     const transportFee = +(distKm * ratePerKm).toFixed(2);
 
-    const nearbyCount = await Driver.countDocuments({
-      isActive: true,
-      isVerified: true,
-      isBlocked: false,
-      status: "Available",
-      location: {
-        $geoWithin: { $centerSphere: [[pLng, pLat], CARE_RIDE_RADIUS_RAD] },
-      },
+    await RidePaymentIntent.deleteMany({ booking: booking._id, requestedBy: req.user._id, status: "pending" }); // clear stale intents
+
+    const intent = await RidePaymentIntent.create({
+      booking: booking._id, bookingCode: booking.bookingCode, requestedBy: req.user._id, requesterRole,
+      pickup: buildGeo(pickupLocation), dropoff: buildGeo(destinationLocation),
+      scheduledAt: scheduledAt || booking.scheduledAt || null, notes: notes || null,
+      distKm: +distKm.toFixed(2), ratePerKm, rateSource, transportFee,
+      expiresAt: new Date(Date.now() + INTENT_TTL_MIN * 60 * 1000),
     });
 
-    const { ride } = await createRideRequest({
-      pickupGeo,
-      dropoffGeo,
-      scheduledAt,
-      bookingId: bookingId || null,
-      createdBy: req.user._id,
-    });
-
-    if (bookingId) {
-      await Booking.findByIdAndUpdate(bookingId, {
-        $push: { rides: ride._id },
-        $set: {
-          primaryRide: ride._id,
-          patientLocation: pickupGeo,
-          destinationLocation: dropoffGeo,
-          "fareBreakdown.transportFee": transportFee,
-        },
-      });
-      getBookingSocketService()?.emitJoinRoom(
-        String(req.user._id),
-        `booking:${bookingId}`,
-      );
+    const requiresPayment = transportFee > 0;
+    let razorpayOrder = null;
+    if (requiresPayment) {
+      razorpayOrder = await createRazorpayOrder(transportFee, `${booking.bookingCode}-RIDE`, { intentId: String(intent._id) });
+      intent.razorpayOrderId = razorpayOrder.orderId;
+      await intent.save();
     }
 
-    getBookingSocketService()?.emitToAdminOps("ride_requested", {
-      rideId: ride._id,
-      bookingId: bookingId || null,
-      requesterType: "customer",
-      customerId: req.user._id,
-      pickup: pickupGeo,
-      destination: dropoffGeo,
-      distKm: +distKm.toFixed(2),
-      ratePerKm,
-      rateSource,
-      transportFee,
-      noDriverNearby: nearbyCount === 0,
-      searchRadiusKm: 30,
-      notes: notes || null,
-      timestamp: new Date(),
-    });
+    const wallet = await Wallet.findOne({ user: req.user._id }).select("balance lockedBalance").lean();
+    const walletAvailable = wallet ? Math.max(0, +(wallet.balance - (wallet.lockedBalance || 0)).toFixed(2)) : 0;
 
     return res.status(201).json({
       success: true,
-      message:
-        nearbyCount === 0
-          ? "Ride requested. No driver nearby — admin will assign."
-          : "Ride requested. Waiting for admin to assign driver.",
       data: {
-        rideId: ride._id,
-        pickup: pickupGeo,
-        destination: dropoffGeo,
-        distKm: +distKm.toFixed(2),
-        ratePerKm,
-        rateSource,
-        transportFee,
-        searchRadiusKm: 30,
-        status: "searching",
-        socketHint: bookingId
-          ? { room: `booking:${bookingId}`, event: "ride_assigned" }
-          : null,
+        intentId: intent._id, distKm: intent.distKm, ratePerKm, rateSource, transportFee, requiresPayment,
+        razorpay: razorpayOrder ? { orderId: razorpayOrder.orderId, amount: transportFee, keyId: process.env.RAZORPAY_KEY_ID } : null,
+        walletAvailable, walletSufficient: walletAvailable >= transportFee,
+        expiresAt: intent.expiresAt,
       },
     });
   } catch (err) {
-    console.error("[POST /customer]", err);
+    console.error("[POST /quote]", err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// ═════════════════════════════════════════════════════════════════════════════
-// CARE ASSISTANT — POST /api/ride-requests/care-assistant
-// ═════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// POST /ride-requests/confirm — pay, THEN create ride.
+// paymentMethod: 'razorpay' | 'wallet'
+// ═══════════════════════════════════════════════════════════════
+router.post("/confirm", protect, authorize("customer", "care_assistant"), async (req, res) => {
+  try {
+    const { intentId, paymentMethod, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    if (!intentId || !isValidObjId(intentId))
+      return res.status(400).json({ success: false, message: "Valid intentId required" });
 
-router.post(
-  "/care-assistant",
-  protect,
-  authorize("care_assistant"),
-  async (req, res) => {
-    try {
-      const {
-        pickupLocation,
-        destinationLocation,
-        scheduledAt,
-        bookingId,
-        notes,
-      } = req.body;
-      const locErr = validateLocations(pickupLocation, destinationLocation);
-      if (locErr)
-        return res.status(400).json({ success: false, message: locErr });
-
-      if (!bookingId)
-        return res
-          .status(400)
-          .json({ success: false, message: "bookingId required" });
-      if (!isValidObjId(bookingId))
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid bookingId" });
-
-      const profile = await CareAssistantProfile.findOne({ user: req.user._id })
-        .select("_id fullName")
-        .lean();
-      if (!profile)
-        return res
-          .status(404)
-          .json({
-            success: false,
-            message: "Care assistant profile not found",
-          });
-
-      const booking = await Booking.findOne({
-        _id: bookingId,
-        careAssistant: profile._id,
-        status: { $in: ["confirmed", "in_progress"] },
-      })
-        .select("_id customer scheduledAt bookingCode")
-        .lean();
-      if (!booking)
-        return res
-          .status(404)
-          .json({
-            success: false,
-            message: "Booking not found or not assigned to you",
-          });
-
-      const activeRide = await Ride.findOne({
-        booking: booking._id,
-        status: { $in: RIDE_STATUSES_ACTIVE },
-      })
-        .select("_id")
-        .lean();
-      if (activeRide)
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "Active ride already exists on this booking",
-          });
-
-      const pickupGeo = buildGeo(pickupLocation);
-      const dropoffGeo = buildGeo(destinationLocation);
-      const [pLng, pLat] = pickupLocation.coordinates;
-
-      const { ratePerKm, source: rateSource } = await resolveCareRideKmRate(
-        booking.customer,
-      );
-      const distKm = haversineKm(
-        pickupLocation.coordinates,
-        destinationLocation.coordinates,
-      );
-      const transportFee = +(distKm * ratePerKm).toFixed(2);
-
-      const nearbyCount = await Driver.countDocuments({
-        isActive: true,
-        isVerified: true,
-        isBlocked: false,
-        status: "Available",
-        location: {
-          $geoWithin: { $centerSphere: [[pLng, pLat], CARE_RIDE_RADIUS_RAD] },
-        },
-      });
-
-      const { ride } = await createRideRequest({
-        pickupGeo,
-        dropoffGeo,
-        scheduledAt: scheduledAt || booking.scheduledAt,
-        bookingId: booking._id,
-        createdBy: req.user._id,
-      });
-
-      await Booking.findByIdAndUpdate(booking._id, {
-        $push: { rides: ride._id },
-        $set: {
-          primaryRide: ride._id,
-          patientLocation: pickupGeo,
-          destinationLocation: dropoffGeo,
-          "fareBreakdown.transportFee": transportFee,
-        },
-      });
-
-      const socketService = getBookingSocketService();
-      socketService?.emitJoinRoom(
-        String(booking.customer),
-        `booking:${booking._id}`,
-      );
-      socketService?.emitToAdminOps("ride_requested", {
-        rideId: ride._id,
-        bookingId: booking._id,
-        bookingCode: booking.bookingCode,
-        requesterType: "care_assistant",
-        careAssistantId: profile._id,
-        careAssistantName: profile.fullName,
-        customerId: booking.customer,
-        pickup: pickupGeo,
-        destination: dropoffGeo,
-        distKm: +distKm.toFixed(2),
-        ratePerKm,
-        rateSource,
-        transportFee,
-        noDriverNearby: nearbyCount === 0,
-        searchRadiusKm: 30,
-        notes: notes || null,
-        timestamp: new Date(),
-      });
-      socketService?.emitToRoom(`booking:${booking._id}`, "ride_requested", {
-        rideId: ride._id,
-        requestedBy: "care_assistant",
-        pickup: pickupGeo,
-        destination: dropoffGeo,
-        distKm: +distKm.toFixed(2),
-        transportFee,
-        timestamp: new Date(),
-      });
-
-      await createNotification({
-        recipient: booking.customer,
-        title: "Ride Requested",
-        body: "Your care assistant requested a ride for your appointment.",
-        type: "Ride_Update",
-        bookingId: booking._id,
-      });
-
-      return res.status(201).json({
-        success: true,
-        message:
-          nearbyCount === 0
-            ? "Ride requested. No driver nearby — admin will assign."
-            : "Ride requested. Waiting for admin to assign driver.",
-        data: {
-          rideId: ride._id,
-          bookingId: booking._id,
-          pickup: pickupGeo,
-          destination: dropoffGeo,
-          distKm: +distKm.toFixed(2),
-          ratePerKm,
-          rateSource,
-          transportFee,
-          searchRadiusKm: 30,
-          status: "searching",
-          socketHint: {
-            room: `booking:${booking._id}`,
-            event: "ride_assigned",
-          },
-        },
-      });
-    } catch (err) {
-      console.error("[POST /care-assistant]", err);
-      return res.status(500).json({ success: false, message: err.message });
+    const intent = await RidePaymentIntent.findOne({ _id: intentId, requestedBy: req.user._id, status: "pending" });
+    if (!intent) return res.status(404).json({ success: false, message: "Intent not found, already used, or expired" });
+    if (intent.expiresAt < new Date()) {
+      intent.status = "expired"; await intent.save();
+      return res.status(400).json({ success: false, message: "Quote expired — request a new one" });
     }
-  },
-);
+
+    const activeRide = await Ride.findOne({ booking: intent.booking, status: { $in: RIDE_STATUSES_ACTIVE } }).select("_id").lean();
+    if (activeRide) return res.status(400).json({ success: false, message: "Active ride already exists on this booking" });
+
+    let paymentRecord = null;
+
+    if (intent.transportFee > 0) {
+      if (paymentMethod === "razorpay") {
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature)
+          return res.status(400).json({ success: false, message: "Razorpay payment fields required" });
+        if (razorpay_order_id !== intent.razorpayOrderId)
+          return res.status(400).json({ success: false, message: "Order mismatch" });
+        const ok = verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+        if (!ok) return res.status(400).json({ success: false, message: "Payment signature verification failed" });
+
+        paymentRecord = { gateway: "Razorpay", transactionId: razorpay_payment_id, orderId: razorpay_order_id, paymentMode: "UPI", amount: intent.transportFee, status: "success", paidAt: new Date() };
+      } else if (paymentMethod === "wallet") {
+        const wallet = await Wallet.findOne({ user: req.user._id });
+        if (!wallet) return res.status(404).json({ success: false, message: "Wallet not found" });
+        if (wallet.availableBalance < intent.transportFee)
+          return res.status(400).json({ success: false, message: `Insufficient wallet balance. Available: ₹${wallet.availableBalance}` });
+        await wallet.debit(intent.transportFee, "Booking_Payment", { referenceId: intent.booking, onModel: "Booking", description: `Ride transport fee — ${intent.bookingCode}`, initiatedBy: req.user._id });
+
+        paymentRecord = { gateway: "Wallet", transactionId: `WALLET-${Date.now()}`, paymentMode: "Wallet", amount: intent.transportFee, status: "success", paidAt: new Date() };
+      } else {
+        return res.status(400).json({ success: false, message: "paymentMethod must be 'razorpay' or 'wallet'" });
+      }
+    }
+
+    // Payment done (or free) — now create the ride.
+    const { ride } = await createRideRequest({
+      pickupGeo: intent.pickup, dropoffGeo: intent.dropoff, scheduledAt: intent.scheduledAt,
+      bookingId: intent.booking, createdBy: req.user._id,
+      careAssistantId: intent.requesterRole === "care_assistant"
+        ? (await CareAssistantProfile.findOne({ user: req.user._id }).select("_id").lean())?._id : null,
+    });
+
+    const bookingUpdate = {
+      $push: { rides: ride._id, ...(paymentRecord ? { payments: paymentRecord } : {}) },
+      $set: { primaryRide: ride._id, patientLocation: intent.pickup, destinationLocation: intent.dropoff, "fareBreakdown.transportFee": intent.transportFee },
+      $inc: paymentRecord ? { "fareBreakdown.amountPaid": paymentRecord.amount, "fareBreakdown.totalAmount": paymentRecord.amount } : {},
+    };
+    const updatedBooking = await Booking.findByIdAndUpdate(intent.booking, bookingUpdate, { new: true }).select("customer fareBreakdown").lean();
+    if (paymentRecord) {
+      const isFull = (updatedBooking.fareBreakdown?.amountPaid || 0) >= (updatedBooking.fareBreakdown?.totalAmount || 0);
+      await Booking.findByIdAndUpdate(intent.booking, { $set: { paymentStatus: isFull ? "paid" : "partially_paid" } });
+    }
+
+    intent.status = "paid"; intent.paymentMethod = paymentMethod || null; intent.createdRideId = ride._id;
+    await intent.save();
+
+    getBookingSocketService()?.emitJoinRoom(String(updatedBooking.customer), `booking:${intent.booking}`);
+    getBookingSocketService()?.emitToAdminOps("ride_requested", {
+      rideId: ride._id, bookingId: intent.booking, bookingCode: intent.bookingCode, requesterType: intent.requesterRole,
+      distKm: intent.distKm, ratePerKm: intent.ratePerKm, rateSource: intent.rateSource, transportFee: intent.transportFee,
+      paymentMethod, timestamp: new Date(),
+    });
+
+    return res.status(201).json({
+      success: true, message: "Payment confirmed. Ride requested — waiting for driver assignment.",
+      data: { rideId: ride._id, bookingId: intent.booking, transportFee: intent.transportFee, status: "searching" },
+    });
+  } catch (err) {
+    console.error("[POST /confirm]", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 // ═════════════════════════════════════════════════════════════════════════════
 // GET /:rideId

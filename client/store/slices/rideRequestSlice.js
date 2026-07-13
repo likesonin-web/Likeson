@@ -3,29 +3,32 @@ import API from '../api';
 import toast from 'react-hot-toast';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ASYNC THUNKS — one per actual router route
+// ASYNC THUNKS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// POST /ride-requests/customer
-export const customerRequestRide = createAsyncThunk(
-  'rideRequest/customerRequestRide',
+// POST /ride-requests/quote — works for BOTH customer and care_assistant roles.
+// bookingId is mandatory. Returns fare (subscription-aware) + payment info,
+// does NOT create a Ride yet.
+export const quoteRide = createAsyncThunk(
+  'rideRequest/quoteRide',
   async (payload, { rejectWithValue }) => {
     try {
-      const { data } = await API.post('/ride-requests/customer', payload);
-      return data.data;
+      const { data } = await API.post('/ride-requests/quote', payload);
+      return data.data; // { intentId, distKm, ratePerKm, rateSource, transportFee, requiresPayment, razorpay, walletAvailable, walletSufficient, expiresAt }
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
     }
   }
 );
 
-// POST /ride-requests/care-assistant
-export const careAssistantRequestRide = createAsyncThunk(
-  'rideRequest/careAssistantRequestRide',
+// POST /ride-requests/confirm — pays (razorpay/wallet/free) THEN creates the Ride.
+export const confirmRide = createAsyncThunk(
+  'rideRequest/confirmRide',
   async (payload, { rejectWithValue }) => {
+    // payload: { intentId, paymentMethod?, razorpay_order_id?, razorpay_payment_id?, razorpay_signature? }
     try {
-      const { data } = await API.post('/ride-requests/care-assistant', payload);
-      return data.data;
+      const { data } = await API.post('/ride-requests/confirm', payload);
+      return data.data; // { rideId, bookingId, transportFee, status }
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
     }
@@ -74,7 +77,6 @@ export const fetchNearbyDrivers = createAsyncThunk(
 );
 
 // POST /ride-requests/admin/:rideId/assign
-// assignType: 'tp' | 'solo' | 'agency_driver'
 export const adminAssignRide = createAsyncThunk(
   'rideRequest/adminAssignRide',
   async ({ rideId, assignType, assignId }, { rejectWithValue }) => {
@@ -98,7 +100,7 @@ export const tpAssignDriver = createAsyncThunk(
       const { data } = await API.patch(`/ride-requests/tp/${rideId}/assign-driver`, {
         driverId,
       });
-      return data.data; // { rideId, driverId, status }
+      return data.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
     }
@@ -106,8 +108,6 @@ export const tpAssignDriver = createAsyncThunk(
 );
 
 // PATCH /ride-requests/:rideId/status
-// action: accept | start_route | arrived | verify_otp | start_ride |
-//         at_stop | resume | complete | cancel | complete_waypoint
 export const updateRideStatus = createAsyncThunk(
   'rideRequest/updateRideStatus',
   async ({ rideId, action, otp, stopIndex, cancelReason, eta, waypointType } = {}, { rejectWithValue }) => {
@@ -148,7 +148,7 @@ export const fetchRideTracking = createAsyncThunk(
       const { data } = await API.get(`/ride-requests/${rideId}/tracking`, {
         params: { breadcrumbs },
       });
-      return data.data; // { ride, tracking, socketHint, _serverTime }
+      return data.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
     }
@@ -163,7 +163,7 @@ export const postMilestone = createAsyncThunk(
       const { data } = await API.post(`/ride-requests/${rideId}/tracking/milestone`, {
         name, coordinates, stopSequence, meta,
       });
-      return data.data; // { rideId, milestone, bookingRoom }
+      return data.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
     }
@@ -188,16 +188,13 @@ export const fetchCareAssistantLive = createAsyncThunk(
 // ─────────────────────────────────────────────────────────────────────────────
 
 const initialState = {
+  // Quote (pre-payment) — from /ride-requests/quote
+  quote: null,
+
   // Single ride being viewed/tracked
   currentRide: null,
-
-  // Live snapshot (polling fallback)
   liveData: null,
-
-  // Full tracking doc (breadcrumbs, milestones, polylines)
   trackingData: null,
-
-  // Care assistant live (role-gated view)
   caLiveData: null,
 
   // Admin: list of rides
@@ -209,10 +206,9 @@ const initialState = {
   // Admin: nearby search result for a ride
   nearbyResult: null,
 
-  // Ride just created (customer / care-assistant)
+  // Ride just created after successful payment
   createdRide: null,
 
-  // Socket-pushed live state (updated by socket action reducers below)
   socketLive: {
     status:                 null,
     rideStage:              null,
@@ -221,7 +217,7 @@ const initialState = {
     etaTarget:              null,
     navigationTarget:       null,
     activeNavigationTarget: null,
-    activeTarget:           null, // alias — kept for compat
+    activeTarget:           null,
     driverSnapshot:         null,
     vehicleSnapshot:        null,
     otpResult:              null,
@@ -243,41 +239,39 @@ const initialState = {
     },
   },
 
-  // CA workflow state — top-level (NOT inside socketLive)
   caAtJoinPoint: false,
   caHasJoined:   false,
-  caViewMode:    null, // 'navigate_to_jp' | 'driver_tracking_only'
+  caViewMode:    null,
   jpCompleted:   false,
 
-  // Loading states per operation
   loading: {
-    customerRequest: false,
-    careRequest:     false,
-    fetchRide:       false,
-    adminAll:        false,
-    nearby:          false,
-    adminAssign:     false,
-    tpAssign:        false,
-    statusUpdate:    false,
-    live:            false,
-    tracking:        false,
-    milestone:       false,
-    caLive:          false,
+    quote:        false,
+    confirm:      false,
+    fetchRide:    false,
+    adminAll:     false,
+    nearby:       false,
+    adminAssign:  false,
+    tpAssign:     false,
+    statusUpdate: false,
+    live:         false,
+    tracking:     false,
+    milestone:    false,
+    caLive:       false,
   },
 
   errors: {
-    customerRequest: null,
-    careRequest:     null,
-    fetchRide:       null,
-    adminAll:        null,
-    nearby:          null,
-    adminAssign:     null,
-    tpAssign:        null,
-    statusUpdate:    null,
-    live:            null,
-    tracking:        null,
-    milestone:       null,
-    caLive:          null,
+    quote:        null,
+    confirm:      null,
+    fetchRide:    null,
+    adminAll:     null,
+    nearby:       null,
+    adminAssign:  null,
+    tpAssign:     null,
+    statusUpdate: null,
+    live:         null,
+    tracking:     null,
+    milestone:    null,
+    caLive:       null,
   },
 };
 
@@ -291,8 +285,6 @@ const rideRequestSlice = createSlice({
 
   reducers: {
     // ── Socket event handlers ──────────────────────────────────────────────
-
-    // location_update
     socketLocationUpdate(state, action) {
       const p = action.payload;
       state.socketLive.liveLocation = {
@@ -307,14 +299,12 @@ const rideRequestSlice = createSlice({
       }
     },
 
-    // eta_update
     socketEtaUpdate(state, action) {
       state.socketLive.etaMinutes = action.payload.etaMinutes   ?? state.socketLive.etaMinutes;
       state.socketLive.etaTarget  = action.payload.currentTarget ?? state.socketLive.etaTarget;
       if (state.liveData) state.liveData.currentEtaMinutes = action.payload.etaMinutes;
     },
 
-    // ride_status_changed
     socketRideStatusChanged(state, action) {
       const p = action.payload;
       state.socketLive.status = p.status;
@@ -329,7 +319,6 @@ const rideRequestSlice = createSlice({
       }
     },
 
-    // Fine-grained status reducers (server also emits dedicated events)
     socketDriverAccepted(state) {
       state.socketLive.status = 'driver_accepted';
       if (state.currentRide) state.currentRide.status = 'driver_accepted';
@@ -365,7 +354,6 @@ const rideRequestSlice = createSlice({
       if (state.currentRide) state.currentRide.status = 'cancelled';
     },
 
-    // hospital_eta_update
     socketHospitalEtaUpdate(state, action) {
       state.socketLive.hospitalEta = {
         hospitalId:   action.payload.hospitalId,
@@ -376,7 +364,6 @@ const rideRequestSlice = createSlice({
       };
     },
 
-    // care-assistant:ride:tracking
     socketCareAssistantTracking(state, action) {
       state.socketLive.careAssistantTracking = {
         bookingId:      action.payload.bookingId,
@@ -389,7 +376,6 @@ const rideRequestSlice = createSlice({
       state.socketLive.activeTarget = action.payload.activeTarget;
     },
 
-    // care_assistant_at_jp — CA reached join point
     socketCaAtJoinPoint(state, action) {
       state.caAtJoinPoint = true;
       state.caViewMode    = 'navigate_to_jp';
@@ -401,7 +387,6 @@ const rideRequestSlice = createSlice({
       }
     },
 
-    // care_assistant_joined_ride — CA boarded, switch to driver-only view
     socketCaJoinedRide(state, action) {
       state.caHasJoined   = true;
       state.caViewMode    = 'driver_tracking_only';
@@ -409,12 +394,10 @@ const rideRequestSlice = createSlice({
       if (action.payload?.jpCompleted) state.jpCompleted = true;
     },
 
-    // ca_join_waypoint_completed — driver picked up CA
     socketJpWaypointCompleted(state) {
       state.jpCompleted = true;
     },
 
-    // navigation_target_changed
     socketNavigationTargetChanged(state, action) {
       const p = action.payload;
       state.socketLive.navigationTarget      = p;
@@ -422,17 +405,14 @@ const rideRequestSlice = createSlice({
       state.socketLive.activeTarget          = p.currentTarget || p.activeNavigationTarget;
     },
 
-    // otp_result
     socketOtpResult(state, action) {
       state.socketLive.otpResult = action.payload;
     },
 
-    // otp_wrong_attempt
     socketOtpWrongAttempt(state) {
       state.socketLive.wrongOtpAttempts += 1;
     },
 
-    // ride_assigned (after admin/TP assigns driver)
     socketRideAssigned(state, action) {
       state.socketLive.status         = action.payload.status;
       state.socketLive.driverSnapshot = action.payload.driverSnapshot ?? state.socketLive.driverSnapshot;
@@ -442,6 +422,11 @@ const rideRequestSlice = createSlice({
     },
 
     // ── Manual resets ──────────────────────────────────────────────────────
+    clearQuote(state) {
+      state.quote = null;
+      state.errors.quote = null;
+    },
+
     clearCurrentRide(state) {
       state.currentRide   = null;
       state.liveData      = null;
@@ -449,6 +434,7 @@ const rideRequestSlice = createSlice({
       state.nearbyResult  = null;
       state.createdRide   = null;
       state.caLiveData    = null;
+      state.quote         = null;
       state.socketLive    = initialState.socketLive;
       state.caAtJoinPoint = false;
       state.caHasJoined   = false;
@@ -470,32 +456,39 @@ const rideRequestSlice = createSlice({
 
   extraReducers: (builder) => {
 
-    // ── customerRequestRide ────────────────────────────────────────────────
+    // ── quoteRide ─────────────────────────────────────────────────────────
     builder
-      .addCase(customerRequestRide.pending,   (state) => { state.loading.customerRequest = true;  state.errors.customerRequest = null; })
-      .addCase(customerRequestRide.fulfilled, (state, action) => {
-        state.loading.customerRequest = false;
-        state.createdRide = action.payload;
-        toast.success('Ride requested. Waiting for driver assignment.');
+      .addCase(quoteRide.pending, (state) => {
+        state.loading.quote = true;
+        state.errors.quote  = null;
+        state.quote         = null;
       })
-      .addCase(customerRequestRide.rejected,  (state, action) => {
-        state.loading.customerRequest = false;
-        state.errors.customerRequest  = action.payload;
-        toast.error(action.payload || 'Ride request failed');
+      .addCase(quoteRide.fulfilled, (state, action) => {
+        state.loading.quote = false;
+        state.quote         = action.payload;
+      })
+      .addCase(quoteRide.rejected, (state, action) => {
+        state.loading.quote = false;
+        state.errors.quote  = action.payload;
+        toast.error(action.payload || 'Could not get fare quote');
       });
 
-    // ── careAssistantRequestRide ───────────────────────────────────────────
+    // ── confirmRide ───────────────────────────────────────────────────────
     builder
-      .addCase(careAssistantRequestRide.pending,   (state) => { state.loading.careRequest = true;  state.errors.careRequest = null; })
-      .addCase(careAssistantRequestRide.fulfilled, (state, action) => {
-        state.loading.careRequest = false;
-        state.createdRide         = action.payload;
-        toast.success('Ride requested for patient.');
+      .addCase(confirmRide.pending, (state) => {
+        state.loading.confirm = true;
+        state.errors.confirm  = null;
       })
-      .addCase(careAssistantRequestRide.rejected,  (state, action) => {
-        state.loading.careRequest = false;
-        state.errors.careRequest  = action.payload;
-        toast.error(action.payload || 'Care assistant ride request failed');
+      .addCase(confirmRide.fulfilled, (state, action) => {
+        state.loading.confirm = false;
+        state.createdRide     = action.payload;
+        state.quote           = null;
+        toast.success('Ride requested. Waiting for driver assignment.');
+      })
+      .addCase(confirmRide.rejected, (state, action) => {
+        state.loading.confirm = false;
+        state.errors.confirm  = action.payload;
+        toast.error(action.payload || 'Payment or ride confirmation failed');
       });
 
     // ── fetchRide ─────────────────────────────────────────────────────────
@@ -579,8 +572,6 @@ const rideRequestSlice = createSlice({
           state.currentRide.status = newStatus;
         }
         if (newStatus) state.socketLive.status = newStatus;
-
-        // complete_waypoint → mark CA join completed
         if (action.payload.jpCompleted) state.jpCompleted = true;
 
         const toastMap = {
@@ -615,7 +606,6 @@ const rideRequestSlice = createSlice({
       .addCase(fetchRideLive.rejected,  (state, action) => { state.loading.live = false; state.errors.live = action.payload; });
 
     // ── fetchRideTracking ─────────────────────────────────────────────────
-    // Router returns { ride, tracking, socketHint, _serverTime } — ride.stops is embedded
     builder
       .addCase(fetchRideTracking.pending,   (state) => { state.loading.tracking = true;  state.errors.tracking = null; })
       .addCase(fetchRideTracking.fulfilled, (state, action) => {
@@ -653,7 +643,6 @@ const rideRequestSlice = createSlice({
       .addCase(fetchCareAssistantLive.fulfilled, (state, action) => {
         state.loading.caLive = false;
         state.caLiveData     = action.payload;
-        // Hydrate CA workflow flags from server response
         if (action.payload.caViewMode)                 state.caViewMode  = action.payload.caViewMode;
         if (action.payload.caHasJoined !== undefined)  state.caHasJoined = action.payload.caHasJoined;
       })
@@ -689,6 +678,7 @@ export const {
   socketOtpResult,
   socketOtpWrongAttempt,
   socketRideAssigned,
+  clearQuote,
   clearCurrentRide,
   clearCreatedRide,
   clearNearby,
@@ -699,6 +689,12 @@ export const {
 // ─────────────────────────────────────────────────────────────────────────────
 // SELECTORS
 // ─────────────────────────────────────────────────────────────────────────────
+
+export const selectQuote              = (s) => s.rideRequest.quote;
+export const selectQuoteLoading       = (s) => s.rideRequest.loading.quote;
+export const selectQuoteError         = (s) => s.rideRequest.errors.quote;
+export const selectConfirmLoading     = (s) => s.rideRequest.loading.confirm;
+export const selectConfirmError       = (s) => s.rideRequest.errors.confirm;
 
 export const selectCurrentRide        = (s) => s.rideRequest.currentRide;
 export const selectCreatedRide        = (s) => s.rideRequest.createdRide;
@@ -719,22 +715,18 @@ export const selectNavigationTarget   = (s) => s.rideRequest.socketLive.navigati
 export const selectActiveNavigationTarget = (s) => s.rideRequest.socketLive.activeNavigationTarget;
 export const selectActiveTarget       = (s) => s.rideRequest.socketLive.activeTarget;
 export const selectEta                = (s) => ({ minutes: s.rideRequest.socketLive.etaMinutes, target: s.rideRequest.socketLive.etaTarget });
-export const selectEtaUpdate          = (s) => s.rideRequest.socketLive.etaMinutes; // compat alias used by useRideTracking
+export const selectEtaUpdate          = (s) => s.rideRequest.socketLive.etaMinutes;
 export const selectOtpResult          = (s) => s.rideRequest.socketLive.otpResult;
 export const selectWrongOtpAttempts   = (s) => s.rideRequest.socketLive.wrongOtpAttempts;
 export const selectHospitalEta        = (s) => s.rideRequest.socketLive.hospitalEta;
 export const selectCareAssistantTracking = (s) => s.rideRequest.socketLive.careAssistantTracking;
 
-// CA live
 export const selectCaLiveData         = (s) => s.rideRequest.caLiveData;
-
-// CA workflow — top-level
 export const selectCaAtJoinPoint      = (s) => s.rideRequest.caAtJoinPoint;
 export const selectCaHasJoined        = (s) => s.rideRequest.caHasJoined;
 export const selectCaViewMode         = (s) => s.rideRequest.caViewMode;
 export const selectJpCompleted        = (s) => s.rideRequest.jpCompleted;
 
-// Loading
 export const selectRideLoading        = (s) => s.rideRequest.loading;
 export const selectRideErrors         = (s) => s.rideRequest.errors;
 export const selectStatusUpdating     = (s) => s.rideRequest.loading.statusUpdate;
@@ -749,13 +741,6 @@ export const selectTpAssignLoading    = (s) => s.rideRequest.loading.tpAssign;
 // SOCKET WIRING HELPER
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * wireRideSocketEvents
- * @param {Function} on             — socketService.on
- * @param {object}   SOCKET_EVENTS  — from socketService.js
- * @param {Function} dispatch       — Redux dispatch
- * @returns {() => void}            — cleanup fn
- */
 export function wireRideSocketEvents(on, SOCKET_EVENTS, dispatch) {
   const EV = SOCKET_EVENTS;
 
@@ -768,16 +753,13 @@ export function wireRideSocketEvents(on, SOCKET_EVENTS, dispatch) {
     on(EV.OTP_WRONG_ATTEMPT,                  ()  => dispatch(socketOtpWrongAttempt())),
     on(EV.HOSPITAL_ETA_UPDATE,                (d) => dispatch(socketHospitalEtaUpdate(d))),
 
-    // CA workflow — each event mapped ONCE
     on(EV.CARE_ASSISTANT_AT_JP,               (d) => dispatch(socketCaAtJoinPoint(d))),
     on(EV.CARE_ASSISTANT_JOINED_RIDE,         (d) => dispatch(socketCaJoinedRide(d))),
     on(EV.CA_JOIN_WAYPOINT_COMPLETED,         (d) => dispatch(socketJpWaypointCompleted(d))),
     on(EV.CARE_ASSISTANT_ATTACHED,            (d) => dispatch(socketRideAssigned(d))),
 
-    // care-assistant:ride:tracking (custom event, not in SOCKET_EVENTS)
     on('care-assistant:ride:tracking',         (d) => dispatch(socketCareAssistantTracking(d))),
 
-    // Fine-grained ride status events (server emits these in addition to ride_status_changed)
     on('driver_accepted',                      (d) => dispatch(socketDriverAccepted(d))),
     on('driver_en_route',                      (d) => dispatch(socketDriverEnRoute(d))),
     on('driver_arrived',                       (d) => dispatch(socketDriverArrived(d))),

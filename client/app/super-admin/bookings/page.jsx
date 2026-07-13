@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   Search, Filter, Download, RefreshCw, X, ChevronLeft,
   ChevronRight, Bell, BarChart2, HelpCircle, AlertTriangle,
-  Layers, CheckCircle, Clock,
+  Layers, CheckCircle, Clock, Route,
 } from 'lucide-react';
 
 // ── Slice imports ────────────────────────────────────────────────────────────
@@ -101,9 +101,13 @@ import { BookingCard, AnalysisSection } from './Analyticsbookingcard';
 import { BookingDetailPanel } from './BookingDetailPanel';
 import { HelpSection } from './HelpSection';
 import { SosPanelAdmin } from './SosDestinationPanel';
+import { RidesQueuePanel } from './RidesQueuePanel';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const MAIN_TABS = ['bookings', 'analysis', 'sos', 'help'];
+// NEW: 'rides_queue' tab — surfaces the ride-requests admin endpoints
+// (fetchAdminAllRides / fetchNearbyDrivers / adminAssignRide / tpAssignDriver)
+// that lived unused in rideRequestSlice with no UI wired to them.
+const MAIN_TABS = ['bookings', 'rides_queue', 'analysis', 'sos', 'help'];
 const POLL_MS   = 30_000; // 30s auto-refresh for SOS
 
 // ── Export all thunks as named map for child panels ─────────────────────────
@@ -364,10 +368,11 @@ export default function BookingsManagement() {
   };
 
   const TAB_LABELS = {
-    bookings: 'Bookings',
-    analysis: 'Analysis',
-    sos:      'SOS Alerts',
-    help:     'Help',
+    bookings:    'Bookings',
+    rides_queue: 'Rides Queue',
+    analysis:    'Analysis',
+    sos:         'SOS Alerts',
+    help:        'Help',
   };
 
   return (
@@ -387,6 +392,7 @@ export default function BookingsManagement() {
               onClick={() => setMainTab(t)}
               className={`btn btn-sm gap-1.5 ${mainTab === t ? 'btn-primary' : 'btn-ghost text-base-content/60'}`}
             >
+              {t === 'rides_queue' && <Route size={11} />}
               {t === 'analysis' && <BarChart2 size={11} />}
               {t === 'sos'      && <><AlertTriangle size={11} />{activeSos.length > 0 && <SosBadge count={activeSos.length} />}</>}
               {t === 'help'     && <HelpCircle size={11} />}
@@ -418,6 +424,13 @@ export default function BookingsManagement() {
             />
           </div>
         </div>
+      )}
+
+      {/* NEW: Rides Queue — admin ride assignment queue driven by rideRequestSlice
+          (fetchAdminAllRides / fetchNearbyDrivers / adminAssignRide). Distinct from
+          the per-booking "Assign" tab above, which goes through operationsSlice. */}
+      {mainTab === 'rides_queue' && (
+        <RidesQueuePanel />
       )}
 
       {mainTab === 'analysis' && (

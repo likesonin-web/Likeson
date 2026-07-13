@@ -16,10 +16,11 @@
  *      c. Check outstanding liability (PartnerCollectionLiability, keyed by User id)
  *      d. Compute recoveryDeduction
  *      e. Compute netPayable
- *      f. Create PartnerSettlement record
- *      g. Write PartnerWalletTransaction (ledger entry)
- *      h. Update PartnerWallet balance projection
- *      i. If transportpartner allocation: sync display-only earnings onto the
+ *      f. Upsert PartnerBookingAllocation record (see FIX note in step F below)
+ *      g. Create PartnerSettlement record
+ *      h. Write PartnerWalletTransaction (ledger entry)
+ *      i. Update PartnerWallet balance projection
+ *      j. If transportpartner allocation: sync display-only earnings onto the
  *         Driver doc(s) that actually drove the leg (Driver has NO wallet)
  *   6. Mark booking settlementProcessed
  *   7. Handle PAY_AT_SERVICE cash collector liability (correct entity, not raw role match)
@@ -31,6 +32,17 @@
  *   - Subscription discounts absorbed by platform; partner payout unchanged
  *   - partnerId is ALWAYS a User._id once it reaches Wallet/Settlement/Ledger/
  *     Liability. Allocation additionally stores partnerProfileId for traceability.
+ *
+ * FIX LOG:
+ *   - computePartnerAllocations() can return [] (missing doctor/hospital
+ *     link, no matching partner role, etc). Booking used to still get
+ *     marked settlementProcessed=true with zero settlements/allocations —
+ *     silent failure. Now throws instead (see step 4).
+ *   - BookingPartnerAllocation.create() in step F collided with the
+ *     display-only 'pending' allocation already inserted by
+ *     createAllocationsForBooking() (Booking.post-save hook) on booking
+ *     completion — same idempotencyKey, E11000, whole transaction aborted.
+ *     Now upserts on idempotencyKey instead of blind create().
  */
 
 import mongoose from 'mongoose';
@@ -69,7 +81,7 @@ async function resolveUserIdFromProfile(profileId, partnerRole) {
     case 'solodriverpartner': return (await SoloDriverPartner.findById(profileId).select('user').lean())?.user;
     case 'transportpartner':  return (await TransportPartner.findById(profileId).select('user').lean())?.user;
     case 'lab_partner':       return (await LabPartnerProfile.findById(profileId).select('user').lean())?.user;
- case 'hospital': {
+    case 'hospital': {
       const Hospital = mongoose.model('Hospital');
       return (await Hospital.findById(profileId).select('managedBy').lean())?.managedBy;
     }
@@ -121,6 +133,17 @@ export async function processBookingSettlement(bookingId, externalSession = null
     // ── 4. Compute Allocations (profile-id based) ─────────────────────────────
     const allocations = await computePartnerAllocations(booking, pricingConfig, session);
     // allocations = [{ partnerId(profileId), partnerRole, grossAmount, platformFee, taxAmount, tdsAmount, rideLegs? }]
+
+    // FIX: computePartnerAllocations() can return []. Old code fell through
+    // and still marked settlementProcessed=true at step 8 — booking looks
+    // "settled" forever with zero PartnerSettlement/BookingPartnerAllocation
+    // records and zero money moved. Fail loudly instead so it's retryable.
+    if (!Array.isArray(allocations) || allocations.length === 0) {
+      throw new Error(
+        `Booking ${bookingId} (${booking.bookingType}) produced ZERO partner allocations — ` +
+        `refusing to mark settled. Check computePartnerAllocations() for this bookingType/fareBreakdown.`
+      );
+    }
 
     const paymentSource = resolvePaymentSource(booking);
 
@@ -241,7 +264,17 @@ async function processPartnerAllocation({
     +(grossAmount - platformFee - taxAmount - (tdsAmount ?? 0) - recoveryDeduction).toFixed(2)
   );
 
-  // ── F. Create Allocation Record ──────────────────────────────────────────
+  // ── F. Upsert Allocation Record ──────────────────────────────────────────
+  // FIX: createAllocationsForBooking() (Booking.post-save hook) already
+  // inserts a 'pending' display-only allocation with this exact
+  // idempotencyKey the moment the booking completes. Old code did
+  // BookingPartnerAllocation.create([...]) here unconditionally, which
+  // collided with that pre-existing doc -> E11000 duplicate key -> whole
+  // settlement transaction aborted (409 on the route). Upsert instead:
+  // overwrite the pending doc with the authoritative settlement numbers
+  // (platformFee/taxAmount/netPayable computed here may differ from the
+  // display-only estimate), keeping the SAME _id so step J below (marking
+  // status:'settled') still targets the right document.
   const isCashCollector = paymentSource === 'PAY_AT_SERVICE'
     && collectorUserId
     && collectorUserId.toString() === userId.toString();
@@ -249,29 +282,46 @@ async function processPartnerAllocation({
 
   const rideLegIds = Array.isArray(alloc.rideLegs) ? alloc.rideLegs.map((l) => l.rideId) : undefined;
 
-  const [allocation] = await BookingPartnerAllocation.create(
-    [{
-      bookingId:            booking._id,
-      partnerId:            userId,
-      partnerProfileId:     profileId,
-      partnerRole,
-      bookingType:          booking.bookingType,
-      walletId:             wallet._id,
-      grossAmount,
-      platformFee,
-      taxAmount,
-      tdsAmount:            tdsAmount ?? 0,
-      recoveryDeduction,
-      netPayable,
-      subscriptionAbsorbed,
-      paymentSource,
-      isCashCollector,
-      cashCollected,
-      status:               'pending',
-      idempotencyKey:       `alloc:${booking._id}:${userId}:${partnerRole}`,
-      remarks:              rideLegIds ? `rides: ${rideLegIds.join(',')}` : undefined,
-    }],
-    { session }
+  const allocIdempotencyKey = `alloc:${booking._id}:${userId}:${partnerRole}`;
+
+  const existingAlloc = await BookingPartnerAllocation.findOne({
+    idempotencyKey: allocIdempotencyKey,
+  }).session(session);
+
+  // Guard: if this allocation was somehow already settled (e.g. a
+  // force-settle race), don't double-credit the wallet below.
+  if (existingAlloc && existingAlloc.status === 'settled') {
+    console.warn(`[settlementEngine] Allocation ${allocIdempotencyKey} already settled — skipping re-settlement`);
+    return { partnerId: userId, partnerRole, skipped: true, reason: 'already_settled' };
+  }
+
+  const allocation = await BookingPartnerAllocation.findOneAndUpdate(
+    { idempotencyKey: allocIdempotencyKey },
+    {
+      $set: {
+        bookingId:            booking._id,
+        partnerId:            userId,
+        partnerProfileId:     profileId,
+        partnerRole,
+        bookingType:          booking.bookingType,
+        walletId:             wallet._id,
+        grossAmount,
+        platformFee,
+        taxAmount,
+        tdsAmount:            tdsAmount ?? 0,
+        recoveryDeduction,
+        netPayable,
+        subscriptionAbsorbed,
+        paymentSource,
+        isCashCollector,
+        cashCollected,
+        remarks:              rideLegIds ? `rides: ${rideLegIds.join(',')}` : undefined,
+      },
+      $setOnInsert: {
+        status: 'pending', // flipped to 'settled' in step J below
+      },
+    },
+    { session, upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
   // ── G. Create Settlement Record ──────────────────────────────────────────
@@ -312,7 +362,7 @@ async function processPartnerAllocation({
       netAmount:    netPayable,
       beforeBalance,
       afterBalance,
-balanceSnapshot: {
+      balanceSnapshot: {
         availableBalance:  afterBalance,
         pendingBalance:    wallet.pendingBalance,
         withdrawalBalance: wallet.withdrawalBalance,
@@ -329,7 +379,7 @@ balanceSnapshot: {
     { session }
   );
 
-// ── I. Update Wallet Balances ────────────────────────────────────────────
+  // ── I. Update Wallet Balances ────────────────────────────────────────────
   // FIX: `wallet` was fetched BEFORE applyRecovery() ran. When recovery
   // actually deducts something, it bumps this same wallet's __v_balance in
   // the DB — but the local `wallet` var here still holds the stale value.
@@ -495,7 +545,8 @@ async function resolveCashCollectorEntity(cashCollectorUserId, session) {
       const doc = await DoctorProfile.findOne({ user: cashCollectorUserId }).select('_id').session(session).lean();
       return doc ? { userId: cashCollectorUserId, partnerRole: 'doctor', profileId: doc._id } : null;
     }
-case 'lab_partner': {
+
+    case 'lab_partner': {
       const lab = await LabPartnerProfile.findOne({ user: cashCollectorUserId }).select('_id').session(session).lean();
       return lab ? { userId: cashCollectorUserId, partnerRole: 'lab_partner', profileId: lab._id } : null;
     }

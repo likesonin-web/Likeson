@@ -1380,3 +1380,19 @@
   .glass-card { border: 1px solid #e5e7eb; background: white; }
   .no-print   { display: none !important; }
 }
+
+/* Google Places autocomplete dropdown was rendering behind the card UI */
+.pac-container {
+  z-index: 9999 !important;
+  font-family: inherit;
+  border-radius: 0.5rem;
+  margin-top: 4px;
+}
+.pac-item {
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.pac-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}

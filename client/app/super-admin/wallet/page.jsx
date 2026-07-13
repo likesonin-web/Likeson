@@ -1381,7 +1381,7 @@ export default function AdminWalletsPage() {
   const [view, setView]                                       = useState('wallets'); // 'wallets' | 'partner' | 'withdrawals'
 
   return (
-    <div className="flex flex-col h-screen bg-base-100 overflow-hidden">
+    <div className="flex flex-col  bg-base-100 overflow-hidden">
       {/* top bar */}
       <header className="flex items-center justify-between px-5 py-3 border-b border-base-300 bg-base-100 flex-shrink-0 z-10">
         <div className="flex items-center gap-3">
