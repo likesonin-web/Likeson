@@ -34,14 +34,10 @@ const CustomTooltip = ({ active, payload, label, prefix = '', suffix = '' }) => 
   if (!active || !payload?.length) return null;
   return (
     <div
-      className="rounded-xl px-3 py-2.5 text-sm shadow-2xl border"
-      style={{
-        background: 'var(--base-200)',
-        borderColor: 'color-mix(in srgb, var(--primary), transparent 65%)',
-        color: 'var(--base-content)',
-      }}
+      className="rounded-xl px-3 py-2.5 text-sm shadow-2xl border bg-base-200 text-base-content"
+      style={{ borderColor: 'color-mix(in srgb, var(--primary), transparent 65%)' }}
     >
-      {label && <p className="text-xs mb-1" style={{ color: 'color-mix(in oklch, var(--base-content) 55%, transparent)' }}>{label}</p>}
+      {label && <p className="text-xs mb-1 text-[color-mix(in oklch, var(--base-content) 55%, transparent)]">{label}</p>}
       {payload.map((p, i) => (
         <p key={i} className="font-bold" style={{ color: p.color || p.fill || 'var(--primary)' }}>
           {p.name}: {prefix}{typeof p.value === 'number' ? p.value.toLocaleString('en-IN') : p.value}{suffix}
@@ -68,22 +64,19 @@ const buildMonthlyData = (stats) => {
 const StatChip = ({ icon: Icon, label, value, delay }) => (
   <motion.div
     variants={fadeUp} custom={delay} initial="hidden" animate="show"
-    className="flex items-center gap-3 p-4 rounded-xl border"
-    style={{
-      background: 'var(--base-200)',
-      borderColor: 'color-mix(in srgb, var(--base-content), transparent 88%)',
-    }}
+    className="flex items-center gap-3 p-4 rounded-xl border bg-base-200"
+    style={{ borderColor: 'color-mix(in srgb, var(--base-content), transparent 88%)' }}
   >
     <div
-      className="p-2 rounded-lg flex-shrink-0"
-      style={{ background: 'color-mix(in srgb, var(--primary), transparent 82%)', color: 'var(--primary)' }}
+      className="p-2 rounded-lg flex-shrink-0 bg-[color-mix(in srgb, var(--primary), transparent 82%)] text-primary"
+     
     >
       <Icon className="w-4 h-4" />
     </div>
     <div className="min-w-0">
-      <p className="text-lg font-black font-mono truncate" style={{ color: 'var(--base-content)' }}>{value}</p>
-      <p className="text-[11px] font-medium uppercase tracking-wide truncate"
-        style={{ color: 'color-mix(in oklch, var(--base-content) 48%, transparent)' }}>
+      <p className="text-lg font-black font-mono truncate text-base-content">{value}</p>
+      <p className="text-[11px] font-medium uppercase tracking-wide truncate text-[color-mix(in oklch, var(--base-content) 48%, transparent)]"
+       >
         {label}
       </p>
     </div>
@@ -109,19 +102,16 @@ const TabBtn = ({ active, onClick, children }) => (
 const SectionCard = ({ children, delay, className = '' }) => (
   <motion.div
     variants={fadeUp} custom={delay} initial="hidden" animate="show"
-    className={`p-5 rounded-2xl border ${className}`}
-    style={{
-      background: 'var(--base-200)',
-      borderColor: 'color-mix(in srgb, var(--base-content), transparent 88%)',
-    }}
+    className={`p-5 rounded-2xl border ${className} bg-base-200`}
+ style={{ borderColor: 'color-mix(in srgb, var(--base-content), transparent 88%)' }}
   >
     {children}
   </motion.div>
 );
 
 const SectionTitle = ({ children }) => (
-  <h2 className="text-xs font-bold uppercase tracking-widest mb-4"
-    style={{ color: 'color-mix(in oklch, var(--base-content) 55%, transparent)' }}>
+  <h2 className="text-xs font-bold uppercase tracking-widest mb-4 text-[color-mix(in oklch, var(--base-content) 55%, transparent)]"
+   >
     {children}
   </h2>
 );
@@ -189,23 +179,23 @@ const chips = [
   const gridStyle = 'color-mix(in srgb, var(--base-content), transparent 90%)';
 
   return (
-    <div className="min-h-screen font-[family-name:var(--font-family-poppins)]"
-      style={{ background: 'var(--base-100)', color: 'var(--base-content)' }}>
+    <div className="min-h-screen font-[family-name:var(--font-family-poppins)] bg-base-100 text-base-content"
+     >
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-8">
 
         {/* ── Header ── */}
         <motion.div variants={fadeUp} custom={0} initial="hidden" animate="show" className="mb-8">
           <div className="flex items-center gap-3 mb-1">
-            <div className="p-2.5 rounded-xl" style={{ background: 'var(--primary)', color: 'var(--primary-content)' }}>
+            <div className="p-2.5 rounded-xl bg-primary text-primary-content">
               <BarChart2 className="w-5 h-5" />
             </div>
-            <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--base-content)' }}>
+            <h1 className="text-2xl font-black tracking-tight text-base-content">
               Analytics
             </h1>
           </div>
-          <p className="text-sm ml-[3.25rem]"
-            style={{ color: 'color-mix(in oklch, var(--base-content) 50%, transparent)' }}>
+          <p className="text-sm ml-[3.25rem] text-[color-mix(in oklch, var(--base-content) 50%, transparent)]"
+           >
             Consultation &amp; earnings overview
           </p>
         </motion.div>
@@ -214,8 +204,8 @@ const chips = [
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
           {isLoading
             ? Array(6).fill(0).map((_, i) => (
-                <div key={i} className="h-20 rounded-xl animate-pulse"
-                  style={{ background: 'var(--base-300)' }} />
+                <div key={i} className="h-20 rounded-xl animate-pulse bg-base-300"
+                  />
               ))
             : chips.map((c) => <StatChip key={c.label} {...c} />)
           }
@@ -228,8 +218,8 @@ const chips = [
           <SectionCard delay={7} className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
               <SectionTitle>Monthly Trend</SectionTitle>
-              <div className="flex gap-1 p-1 rounded-lg"
-                style={{ background: 'var(--base-300)' }}>
+              <div className="flex gap-1 p-1 rounded-lg bg-base-300"
+               >
                 {['earnings', 'consultations', 'referrals'].map((t) => (
                   <TabBtn key={t} active={tab === t} onClick={() => setTab(t)}>
                     {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -239,7 +229,7 @@ const chips = [
             </div>
 
             {isLoading
-              ? <div className="h-52 rounded-xl animate-pulse" style={{ background: 'var(--base-300)' }} />
+              ? <div className="h-52 rounded-xl animate-pulse bg-base-300" />
               : (
                 <ResponsiveContainer width="100%" height={220}>
                   <AreaChart data={monthlyData} margin={{ top: 5, right: 4, left: -22, bottom: 0 }}>
@@ -270,7 +260,7 @@ const chips = [
           <SectionCard delay={8}>
             <SectionTitle>Consultation Types</SectionTitle>
             {isLoading
-              ? <div className="h-52 rounded-xl animate-pulse" style={{ background: 'var(--base-300)' }} />
+              ? <div className="h-52 rounded-xl animate-pulse bg-base-300" />
               : consultTypeData.length > 0
                 ? (
                   <>
@@ -295,12 +285,12 @@ const chips = [
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full"
                               style={{ background: pieColors[i % pieColors.length] }} />
-                            <span className="text-xs"
-                              style={{ color: 'color-mix(in oklch, var(--base-content) 60%, transparent)' }}>
+                            <span className="text-xs text-[color-mix(in oklch, var(--base-content) 60%, transparent)]"
+                             >
                               {d.name}
                             </span>
                           </div>
-                          <span className="text-xs font-bold" style={{ color: 'var(--base-content)' }}>
+                          <span className="text-xs font-bold text-base-content">
                             {d.value}
                           </span>
                         </div>
@@ -309,8 +299,8 @@ const chips = [
                   </>
                 )
                 : (
-                  <div className="h-40 flex items-center justify-center text-sm"
-                    style={{ color: 'color-mix(in oklch, var(--base-content) 35%, transparent)' }}>
+                  <div className="h-40 flex items-center justify-center text-sm text-[color-mix(in oklch, var(--base-content) 35%, transparent)]"
+                   >
                     No data yet
                   </div>
                 )
@@ -325,7 +315,7 @@ const chips = [
           <SectionCard delay={9}>
             <SectionTitle>Monthly Referrals</SectionTitle>
             {isLoading
-              ? <div className="h-40 rounded-xl animate-pulse" style={{ background: 'var(--base-300)' }} />
+              ? <div className="h-40 rounded-xl animate-pulse bg-base-300" />
               : (
                 <ResponsiveContainer width="100%" height={160}>
                   <BarChart data={monthlyData} margin={{ top: 0, right: 0, left: -26, bottom: 0 }} barSize={13}>
@@ -344,7 +334,7 @@ const chips = [
           <SectionCard delay={10}>
             <SectionTitle>Settlement Breakdown</SectionTitle>
             {isLoading
-              ? <div className="h-40 rounded-xl animate-pulse" style={{ background: 'var(--base-300)' }} />
+              ? <div className="h-40 rounded-xl animate-pulse bg-base-300" />
               : (
                 <div className="flex items-center gap-5">
                   <ResponsiveContainer width={130} height={130}>
@@ -366,17 +356,17 @@ const chips = [
                           <div className="flex items-center justify-between mb-1.5">
                             <div className="flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full" style={{ background: d.fill }} />
-                              <span className="text-xs font-medium"
-                                style={{ color: 'color-mix(in oklch, var(--base-content) 60%, transparent)' }}>
+                              <span className="text-xs font-medium text-[color-mix(in oklch, var(--base-content) 60%, transparent)]"
+                               >
                                 {d.name}
                               </span>
                             </div>
-                            <span className="text-xs font-bold" style={{ color: 'var(--base-content)' }}>
+                            <span className="text-xs font-bold text-base-content">
                               ₹{d.value.toLocaleString('en-IN')}
                             </span>
                           </div>
-                          <div className="h-1.5 rounded-full overflow-hidden"
-                            style={{ background: 'var(--base-300)' }}>
+                          <div className="h-1.5 rounded-full overflow-hidden bg-base-300"
+                           >
                             <motion.div
                               initial={{ width: 0 }}
                               animate={{ width: `${pct}%` }}
@@ -391,11 +381,11 @@ const chips = [
 
                     <div className="pt-3 border-t"
                       style={{ borderColor: 'color-mix(in srgb, var(--base-content), transparent 88%)' }}>
-                      <p className="text-[11px] uppercase tracking-wider font-semibold mb-0.5"
-                        style={{ color: 'color-mix(in oklch, var(--base-content) 45%, transparent)' }}>
+                      <p className="text-[11px] uppercase tracking-wider font-semibold mb-0.5 text-[color-mix(in oklch, var(--base-content) 45%, transparent)]"
+                       >
                         Total Earnings
                       </p>
-                      <p className="text-base font-black" style={{ color: 'var(--primary)' }}>
+                      <p className="text-base font-black text-primary">
                         ₹{(s.totalEarnings || 0).toLocaleString('en-IN')}
                       </p>
                     </div>

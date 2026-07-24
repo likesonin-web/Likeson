@@ -94,7 +94,7 @@ function Section({ title, children, action }) {
     <div className="glass-card overflow-hidden">
       <div className="px-6 py-4 border-b flex items-center justify-between"
         style={{ borderColor: "var(--base-300)" }}>
-        <p className="font-display font-black text-base" style={{ color: "var(--base-content)" }}>{title}</p>
+        <p className="font-display font-black text-base text-base-content">{title}</p>
         {action}
       </div>
       <div className="p-6">{children}</div>
@@ -167,8 +167,8 @@ function SettingsTab({ userId }) {
             { key: "isEmailVerified", label: "Email Verified", icon: Mail, hint: "Mark email as manually verified" },
             { key: "isPhoneVerified", label: "Phone Verified", icon: Phone, hint: "Mark phone as manually verified" },
           ].map(t => (
-            <div key={t.key} className="flex items-center justify-between p-4 rounded-xl"
-              style={{ background: "var(--base-200)", border: "1px solid var(--base-300)" }}>
+            <div key={t.key} className="flex items-center justify-between p-4 rounded-xl bg-base-200 border border-base-300"
+             >
               <div className="flex items-center gap-3">
                 <t.icon size={16} style={{ color: form[t.key] ? "var(--success)" : "color-mix(in oklch, var(--base-content) 40%, transparent)" }} />
                 <div>
@@ -181,8 +181,8 @@ function SettingsTab({ userId }) {
           ))}
 
           {/* Work status */}
-          <div className="p-4 rounded-xl space-y-2"
-            style={{ background: "var(--base-200)", border: "1px solid var(--base-300)" }}>
+          <div className="p-4 rounded-xl space-y-2 bg-base-200 border border-base-300"
+           >
             <label className="text-sm font-semibold">Work Status</label>
             <select value={form.workStatus} onChange={e => update("workStatus", e.target.value)}
               className="input-field w-full text-sm cursor-pointer">
@@ -194,8 +194,8 @@ function SettingsTab({ userId }) {
           </div>
 
           {/* Last known address */}
-          <div className="p-4 rounded-xl space-y-2"
-            style={{ background: "var(--base-200)", border: "1px solid var(--base-300)" }}>
+          <div className="p-4 rounded-xl space-y-2 bg-base-200 border border-base-300"
+           >
             <label className="text-sm font-semibold flex items-center gap-2">
               <MapPin size={13} />Last Known Address
             </label>
@@ -214,8 +214,8 @@ function SettingsTab({ userId }) {
           <MiniStat icon={CheckCircle} label="Consent Terms" value={settings?.consent?.termsAcceptedAt ? "Yes" : "No"} color="var(--chart-2)" />
           <MiniStat icon={Smartphone} label="Devices" value={settings?.devices?.registeredCount} color="var(--chart-3)" />
         </div>
-        <div className="p-4 rounded-xl space-y-2"
-          style={{ background: "var(--base-200)", border: "1px solid var(--base-300)" }}>
+        <div className="p-4 rounded-xl space-y-2 bg-base-200 border border-base-300"
+         >
           <label className="text-sm font-semibold">Referral Code Override</label>
           <p className="text-xs opacity-45">Only changeable if user has no referral history</p>
           <div className="flex gap-2">
@@ -231,8 +231,8 @@ function SettingsTab({ userId }) {
       <Section title="Registered Devices"
         action={
           <button onClick={() => dispatch(clearUserDevices(userId))} disabled={clearingDev}
-            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
-            style={{ color: "var(--error)", border: "1px solid color-mix(in srgb, var(--error), transparent 70%)" }}>
+            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all text-error border border-[color-mix(in srgb, var(--error), transparent 70%)]"
+           >
             {clearingDev ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
             Clear All
           </button>
@@ -323,8 +323,8 @@ function SecurityTab({ userId, userRole }) {
             { icon: Lock, label: "Password Changed", value: s?.loginActivity?.passwordChangedAt ? new Date(s.loginActivity.passwordChangedAt).toLocaleDateString("en-IN") : "Never" },
             { icon: CheckCircle, label: "Email Verified", value: s?.account?.isEmailVerified ? "Yes" : "No" },
           ].map(item => (
-            <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl"
-              style={{ background: "var(--base-200)", border: "1px solid var(--base-300)" }}>
+            <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl bg-base-200 border border-base-300"
+             >
               <item.icon size={14} className="opacity-40 flex-shrink-0" />
               <div>
                 <p className="text-xs opacity-45 font-semibold uppercase tracking-wide">{item.label}</p>
@@ -361,8 +361,8 @@ function SecurityTab({ userId, userRole }) {
         <AnimatePresence>
           {showCoin && (
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-              className="mt-4 p-4 rounded-xl space-y-3"
-              style={{ background: "var(--base-200)", border: "1px solid var(--base-300)" }}>
+              className="mt-4 p-4 rounded-xl space-y-3 bg-base-200 border border-base-300"
+             >
               <div className="flex rounded-xl overflow-hidden border" style={{ borderColor: "var(--base-300)" }}>
                 {["credit", "debit"].map(a => (
                   <button key={a} onClick={() => setCoinForm(p => ({ ...p, action: a }))}
@@ -385,9 +385,8 @@ function SecurityTab({ userId, userRole }) {
               <div className="flex gap-2">
                 <button onClick={() => setShowCoin(false)} className="btn-secondary flex-1 !py-2 !text-xs">Cancel</button>
                 <button onClick={handleCoinSubmit} disabled={adjusting || !coinForm.amount || !coinForm.reason}
-                  className="flex-1 !py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all"
-                  style={{ background: coinForm.action === "credit" ? "var(--success)" : "var(--error)", color: "white",
-                    opacity: (adjusting || !coinForm.amount || !coinForm.reason) ? 0.5 : 1 }}>
+                  className="flex-1 !py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all text-[white]"
+                  style={{ background: coinForm.action === "credit" ? "var(--success)" : "var(--error)", opacity: (adjusting || !coinForm.amount || !coinForm.reason) ? 0.5 : 1 }}>
                   {adjusting ? <Loader2 size={12} className="animate-spin" /> : <Coins size={12} />}
                   Confirm
                 </button>
@@ -409,8 +408,8 @@ function SecurityTab({ userId, userRole }) {
           <AnimatePresence>
             {showKyc && (
               <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className="p-4 rounded-xl space-y-3"
-                style={{ background: "var(--base-200)", border: "1px solid var(--base-300)" }}>
+                className="p-4 rounded-xl space-y-3 bg-base-200 border border-base-300"
+               >
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {Object.entries(KYC_STATUS_META).map(([val, cfg]) => {
                     const Icon = cfg.icon;
@@ -496,13 +495,13 @@ function SecurityTab({ userId, userRole }) {
         <Section title="Recent Security Events">
           <div className="space-y-2">
             {s.recentSecurityEvents.map((evt, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-xl"
-                style={{ background: "var(--base-200)", border: "1px solid var(--base-300)" }}>
+              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-base-200 border border-base-300"
+               >
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
                   style={{ background: evt.priority === "High" ? "color-mix(in srgb, var(--error), transparent 85%)" : "color-mix(in srgb, var(--info), transparent 85%)" }}>
                   {evt.priority === "High"
-                    ? <AlertTriangle size={12} style={{ color: "var(--error)" }} />
-                    : <Shield size={12} style={{ color: "var(--info)" }} />}
+                    ? <AlertTriangle size={12} className="text-error" />
+                    : <Shield size={12} className="text-info" />}
                 </div>
                 <div className="flex-1">
                   <p className="text-xs font-semibold">{evt.title}</p>
@@ -548,8 +547,8 @@ function SessionsTab({ userId }) {
         <p className="text-sm font-semibold opacity-60">{sessions?.length || 0} active session(s)</p>
         {sessions?.length > 0 && (
           <button onClick={handleRevokeAll} disabled={revokingAll}
-            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
-            style={{ color: "var(--error)", border: "1px solid color-mix(in srgb, var(--error), transparent 65%)" }}>
+            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all text-error border border-[color-mix(in srgb, var(--error), transparent 65%)]"
+           >
             {revokingAll ? <Loader2 size={11} className="animate-spin" /> : <LogOut size={11} />}
             Revoke All
           </button>
@@ -595,8 +594,8 @@ function SessionsTab({ userId }) {
                   </div>
                 </div>
                 <button onClick={() => handleRevokeOne(s._id)} disabled={revoking}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex-shrink-0"
-                  style={{ color: "var(--error)", border: "1px solid color-mix(in srgb, var(--error), transparent 70%)" }}>
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 text-error border border-[color-mix(in srgb, var(--error), transparent 70%)]"
+                 >
                   {revoking ? <Loader2 size={11} className="animate-spin" /> : <LogOut size={11} />}Revoke
                 </button>
               </motion.div>
@@ -641,8 +640,8 @@ function NotificationsTab({ userId }) {
         </div>
         <button onClick={() => { if (confirm("Delete ALL notifications for this user?")) dispatch(clearUserNotifications(userId)); }}
           disabled={clearing || notifs.length === 0}
-          className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
-          style={{ color: "var(--error)", border: "1px solid color-mix(in srgb, var(--error), transparent 65%)" }}>
+          className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40 text-error border border-[color-mix(in srgb, var(--error), transparent 65%)]"
+         >
           {clearing ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}Clear All
         </button>
       </div>
@@ -689,7 +688,7 @@ function NotificationsTab({ userId }) {
                       color: PRIORITY_COLOR[n.priority] || "var(--neutral)",
                       border: `1px solid color-mix(in srgb, ${PRIORITY_COLOR[n.priority] || "var(--neutral)"}, transparent 65%)`,
                     }}>{n.priority}</span>
-                    <span className="badge !text-[10px] !py-0.5" style={{ background: "var(--base-300)", color: "var(--base-content)" }}>
+                    <span className="badge !text-[10px] !py-0.5 bg-base-300 text-base-content">
                       {n.type?.replace(/_/g, " ")}
                     </span>
                   </div>
@@ -740,7 +739,7 @@ export default function UserSettingsSecurity() {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--base-100)" }}>
+      <div className="min-h-screen flex items-center justify-center bg-base-100">
         <div className="text-center">
           <div className="spinner mx-auto mb-4" />
           <p className="text-sm opacity-40">Loading user…</p>
@@ -750,7 +749,7 @@ export default function UserSettingsSecurity() {
   }
 
   return (
-    <div className="min-h-screen p-6" style={{ background: "var(--base-100)" }}>
+    <div className="min-h-screen p-6 bg-base-100">
       <div className="max-w-4xl mx-auto space-y-6">
 
         {/* Header */}
@@ -762,19 +761,19 @@ export default function UserSettingsSecurity() {
               <ChevronRight size={12} className="opacity-30" />
               <Link href={`/admin/users/${userId}`} className="text-xs opacity-50 hover:opacity-80 transition-opacity">{user.name}</Link>
               <ChevronRight size={12} className="opacity-30" />
-              <span className="text-xs font-semibold" style={{ color: "var(--primary)" }}>Settings & Security</span>
+              <span className="text-xs font-semibold text-primary">Settings & Security</span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl overflow-hidden flex-shrink-0"
-                style={{ background: "var(--base-300)" }}>
+              <div className="w-12 h-12 rounded-2xl overflow-hidden flex-shrink-0 bg-base-300"
+               >
                 {user.avatar
                   ? <img src={user.avatar} alt="" className="w-full h-full object-cover" />
-                  : <div className="w-full h-full flex items-center justify-center font-black text-lg"
-                      style={{ color: "var(--primary)" }}>{user.name?.[0]?.toUpperCase()}</div>
+                  : <div className="w-full h-full flex items-center justify-center font-black text-lg text-primary"
+                     >{user.name?.[0]?.toUpperCase()}</div>
                 }
               </div>
               <div>
-                <h1 className="font-display font-black text-2xl leading-tight" style={{ color: "var(--base-content)" }}>
+                <h1 className="font-display font-black text-2xl leading-tight text-base-content">
                   {user.name}
                 </h1>
                 <p className="text-xs opacity-45">{user.email} · {user.role}</p>

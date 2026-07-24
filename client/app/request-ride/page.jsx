@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { motion, AnimatePresence } from 'framer-motion';
-import Script from 'next/script';
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { motion, AnimatePresence } from "framer-motion";
+import Script from "next/script";
 import {
   MapPin,
   Navigation,
@@ -18,12 +18,13 @@ import {
   Wallet as WalletIcon,
   CreditCard,
   Gift,
-} from 'lucide-react';
+} from "lucide-react";
 
-import LocationAutocomplete from './LocationAutocomplete';
-import FareEstimateCard from './FareEstimateCard';
-import { useGoogleMaps } from '@/hooks/useGoogleMaps';
-import { DEFAULT_KM_RATE } from '@/lib/geo';
+import LocationAutocomplete from "./LocationAutocomplete";
+import FareEstimateCard from "./FareEstimateCard";
+import SpecialButton from "@/components/SpecialButton"; // <-- Imported SpecialButton
+import { useGoogleMaps } from "@/hooks/useGoogleMaps";
+import { DEFAULT_KM_RATE } from "@/lib/geo";
 import {
   quoteRide,
   confirmRide,
@@ -33,12 +34,17 @@ import {
   selectRideErrors,
   clearQuote,
   clearCreatedRide,
-} from '@/store/slices/rideRequestSlice';
+} from "@/store/slices/rideRequestSlice";
 import {
   fetchWalletDetails,
   selectWalletBalance,
   selectWalletLoading as selectWalletDetailsLoading,
-} from '@/store/slices/walletSlice';
+} from "@/store/slices/walletSlice";
+
+// ── Utility components for SpecialButton icons ───────────────
+const SpinnerIcon = ({ className, ...props }) => (
+  <Loader2 className={`${className} animate-spin`} {...props} />
+);
 
 // "Now" rounded to the current minute, in the format datetime-local expects.
 function getMinScheduleValue() {
@@ -58,13 +64,13 @@ function sameLocation(a, b) {
 // Adjust this path/shape if your auth slice differs.
 // Expected shape: state.auth.user = { _id, name, role: 'customer' | 'care_assistant' | ... }
 function useCurrentUserRole() {
-  return useSelector((s) => s.user?.user?.role) || 'customer';
+  return useSelector((s) => s.user?.user?.role) || "customer";
 }
 
 export default function RequestRidePage() {
   const dispatch = useDispatch();
   const role = useCurrentUserRole(); // 'customer' | 'care_assistant'
-  const isCareAssistant = role === 'care_assistant';
+  const isCareAssistant = role === "care_assistant";
 
   const quote = useSelector(selectQuote);
   const createdRide = useSelector(selectCreatedRide);
@@ -73,9 +79,7 @@ export default function RequestRidePage() {
 
   const { isLoaded: mapsLoaded, loadError: mapsLoadError } = useGoogleMaps();
 
-  // FIX: live wallet balance from walletSlice — not just the snapshot
-  // baked into the /quote response, which can go stale (e.g. user tops
-  // up wallet in another tab while this page is open).
+  // FIX: live wallet balance from walletSlice
   const liveWalletBalance = useSelector(selectWalletBalance);
   const walletDetailsLoading = useSelector(selectWalletDetailsLoading);
 
@@ -84,11 +88,8 @@ export default function RequestRidePage() {
   }, [dispatch]);
 
   // FIX: preview should reflect the user's OWN subscription transport rate
-  // (if any benefit exists) instead of always falling back to ₹21/km —
-  // avoids a scary mismatch between preview and the official quote.
-  // Adjust selector path to match your subscription slice.
   const mySubTransportRate = useSelector(
-    (s) => s.subscription?.mySubscription?.limits?.transportRatePerKm
+    (s) => s.subscription?.mySubscription?.limits?.transportRatePerKm,
   );
   const previewRatePerKm =
     mySubTransportRate != null && mySubTransportRate > 0
@@ -97,10 +98,10 @@ export default function RequestRidePage() {
 
   const [pickup, setPickup] = useState(null);
   const [destination, setDestination] = useState(null);
-  const [scheduledAt, setScheduledAt] = useState('');
-  const [bookingId, setBookingId] = useState('');
-  const [notes, setNotes] = useState('');
-  const [formError, setFormError] = useState('');
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [bookingId, setBookingId] = useState("");
+  const [notes, setNotes] = useState("");
+  const [formError, setFormError] = useState("");
   const [paying, setPaying] = useState(false);
   const [razorpayReady, setRazorpayReady] = useState(false);
 
@@ -118,8 +119,11 @@ export default function RequestRidePage() {
     !isConfirming;
 
   useEffect(() => {
-    if (!locationsIdentical && formError === "Pickup and drop-off can't be the same place.") {
-      setFormError('');
+    if (
+      !locationsIdentical &&
+      formError === "Pickup and drop-off can't be the same place."
+    ) {
+      setFormError("");
     }
   }, [locationsIdentical, formError]);
 
@@ -130,23 +134,27 @@ export default function RequestRidePage() {
       if (isQuoting || isConfirming) return;
 
       if (!bookingId.trim()) {
-        setFormError('Booking ID is required — every ride must be linked to a booking.');
+        setFormError(
+          "Booking ID is required — every ride must be linked to a booking.",
+        );
         return;
       }
       if (!pickup?.coordinates || !destination?.coordinates) {
-        setFormError('Please select both a pickup and a drop-off location from the suggestions.');
+        setFormError(
+          "Please select both a pickup and a drop-off location from the suggestions.",
+        );
         return;
       }
       if (locationsIdentical) {
         setFormError("Pickup and drop-off can't be the same place.");
         return;
       }
-      setFormError('');
+      setFormError("");
 
       dispatch(
         quoteRide({
           bookingId: bookingId.trim(),
-          bookingCode: bookingId.trim(), // FIX: same input, sent as both keys — backend tries valid ObjectId first, falls back to bookingCode
+          bookingCode: bookingId.trim(),
           pickupLocation: pickup,
           destinationLocation: destination,
           scheduledAt: scheduledAt || undefined,
@@ -154,11 +162,20 @@ export default function RequestRidePage() {
         }),
       );
     },
-    [dispatch, pickup, destination, scheduledAt, bookingId, notes, isQuoting, isConfirming, locationsIdentical],
+    [
+      dispatch,
+      pickup,
+      destination,
+      scheduledAt,
+      bookingId,
+      notes,
+      isQuoting,
+      isConfirming,
+      locationsIdentical,
+    ],
   );
 
   // ── Step 2a: free ride (₹0 fare, e.g. fully covered by subscription) ─────
-  // Auto-confirm the moment a zero-fee quote arrives — no payment step needed.
   useEffect(() => {
     if (quote && !quote.requiresPayment && !createdRide && !isConfirming) {
       dispatch(confirmRide({ intentId: quote.intentId }));
@@ -167,24 +184,31 @@ export default function RequestRidePage() {
 
   // ── Step 2b: pay via Razorpay ──────────────────────────────────────────
   const payWithRazorpay = useCallback(() => {
-    if (!quote?.razorpay || !razorpayReady || typeof window === 'undefined' || !window.Razorpay) {
-      setFormError('Payment gateway still loading — please wait a moment and try again.');
+    if (
+      !quote?.razorpay ||
+      !razorpayReady ||
+      typeof window === "undefined" ||
+      !window.Razorpay
+    ) {
+      setFormError(
+        "Payment gateway still loading — please wait a moment and try again.",
+      );
       return;
     }
     setPaying(true);
     const rzp = new window.Razorpay({
       key: quote.razorpay.keyId,
       amount: Math.round(quote.razorpay.amount * 100),
-      currency: 'INR',
+      currency: "INR",
       order_id: quote.razorpay.orderId,
-      name: 'Likeson Healthcare',
-      description: 'Ride transport fee',
-      theme: { color: '#0f3460' },
+      name: "Likeson Healthcare",
+      description: "Ride transport fee",
+      theme: { color: "#0f3460" },
       handler: (response) => {
         dispatch(
           confirmRide({
             intentId: quote.intentId,
-            paymentMethod: 'razorpay',
+            paymentMethod: "razorpay",
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
@@ -195,7 +219,7 @@ export default function RequestRidePage() {
         ondismiss: () => setPaying(false),
       },
     });
-    rzp.on('payment.failed', () => setPaying(false));
+    rzp.on("payment.failed", () => setPaying(false));
     rzp.open();
   }, [quote, razorpayReady, dispatch]);
 
@@ -203,11 +227,12 @@ export default function RequestRidePage() {
   const payWithWallet = useCallback(() => {
     if (!quote) return;
     setPaying(true);
-    dispatch(confirmRide({ intentId: quote.intentId, paymentMethod: 'wallet' }))
-      .finally(() => {
-        setPaying(false);
-        dispatch(fetchWalletDetails()); // refresh live balance after debit
-      });
+    dispatch(
+      confirmRide({ intentId: quote.intentId, paymentMethod: "wallet" }),
+    ).finally(() => {
+      setPaying(false);
+      dispatch(fetchWalletDetails());
+    });
   }, [quote, dispatch]);
 
   const handleReset = useCallback(() => {
@@ -215,10 +240,10 @@ export default function RequestRidePage() {
     dispatch(clearQuote());
     setPickup(null);
     setDestination(null);
-    setScheduledAt('');
-    setBookingId('');
-    setNotes('');
-    setFormError('');
+    setScheduledAt("");
+    setBookingId("");
+    setNotes("");
+    setFormError("");
   }, [dispatch]);
 
   const handleEditQuote = useCallback(() => {
@@ -228,7 +253,10 @@ export default function RequestRidePage() {
   const displayError = formError || errors.quote || errors.confirm;
 
   return (
-    <div data-theme={isCareAssistant ? 'care_assistant' : 'customer'} className="min-h-screen bg-base-100 py-8 px-4">
+    <div
+      data-theme={isCareAssistant ? "care_assistant" : "customer"}
+      className="min-h-screen bg-base-100 py-8 px-4"
+    >
       <Script
         src="https://checkout.razorpay.com/v1/checkout.js"
         strategy="lazyOnload"
@@ -236,22 +264,27 @@ export default function RequestRidePage() {
       />
 
       <div className="container-custom max-w-lg">
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
           <h1 className="section-heading !mb-1 flex items-center gap-2">
             <Navigation className="w-7 h-7 text-primary" />
-            {isCareAssistant ? 'Request a Ride for Patient' : 'Request a Ride'}
+            {isCareAssistant ? "Request a Ride for Patient" : "Request a Ride"}
           </h1>
           <p className="section-subheading !mb-0">
             {isCareAssistant
               ? "Enter the patient's booking, pickup and drop-off to get a fare quote."
-              : 'Enter your pickup and drop-off to get an instant fare quote.'}
+              : "Enter your pickup and drop-off to get an instant fare quote."}
           </p>
         </motion.div>
 
         {mapsLoadError && (
           <div className="alert alert-warning mb-4" role="alert">
             <p className="text-sm">
-              Location search failed to load. You can still submit if the API is restored — try refreshing the page.
+              Location search failed to load. You can still submit if the API is
+              restored — try refreshing the page.
             </p>
           </div>
         )}
@@ -272,7 +305,9 @@ export default function RequestRidePage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg">Ride requested</h3>
-                  <p className="label-text-alt !mt-0">Waiting for driver assignment.</p>
+                  <p className="label-text-alt !mt-0">
+                    Waiting for driver assignment.
+                  </p>
                 </div>
               </div>
 
@@ -280,13 +315,20 @@ export default function RequestRidePage() {
                 <p className="stat-card-label">Fare paid</p>
                 <p className="stat-card-value flex items-center gap-1">
                   <IndianRupee className="w-6 h-6" />
-                  {Number(createdRide.transportFee ?? 0).toLocaleString('en-IN')}
+                  {Number(createdRide.transportFee ?? 0).toLocaleString(
+                    "en-IN",
+                  )}
                 </p>
               </div>
 
-              <button type="button" onClick={handleReset} className="btn btn-outline w-full">
-                Request another ride
-              </button>
+              <SpecialButton
+                role={role}
+                variant="outline"
+                fullWidth
+                title="Request another ride"
+                onClick={handleReset}
+                textAnimation="slideUp"
+              />
             </motion.div>
           ) : quote ? (
             /* ── QUOTE / PAYMENT STEP ── */
@@ -297,7 +339,11 @@ export default function RequestRidePage() {
               exit={{ opacity: 0 }}
               className="card p-5 space-y-5"
             >
-              <FareEstimateCard pickup={pickup} destination={destination} quote={quote} />
+              <FareEstimateCard
+                pickup={pickup}
+                destination={destination}
+                quote={quote}
+              />
 
               {quote.requiresPayment ? (
                 <div className="space-y-2.5">
@@ -305,60 +351,72 @@ export default function RequestRidePage() {
                     Choose payment method
                   </p>
 
-                  <button
-                    type="button"
+                  <SpecialButton
+                    role={role}
+                    variant="solid"
+                    fullWidth
                     onClick={payWithRazorpay}
                     disabled={paying || isConfirming || !razorpayReady}
-                    className="btn-primary-cta w-full flex items-center justify-center gap-2"
-                  >
-                    {paying || isConfirming ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CreditCard className="w-4 h-4" />
-                    )}
-                    Pay ₹{quote.transportFee.toLocaleString('en-IN')} Online (Razorpay)
-                  </button>
+                    icon={paying || isConfirming ? SpinnerIcon : CreditCard}
+                    title={`Pay ₹${quote.transportFee.toLocaleString("en-IN")} Online (Razorpay)`}
+                    textAnimation="slideUp"
+                  />
 
-                  <button
-                    type="button"
+                  <SpecialButton
+                    role={role}
+                    variant="outline"
+                    fullWidth
                     onClick={payWithWallet}
-                    disabled={paying || isConfirming || liveWalletBalance < quote.transportFee}
-                    className="btn btn-outline w-full flex items-center justify-center gap-2"
-                  >
-                    <WalletIcon className="w-4 h-4" />
-                    {walletDetailsLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>Pay from Wallet (₹{liveWalletBalance.toLocaleString('en-IN')} available)</>
+                    disabled={
+                      paying ||
+                      isConfirming ||
+                      liveWalletBalance < quote.transportFee
+                    }
+                    icon={walletDetailsLoading ? SpinnerIcon : WalletIcon}
+                    title={
+                      walletDetailsLoading
+                        ? "Loading balance..."
+                        : `Pay from Wallet (₹${liveWalletBalance.toLocaleString("en-IN")} available)`
+                    }
+                    textAnimation="slideUp"
+                  />
+
+                  {liveWalletBalance < quote.transportFee &&
+                    !walletDetailsLoading && (
+                      <p className="text-xs text-warning flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        Wallet balance is insufficient for this fare.
+                      </p>
                     )}
-                  </button>
 
-                  {liveWalletBalance < quote.transportFee && !walletDetailsLoading && (
-                    <p className="text-xs text-warning flex items-center gap-1">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                      Wallet balance is insufficient for this fare.
-                    </p>
-                  )}
-
-                  <button
-                    type="button"
+                  <SpecialButton
+                    role={role}
+                    variant="ghost"
+                    size="sm"
+                    fullWidth
                     onClick={handleEditQuote}
                     disabled={paying || isConfirming}
-                    className="btn btn-ghost btn-sm w-full"
-                  >
-                    ← Edit ride details
-                  </button>
+                    title="← Edit ride details"
+                    textAnimation="fade"
+                    uppercase={false}
+                  />
                 </div>
               ) : (
                 <div className="flex items-center gap-2 justify-center py-4 text-success">
                   <Gift className="w-5 h-5" />
-                  <p className="text-sm font-semibold">Free ride — confirming automatically…</p>
+                  <p className="text-sm font-semibold">
+                    Free ride — confirming automatically…
+                  </p>
                   <Loader2 className="w-4 h-4 animate-spin" />
                 </div>
               )}
 
               {displayError && (
-                <div className="alert alert-error" role="alert" aria-live="polite">
+                <div
+                  className="alert alert-error"
+                  role="alert"
+                  aria-live="polite"
+                >
                   <p className="text-sm">{displayError}</p>
                 </div>
               )}
@@ -376,7 +434,10 @@ export default function RequestRidePage() {
             >
               <fieldset disabled={isQuoting} className="space-y-5 contents">
                 <div>
-                  <label htmlFor="bookingId" className="label-text mb-1.5 flex items-center gap-1.5">
+                  <label
+                    htmlFor="bookingId"
+                    className="label-text mb-1.5 flex items-center gap-1.5"
+                  >
                     <Hash className="w-3.5 h-3.5 text-primary" />
                     Booking ID or Code
                     <span className="text-error">*</span>
@@ -386,19 +447,28 @@ export default function RequestRidePage() {
                     type="text"
                     required
                     className="input-field"
-                    placeholder={isCareAssistant ? "Patient's booking ID or code" : 'Your booking ID or code'}
+                    placeholder={
+                      isCareAssistant
+                        ? "Patient's booking ID or code"
+                        : "Your booking ID or code"
+                    }
                     value={bookingId}
                     onChange={(e) => setBookingId(e.target.value)}
                     maxLength={64}
                   />
                   <p className="label-text-alt mt-1">
-                    Booking ID or booking code both work — every ride must be linked to a booking.
+                    Booking ID or booking code both work — every ride must be
+                    linked to a booking.
                   </p>
                 </div>
 
                 <LocationAutocomplete
                   label="Pickup location"
-                  note={isCareAssistant ? "Where should the driver pick the patient up from?" : 'Where should the driver pick you up from?'}
+                  note={
+                    isCareAssistant
+                      ? "Where should the driver pick the patient up from?"
+                      : "Where should the driver pick you up from?"
+                  }
                   placeholder="Search pickup address"
                   icon={MapPin}
                   value={pickup}
@@ -427,10 +497,17 @@ export default function RequestRidePage() {
                   </p>
                 )}
 
-                <FareEstimateCard pickup={pickup} destination={destination} ratePerKm={previewRatePerKm} />
+                <FareEstimateCard
+                  pickup={pickup}
+                  destination={destination}
+                  ratePerKm={previewRatePerKm}
+                />
 
                 <div>
-                  <label htmlFor="scheduledAt" className="label-text mb-1.5 flex items-center gap-1.5">
+                  <label
+                    htmlFor="scheduledAt"
+                    className="label-text mb-1.5 flex items-center gap-1.5"
+                  >
                     <Calendar className="w-3.5 h-3.5 text-primary" />
                     Scheduled time
                   </label>
@@ -442,11 +519,16 @@ export default function RequestRidePage() {
                     value={scheduledAt}
                     onChange={(e) => setScheduledAt(e.target.value)}
                   />
-                  <p className="label-text-alt mt-1">Leave blank to request a ride immediately.</p>
+                  <p className="label-text-alt mt-1">
+                    Leave blank to request a ride immediately.
+                  </p>
                 </div>
 
                 <div>
-                  <label htmlFor="notes" className="label-text mb-1.5 flex items-center gap-1.5">
+                  <label
+                    htmlFor="notes"
+                    className="label-text mb-1.5 flex items-center gap-1.5"
+                  >
                     <FileText className="w-3.5 h-3.5 text-primary" />
                     Notes for driver
                   </label>
@@ -460,35 +542,33 @@ export default function RequestRidePage() {
                     maxLength={300}
                   />
                   <p className="label-text-alt mt-1">
-                    Anything the driver or admin should know before assigning your ride.
+                    Anything the driver or admin should know before assigning
+                    your ride.
                   </p>
                 </div>
               </fieldset>
 
               {displayError && (
-                <div className="alert alert-error" role="alert" aria-live="polite">
+                <div
+                  className="alert alert-error"
+                  role="alert"
+                  aria-live="polite"
+                >
                   <p className="text-sm">{displayError}</p>
                 </div>
               )}
 
-              <motion.button
-                whileTap={{ scale: 0.97 }}
+              <SpecialButton
                 type="submit"
+                role={role}
+                variant="solid"
+                fullWidth
                 disabled={!canQuote}
-                className="btn-primary-cta w-full flex items-center justify-center gap-2"
-              >
-                {isQuoting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Getting quote...
-                  </>
-                ) : (
-                  <>
-                    Get Fare Quote
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </motion.button>
+                icon={isQuoting ? SpinnerIcon : ArrowRight}
+                iconPosition={isQuoting ? "left" : "right"}
+                title={isQuoting ? "Getting quote..." : "Get Fare Quote"}
+                textAnimation="letterStagger"
+              />
             </motion.form>
           )}
         </AnimatePresence>

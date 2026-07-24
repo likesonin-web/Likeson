@@ -43,6 +43,7 @@ import {
   ChevronRight,
   Info,
   MapPin,
+  CircleDot,
 } from "lucide-react";
 import {
   changePassword,
@@ -191,8 +192,8 @@ function ChangePasswordSection({ dispatch, loading, errors }) {
 
       <div className="glass-card p-4">
         <div className="flex items-start gap-2">
-          <Lock size={14} className="shrink-0 mt-0.5" style={{ color: "var(--primary)" }} />
-          <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.65 }}>
+          <Lock size={14} className="shrink-0 mt-0.5 text-primary" />
+          <p className="text-xs text-base-content opacity-65">
             Use a password you don't use anywhere else. Avoid using your name, phone number, or
             common words. Changing your password will sign you out of all other devices.
           </p>
@@ -202,11 +203,11 @@ function ChangePasswordSection({ dispatch, loading, errors }) {
       <form onSubmit={handleSubmit} className="space-y-5">
         {pwFields.map((f) => (
           <div key={f.key} className="space-y-1.5">
-            <label className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "var(--base-content)" }}>
-              <KeyRound size={12} style={{ color: "var(--primary)" }} />
+            <label className="text-xs font-semibold flex items-center gap-1.5 text-base-content">
+              <KeyRound size={12} className="text-primary" />
               {f.label}
             </label>
-            <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.45 }}>
+            <p className="text-[11px] text-base-content opacity-45">
               {f.note}
             </p>
             <div className="relative">
@@ -220,14 +221,14 @@ function ChangePasswordSection({ dispatch, loading, errors }) {
               <button
                 type="button"
                 onClick={() => toggleShow(f.showKey)}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                style={{ color: "var(--base-content)", opacity: 0.4 }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content opacity-40"
+               
               >
                 {show[f.showKey] ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
             {fieldErrors[f.key] && (
-              <p className="text-[11px] flex items-center gap-1" style={{ color: "var(--error)" }}>
+              <p className="text-[11px] flex items-center gap-1 text-error">
                 <X size={11} /> {fieldErrors[f.key]}
               </p>
             )}
@@ -297,8 +298,8 @@ function SessionsSection({ sessions, lastLoginAt, lastLoginIp, loginCount, dispa
               {stat.icon}
             </div>
             <div>
-              <p className="text-xs font-bold" style={{ color: "var(--base-content)" }}>{stat.value}</p>
-              <p className="text-[10px]" style={{ color: "var(--base-content)", opacity: 0.45 }}>{stat.label}</p>
+              <p className="text-xs font-bold text-base-content">{stat.value}</p>
+              <p className="text-[10px] text-base-content opacity-45">{stat.label}</p>
             </div>
           </div>
         ))}
@@ -306,30 +307,30 @@ function SessionsSection({ sessions, lastLoginAt, lastLoginIp, loginCount, dispa
 
       {lastLoginIp && (
         <div className="flex items-center gap-2 px-1">
-          <MapPin size={12} style={{ color: "var(--base-content)", opacity: 0.4 }} />
-          <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.45 }}>
+          <MapPin size={12} className="text-base-content opacity-40" />
+          <p className="text-[11px] text-base-content opacity-45">
             Last login IP: <span className="font-mono font-semibold">{lastLoginIp}</span>
           </p>
         </div>
       )}
 
       <div className="flex items-center justify-between">
-        <p className="text-xs font-bold" style={{ color: "var(--base-content)" }}>
+        <p className="text-xs font-bold text-base-content">
           {sessions.length} active session{sessions.length !== 1 ? "s" : ""}
         </p>
         <div className="flex items-center gap-2">
           <button
             onClick={() => dispatch(getSessions())}
-            className="flex items-center gap-1 text-xs font-semibold"
-            style={{ color: "var(--primary)" }}
+            className="flex items-center gap-1 text-xs font-semibold text-primary"
+           
           >
             <RefreshCw size={12} /> Refresh
           </button>
           {sessions.length > 1 && (
             <button
               onClick={() => setRevokeAllConfirm(true)}
-              className="flex items-center gap-1 text-xs font-semibold"
-              style={{ color: "var(--error)" }}
+              className="flex items-center gap-1 text-xs font-semibold text-error"
+             
             >
               <LogOut size={12} /> Revoke All
             </button>
@@ -344,8 +345,8 @@ function SessionsSection({ sessions, lastLoginAt, lastLoginIp, loginCount, dispa
         </div>
       ) : sessions.length === 0 ? (
         <div className="card p-6 flex flex-col items-center gap-3">
-          <History size={28} style={{ color: "var(--base-content)", opacity: 0.2 }} />
-          <p className="text-xs text-center" style={{ color: "var(--base-content)", opacity: 0.5 }}>No active sessions found</p>
+          <History size={28} className="text-base-content opacity-20" />
+          <p className="text-xs text-center text-base-content opacity-50">No active sessions found</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -365,20 +366,20 @@ function SessionsSection({ sessions, lastLoginAt, lastLoginIp, loginCount, dispa
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-xs font-semibold truncate" style={{ color: "var(--base-content)" }}>
+                  <p className="text-xs font-semibold truncate text-base-content">
                     {s.deviceName || "Unknown Device"}
                   </p>
                   {i === 0 && (
                     <span className="badge badge-success !py-0 !px-1.5 !text-[10px] shrink-0">Current</span>
                   )}
                 </div>
-                <p className="text-[11px] mt-0.5 capitalize" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+                <p className="text-[11px] mt-0.5 capitalize text-base-content opacity-50">
                   {s.platform} · {s.ipAddress}
                 </p>
-                <p className="text-[10px] mt-1" style={{ color: "var(--base-content)", opacity: 0.35 }}>
+                <p className="text-[10px] mt-1 text-base-content opacity-35">
                   Active: {formatDateTime(s.lastActiveAt)}
                 </p>
-                <p className="text-[10px]" style={{ color: "var(--base-content)", opacity: 0.3 }}>
+                <p className="text-[10px] text-base-content opacity-30">
                   Signed in: {formatDateTime(s.createdAt)}
                 </p>
               </div>
@@ -386,8 +387,8 @@ function SessionsSection({ sessions, lastLoginAt, lastLoginIp, loginCount, dispa
                 <button
                   onClick={() => dispatch(revokeSession(s._id))}
                   disabled={loading.security}
-                  className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center"
-                  style={{ background: "color-mix(in srgb, var(--error), transparent 88%)", color: "var(--error)" }}
+                  className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center bg-[color-mix(in srgb, var(--error), transparent 88%)] text-error"
+                 
                 >
                   {loading.security ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
                 </button>
@@ -404,8 +405,8 @@ function SessionsSection({ sessions, lastLoginAt, lastLoginIp, loginCount, dispa
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.97 }}
-            className="fixed inset-0 z-50 flex items-end justify-center p-4"
-            style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+            className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/50 backdrop-blur-[4px]"
+           
           >
             <motion.div
               initial={{ y: 40 }}
@@ -414,12 +415,12 @@ function SessionsSection({ sessions, lastLoginAt, lastLoginIp, loginCount, dispa
               className="card w-full max-w-sm p-6 space-y-4"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--warning), transparent 85%)", color: "var(--warning)" }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[color-mix(in srgb, var(--warning), transparent 85%)] text-warning">
                   <LogOut size={18} />
                 </div>
                 <div>
-                  <p className="text-sm font-bold" style={{ color: "var(--base-content)" }}>Revoke All Sessions?</p>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.55 }}>
+                  <p className="text-sm font-bold text-base-content">Revoke All Sessions?</p>
+                  <p className="text-xs mt-0.5 text-base-content opacity-55">
                     All other devices will be signed out immediately
                   </p>
                 </div>
@@ -487,12 +488,12 @@ function EmailVerifySection({ profile, dispatch, loading, errors }) {
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
       {isEmailVerified || verified ? (
         <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="card p-6 flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--success), transparent 82%)" }}>
-            <CheckCircle2 size={32} style={{ color: "var(--success)" }} />
+          <div className="w-16 h-16 rounded-full flex items-center justify-center bg-[color-mix(in srgb, var(--success), transparent 82%)]">
+            <CheckCircle2 size={32} className="text-success" />
           </div>
           <div className="text-center">
-            <p className="text-base font-black" style={{ color: "var(--base-content)" }}>Email Verified</p>
-            <p className="text-xs mt-1" style={{ color: "var(--base-content)", opacity: 0.55 }}>
+            <p className="text-base font-black text-base-content">Email Verified</p>
+            <p className="text-xs mt-1 text-base-content opacity-55">
               Your email address is verified and secure
             </p>
           </div>
@@ -503,13 +504,13 @@ function EmailVerifySection({ profile, dispatch, loading, errors }) {
       ) : (
         <>
           <div className="card p-5 flex items-start gap-3">
-            <Mail size={20} className="shrink-0 mt-0.5" style={{ color: "var(--primary)" }} />
+            <Mail size={20} className="shrink-0 mt-0.5 text-primary" />
             <div>
-              <p className="text-sm font-semibold" style={{ color: "var(--base-content)" }}>
+              <p className="text-sm font-semibold text-base-content">
                 {profile?.email ?? "your email"}
               </p>
-              <p className="text-xs mt-0.5" style={{ color: "var(--warning)" }}>Not yet verified</p>
-              <p className="text-[11px] mt-1" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+              <p className="text-xs mt-0.5 text-warning">Not yet verified</p>
+              <p className="text-[11px] mt-1 text-base-content opacity-50">
                 Verify your email to receive booking confirmations, KYC updates and security alerts
               </p>
             </div>
@@ -529,8 +530,8 @@ function EmailVerifySection({ profile, dispatch, loading, errors }) {
             <div className="space-y-3">
               <div className="glass-card p-4">
                 <div className="flex items-start gap-2">
-                  <Info size={13} className="shrink-0 mt-0.5" style={{ color: "var(--info)" }} />
-                  <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.65 }}>
+                  <Info size={13} className="shrink-0 mt-0.5 text-info" />
+                  <p className="text-xs text-base-content opacity-65">
                     A 6-digit verification code will be sent to your registered email. The code
                     expires in 10 minutes.
                   </p>
@@ -548,10 +549,10 @@ function EmailVerifySection({ profile, dispatch, loading, errors }) {
           ) : (
             <div className="space-y-5">
               <div>
-                <p className="text-xs font-semibold mb-1" style={{ color: "var(--base-content)" }}>
+                <p className="text-xs font-semibold mb-1 text-base-content">
                   Enter 6-digit code
                 </p>
-                <p className="text-[11px] mb-4" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+                <p className="text-[11px] mb-4 text-base-content opacity-50">
                   Check your email inbox. The code expires in 10 minutes.
                 </p>
                 <div className="flex gap-2 justify-center">
@@ -565,13 +566,8 @@ function EmailVerifySection({ profile, dispatch, loading, errors }) {
                       value={digit}
                       onChange={(e) => handleOtpChange(i, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                      className="w-11 h-13 text-center text-lg font-black rounded-xl border-2 outline-none transition-all"
-                      style={{
-                        background: "var(--base-200)",
-                        borderColor: digit ? "var(--primary)" : "var(--base-300)",
-                        color: "var(--base-content)",
-                        height: "52px",
-                      }}
+                      className="w-11 h-13 text-center text-lg font-black rounded-xl border-2 outline-none transition-all bg-base-200 text-base-content h-[52px]"
+                      style={{ borderColor: digit ? "var(--primary)" : "var(--base-300)" }}
                     />
                   ))}
                 </div>
@@ -588,7 +584,7 @@ function EmailVerifySection({ profile, dispatch, loading, errors }) {
               </button>
 
               <div className="flex items-center justify-between">
-                <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+                <p className="text-xs text-base-content opacity-50">
                   Didn't receive it?
                 </p>
                 <button
@@ -663,15 +659,15 @@ function DeleteAccountSection({ dispatch, loading, errors }) {
         <>
           {/* danger header */}
           <div
-            className="rounded-2xl p-5 flex flex-col items-center gap-3 text-center"
-            style={{ background: "color-mix(in srgb, var(--error), transparent 90%)", border: "1px solid color-mix(in srgb, var(--error), transparent 70%)" }}
+            className="rounded-2xl p-5 flex flex-col items-center gap-3 text-center bg-[color-mix(in srgb, var(--error), transparent 90%)] border border-[color-mix(in srgb, var(--error), transparent 70%)]"
+           
           >
-            <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--error), transparent 80%)" }}>
-              <AlertTriangle size={28} style={{ color: "var(--error)" }} />
+            <div className="w-14 h-14 rounded-full flex items-center justify-center bg-[color-mix(in srgb, var(--error), transparent 80%)]">
+              <AlertTriangle size={28} className="text-error" />
             </div>
             <div>
-              <p className="text-sm font-black" style={{ color: "var(--error)" }}>Permanent Action</p>
-              <p className="text-xs mt-1" style={{ color: "var(--base-content)", opacity: 0.65 }}>
+              <p className="text-sm font-black text-error">Permanent Action</p>
+              <p className="text-xs mt-1 text-base-content opacity-65">
                 Deleting your account is irreversible. Your profile, KYC data and payout history
                 will be deactivated. Existing booking records are retained for legal compliance.
               </p>
@@ -680,7 +676,7 @@ function DeleteAccountSection({ dispatch, loading, errors }) {
 
           {/* consequences */}
           <div className="card p-4 space-y-2">
-            <p className="text-xs font-bold mb-2" style={{ color: "var(--base-content)" }}>What happens when you delete:</p>
+            <p className="text-xs font-bold mb-2 text-base-content">What happens when you delete:</p>
             {[
               "Your profile is immediately deactivated",
               "You cannot log in or accept new bookings",
@@ -689,18 +685,18 @@ function DeleteAccountSection({ dispatch, loading, errors }) {
               "KYC documents are retained for 90 days (legal requirement)",
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-2">
-                <X size={12} className="shrink-0 mt-0.5" style={{ color: "var(--error)" }} />
-                <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.65 }}>{item}</p>
+                <X size={12} className="shrink-0 mt-0.5 text-error" />
+                <p className="text-xs text-base-content opacity-65">{item}</p>
               </div>
             ))}
           </div>
 
           {/* reason */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold" style={{ color: "var(--base-content)" }}>
+            <label className="text-xs font-semibold text-base-content">
               Reason for leaving (optional)
             </label>
-            <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.45 }}>
+            <p className="text-[11px] text-base-content opacity-45">
               Your feedback helps us improve. This is entirely optional.
             </p>
             <div className="grid gap-2">
@@ -735,8 +731,8 @@ function DeleteAccountSection({ dispatch, loading, errors }) {
           <button
             onClick={handleRequestDeletion}
             disabled={loading.security}
-            className="w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all"
-            style={{ background: "var(--error)", color: "var(--error-content)" }}
+            className="w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all bg-error text-error-content"
+           
           >
             {loading.security ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
             {loading.security ? "Sending code…" : "Send Deletion Confirmation Code"}
@@ -748,19 +744,19 @@ function DeleteAccountSection({ dispatch, loading, errors }) {
       {step === 2 && (
         <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="space-y-5">
           <div className="card p-5 flex flex-col items-center gap-3 text-center">
-            <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--warning), transparent 85%)" }}>
-              <Mail size={26} style={{ color: "var(--warning)" }} />
+            <div className="w-14 h-14 rounded-full flex items-center justify-center bg-[color-mix(in srgb, var(--warning), transparent 85%)]">
+              <Mail size={26} className="text-warning" />
             </div>
             <div>
-              <p className="text-sm font-black" style={{ color: "var(--base-content)" }}>Check Your Email</p>
-              <p className="text-xs mt-1" style={{ color: "var(--base-content)", opacity: 0.55 }}>
+              <p className="text-sm font-black text-base-content">Check Your Email</p>
+              <p className="text-xs mt-1 text-base-content opacity-55">
                 A 6-digit confirmation code was sent to your registered email. It expires in 15 minutes.
               </p>
             </div>
           </div>
 
           <div className="space-y-3">
-            <p className="text-xs font-semibold text-center" style={{ color: "var(--base-content)" }}>
+            <p className="text-xs font-semibold text-center text-base-content">
               Enter confirmation code
             </p>
             <div className="flex gap-2 justify-center">
@@ -774,18 +770,13 @@ function DeleteAccountSection({ dispatch, loading, errors }) {
                   value={digit}
                   onChange={(e) => handleOtpChange(i, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                  className="w-11 text-center text-lg font-black rounded-xl border-2 outline-none transition-all"
-                  style={{
-                    background: "var(--base-200)",
-                    borderColor: digit ? "var(--error)" : "var(--base-300)",
-                    color: "var(--base-content)",
-                    height: "52px",
-                  }}
+                  className="w-11 text-center text-lg font-black rounded-xl border-2 outline-none transition-all bg-base-200 text-base-content h-[52px]"
+                  style={{ borderColor: digit ? "var(--error)" : "var(--base-300)" }}
                 />
               ))}
             </div>
             {otpError && (
-              <p className="text-[11px] text-center flex items-center justify-center gap-1" style={{ color: "var(--error)" }}>
+              <p className="text-[11px] text-center flex items-center justify-center gap-1 text-error">
                 <X size={11} /> {otpError}
               </p>
             )}
@@ -861,15 +852,11 @@ export default function SecurityPage() {
   }[section] ?? "var(--primary)";
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--base-100)" }}>
+    <div className="min-h-screen bg-base-100">
       {/* ── sticky header ── */}
       <div
-        className="sticky top-0 z-20 px-4 pt-5 pb-3"
-        style={{
-          background: "color-mix(in srgb, var(--base-100) 92%, transparent)",
-          backdropFilter: "blur(14px)",
-          borderBottom: "1px solid var(--base-300)",
-        }}
+        className="sticky top-0 z-20 px-4 pt-5 pb-3 bg-[color-mix(in srgb, var(--base-100) 92%, transparent)] backdrop-blur-[14px] border-b border-base-300"
+       
       >
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
                      <BackButton className='my-3' />
@@ -877,10 +864,10 @@ export default function SecurityPage() {
           <p className="text-[11px] font-bold uppercase tracking-widest mb-0.5" style={{ color: sectionColor }}>
             Account Security
           </p>
-          <h1 className="!text-xl !font-black !leading-tight" style={{ color: "var(--base-content)" }}>
+          <h1 className="!text-xl !font-black !leading-tight text-base-content">
             {sectionTitle}
           </h1>
-          <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+          <p className="text-xs mt-0.5 text-base-content opacity-50">
             {sectionSubtitle}
           </p>
         </motion.div>

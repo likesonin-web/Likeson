@@ -25,10 +25,10 @@ const CARD_VARIANTS = {
 const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="px-3 py-2 rounded-xl text-xs font-semibold shadow-xl"
-      style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)', color: 'var(--base-content)' }}>
+    <div className="px-3 py-2 rounded-xl text-xs font-semibold shadow-xl bg-base-200 border border-base-300 text-base-content"
+     >
       {payload.map((p, i) => (
-        <p key={i}>{p.name}: <span style={{ color: 'var(--primary)' }}>{p.value}</span></p>
+        <p key={i}>{p.name}: <span className="text-primary">{p.value}</span></p>
       ))}
     </div>
   );
@@ -76,28 +76,28 @@ export default function PerformancePage() {
 
   if (loading.performance && !performance) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--base-100)' }}>
+      <div className="min-h-screen flex items-center justify-center bg-base-100">
         <div className="spinner w-10 h-10" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--base-100)' }}>
+    <div className="min-h-screen bg-base-100">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
         className="px-6 pt-8 pb-4">
                      <BackButton className='my-3' />
           
         <div className="flex items-center gap-3 mb-1">
-          <div className="p-2 rounded-xl" style={{ background: 'color-mix(in srgb, var(--primary), transparent 85%)' }}>
-            <Activity size={22} style={{ color: 'var(--primary)' }} />
+          <div className="p-2 rounded-xl bg-[color-mix(in srgb, var(--primary), transparent 85%)]">
+            <Activity size={22} className="text-primary" />
           </div>
-          <h1 className="text-2xl font-extrabold font-montserrat" style={{ color: 'var(--base-content)' }}>
+          <h1 className="text-2xl font-extrabold font-montserrat text-base-content">
             Performance & Earnings
           </h1>
         </div>
-        <p className="text-sm ml-12" style={{ color: 'color-mix(in oklch, var(--base-content) 55%, transparent)' }}>
+        <p className="text-sm ml-12 text-[color-mix(in oklch, var(--base-content) 55%, transparent)]">
           Your career metrics and payout summary
         </p>
       </motion.div>
@@ -115,7 +115,7 @@ export default function PerformancePage() {
                   style={{ background: `color-mix(in srgb, ${m.color}, transparent 88%)` }}>
                   <Icon size={16} style={{ color: m.color }} />
                 </div>
-                <div className="stat-card-value" style={{ color: m.color, fontSize: '1.5rem' }}>{m.value}</div>
+                <div className="stat-card-value text-[1.5rem]" style={{ color: m.color }}>{m.value}</div>
                 <div className="stat-card-label">{m.label}</div>
               </motion.div>
             );
@@ -128,7 +128,7 @@ export default function PerformancePage() {
           {/* Radar */}
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.25 }} className="card p-5">
-            <h3 className="text-sm font-extrabold font-montserrat mb-4" style={{ color: 'var(--base-content)' }}>
+            <h3 className="text-sm font-extrabold font-montserrat mb-4 text-base-content">
               Performance Radar
             </h3>
             <ResponsiveContainer width="100%" height={250}>
@@ -143,7 +143,7 @@ export default function PerformancePage() {
           {/* Bar */}
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3 }} className="card p-5">
-            <h3 className="text-sm font-extrabold font-montserrat mb-4" style={{ color: 'var(--base-content)' }}>
+            <h3 className="text-sm font-extrabold font-montserrat mb-4 text-base-content">
               Task Breakdown
             </h3>
             <ResponsiveContainer width="100%" height={250}>
@@ -165,8 +165,8 @@ export default function PerformancePage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }} className="card p-6">
           <div className="flex items-center gap-2 mb-5">
-            <IndianRupee size={20} style={{ color: 'var(--primary)' }} />
-            <h3 className="font-extrabold font-montserrat text-base" style={{ color: 'var(--base-content)' }}>
+            <IndianRupee size={20} className="text-primary" />
+            <h3 className="font-extrabold font-montserrat text-base text-base-content">
               Earnings Snapshot
             </h3>
           </div>
@@ -180,8 +180,8 @@ export default function PerformancePage() {
               <div key={label} className="text-center p-3 rounded-xl"
                 style={{ background: `color-mix(in srgb, ${color}, transparent 92%)` }}>
                 <p className="text-xl font-extrabold font-montserrat" style={{ color }}>{value}</p>
-                <p className="text-xs font-semibold mt-1"
-                  style={{ color: 'color-mix(in oklch, var(--base-content) 55%, transparent)' }}>{label}</p>
+                <p className="text-xs font-semibold mt-1 text-[color-mix(in oklch, var(--base-content) 55%, transparent)]"
+                 >{label}</p>
               </div>
             ))}
           </div>
@@ -191,11 +191,11 @@ export default function PerformancePage() {
         {p.lastTaskAt && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
             className="card p-4 flex items-center gap-4">
-            <Award size={20} style={{ color: 'var(--accent)' }} />
+            <Award size={20} className="text-accent" />
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest"
-                style={{ color: 'color-mix(in oklch, var(--base-content) 45%, transparent)' }}>Last Task Completed</p>
-              <p className="text-sm font-semibold" style={{ color: 'var(--base-content)' }}>
+              <p className="text-xs font-bold uppercase tracking-widest text-[color-mix(in oklch, var(--base-content) 45%, transparent)]"
+               >Last Task Completed</p>
+              <p className="text-sm font-semibold text-base-content">
                 {new Date(p.lastTaskAt).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
             </div>

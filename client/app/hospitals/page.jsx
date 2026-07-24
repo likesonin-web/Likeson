@@ -807,19 +807,34 @@ export default function HospitalsPage() {
             <div className="absolute -bottom-[20%] -right-[10%] w-[50%] h-[60%] bg-secondary/10 dark:bg-secondary/15 blur-[100px] md:blur-[140px] rounded-full" />
           </div>
 
-          {/* ── 2. Grid Texture (Restricted to Center Only) ── */}
+{/* ── 2. Grid Texture (Restricted to Center Only) ── */}
           <div
-            className="absolute inset-0 pointer-events-none opacity-[0.04] dark:opacity-[0.08] text-base-content"
+            className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.05]"
             style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm39 39V1H1v38h38z' fill='currentColor' fill-rule='evenodd'/%3E%3C/svg%3E")`,
               /* Masks the pattern so it only exists in the middle and completely disappears at the edges */
-              WebkitMaskImage:
-                "radial-gradient(circle at center, black 10%, transparent 65%)",
-              maskImage:
-                "radial-gradient(circle at center, black 10%, transparent 65%)",
+              WebkitMaskImage: "radial-gradient(circle at center, black 10%, transparent 65%)",
+              maskImage: "radial-gradient(circle at center, black 10%, transparent 65%)",
             }}
             aria-hidden="true"
-          />
+          >
+            <svg className="w-full h-full text-base-content" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern
+                  id="doctor-cross-pattern"
+                  width="60"
+                  height="60"
+                  patternUnits="userSpaceOnUse"
+                >
+                  {/* Medical Cross SVG Path */}
+                  <path
+                    d="M27 21h6v8h8v6h-8v8h-6v-8h-8v-6h8v-8z"
+                    fill="currentColor"
+                  />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#doctor-cross-pattern)" />
+            </svg>
+          </div>
 
           <div className="container-custom relative z-10 py-10 md:py-16">
             {/* ── 3. Go Back Button ── */}

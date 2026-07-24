@@ -138,24 +138,20 @@ export default function StatusPage() {
   const activeConfig = STATUSES.find((s) => s.key === currentStatus) || STATUSES[2];
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--base-100)" }}>
+    <div className="min-h-screen bg-base-100">
       {/* ── Sticky header ── */}
       <div
-        className="sticky top-0 z-20 px-4 pt-5 pb-3"
-        style={{
-          background: "color-mix(in srgb, var(--base-100) 92%, transparent)",
-          backdropFilter: "blur(14px)",
-          borderBottom: "1px solid var(--base-300)",
-        }}
+        className="sticky top-0 z-20 px-4 pt-5 pb-3 bg-[color-mix(in srgb, var(--base-100) 92%, transparent)] backdrop-blur-[14px] border-b border-base-300"
+       
       >
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
           <p className="text-[11px] font-bold uppercase tracking-widest mb-0.5" style={{ color: activeConfig.color }}>
             Activity Status
           </p>
-          <h1 className="!text-xl !font-black !leading-tight" style={{ color: "var(--base-content)" }}>
+          <h1 className="!text-xl !font-black !leading-tight text-base-content">
             My Status
           </h1>
-          <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+          <p className="text-xs mt-0.5 text-base-content opacity-50">
             Let patients and the platform know your current activity
           </p>
         </motion.div>
@@ -182,8 +178,8 @@ export default function StatusPage() {
           style={{ background: activeConfig.bg, border: `2px solid ${activeConfig.border}` }}
         >
           <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-            style={{ background: "white", color: activeConfig.color }}
+            className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 bg-[white]"
+            style={{ color: activeConfig.color }}
           >
             {activeConfig.icon}
           </div>
@@ -194,13 +190,13 @@ export default function StatusPage() {
                 {activeConfig.label}
               </p>
               <span
-                className="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                style={{ background: "rgba(255,255,255,0.7)", color: activeConfig.color }}
+                className="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/70"
+                style={{ color: activeConfig.color }}
               >
                 Current
               </span>
             </div>
-            <p className="text-[11px] mt-1" style={{ color: "var(--base-content)", opacity: 0.65 }}>
+            <p className="text-[11px] mt-1 text-base-content opacity-65">
               {activeConfig.note}
             </p>
           </div>
@@ -211,11 +207,11 @@ export default function StatusPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex items-start gap-2 px-3 py-2.5 rounded-xl"
-            style={{ background: "color-mix(in srgb, var(--warning), transparent 88%)" }}
+            className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-[color-mix(in srgb, var(--warning), transparent 88%)]"
+           
           >
-            <Info size={13} className="shrink-0 mt-0.5" style={{ color: "var(--warning)" }} />
-            <p className="text-[11px]" style={{ color: "var(--warning)" }}>
+            <Info size={13} className="shrink-0 mt-0.5 text-warning" />
+            <p className="text-[11px] text-warning">
               You're currently offline. Go to the Availability page and toggle Online first before changing your status.
             </p>
           </motion.div>
@@ -224,8 +220,8 @@ export default function StatusPage() {
         {/* ── Status picker ── */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 px-1">
-            <Activity size={14} style={{ color: "var(--primary)" }} />
-            <p className="text-xs font-bold" style={{ color: "var(--base-content)" }}>
+            <Activity size={14} className="text-primary" />
+            <p className="text-xs font-bold text-base-content">
               Change Status
             </p>
           </div>
@@ -271,14 +267,14 @@ export default function StatusPage() {
                       </p>
                       {!s.selfSet && (
                         <span
-                          className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
-                          style={{ background: "color-mix(in srgb, var(--base-content), transparent 85%)", color: "var(--base-content)" }}
+                          className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[color-mix(in srgb, var(--base-content), transparent 85%)] text-base-content"
+                         
                         >
                           System Only
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] mt-0.5" style={{ color: "var(--base-content)", opacity: 0.55 }}>
+                    <p className="text-[11px] mt-0.5 text-base-content opacity-55">
                       {s.note}
                     </p>
                   </div>
@@ -298,25 +294,25 @@ export default function StatusPage() {
         <div className="glass-card p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Zap size={13} style={{ color: activeConfig.color }} />
-            <p className="text-xs font-bold" style={{ color: "var(--base-content)" }}>
+            <p className="text-xs font-bold text-base-content">
               Tips for "{activeConfig.label}" status
             </p>
           </div>
           {activeConfig.tips.map((tip, i) => (
             <div key={i} className="flex items-start gap-2">
               <Clock size={11} className="shrink-0 mt-0.5" style={{ color: activeConfig.color }} />
-              <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.6 }}>{tip}</p>
+              <p className="text-[11px] text-base-content opacity-60">{tip}</p>
             </div>
           ))}
         </div>
 
         {/* ── Status history note ── */}
         <div
-          className="flex items-start gap-2 px-3 py-3 rounded-xl"
-          style={{ background: "color-mix(in srgb, var(--info), transparent 90%)" }}
+          className="flex items-start gap-2 px-3 py-3 rounded-xl bg-[color-mix(in srgb, var(--info), transparent 90%)]"
+         
         >
-          <Info size={12} className="shrink-0 mt-0.5" style={{ color: "var(--info)" }} />
-          <p className="text-[11px]" style={{ color: "var(--info)" }}>
+          <Info size={12} className="shrink-0 mt-0.5 text-info" />
+          <p className="text-[11px] text-info">
             Status changes are logged by the system. Your availability history may be reviewed during performance evaluations.
           </p>
         </div>

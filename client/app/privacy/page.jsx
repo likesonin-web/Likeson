@@ -61,7 +61,7 @@ function SectionAccordion({ section, index }) {
         </span>
 
         <span className="flex-1 min-w-0">
-          <span className="font-montserrat font-black text-xs text-base-content block">
+          <span className="font-montserrat font-black text-[16px] text-base-content block">
             {section.title}
           </span>
           {section.isKey && (

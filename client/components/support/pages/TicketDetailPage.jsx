@@ -49,7 +49,7 @@ export default function TicketDetailPage({ ticketId, backHref, currentUser, logi
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !ticketId) return;
     dispatch(fetchTicketById(ticketId));
     dispatch(fetchParticipants(ticketId));
     dispatch(fetchTicketTimeline({ ticketId }));
@@ -122,11 +122,11 @@ export default function TicketDetailPage({ ticketId, backHref, currentUser, logi
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2 card overflow-hidden" style={{ height: '65vh' }}>
+        <div className="xl:col-span-2 card overflow-hidden h-[65vh]">
           <ChatWindow ticketId={ticketId} currentUser={currentUser} />
         </div>
 
-        <div className="card p-4 overflow-y-auto" style={{ height: '65vh' }}>
+        <div className="card p-4 overflow-y-auto h-[65vh]">
           <div className="flex gap-1 mb-4 border-b border-base-300">
             {TABS.filter((t) => t !== 'Audit' || staff).map((tab) => (
               <button

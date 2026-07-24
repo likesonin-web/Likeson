@@ -13,20 +13,17 @@ import {
   FileText,
   Bell,
   ShieldCheck,
-  Settings2,
   LogOut,
   UserRound,
-  History,
   Smartphone,
   CheckCircle2,
   MapPin,
   KeyRound,
-  SquareUserRound,
   Shield,
   Settings,
   ClipboardList,
   CalendarCheck,
-  FileClock,
+  Headset, // Added for Support
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,101 +31,108 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const HOSPITAL_MANAGER_DASHBOARD_LINKS = [
-  // ── 1. Command Centre ────────────────────────────────────────────────────
+  // ── 1. Dashboard (Simplified from Command Centre) ────────────────────────
   {
-    title: "Command Centre",
+    title: "Dashboard",
     icons: <LayoutDashboard size={20} />,
     links: [
-      { name: "Overview",       href: "/hospital-manager/dashboard",  icon: <LayoutDashboard size={18} /> },
-      { name: "Onboarding",     href: "/hospital-manager/onboarding", icon: <CheckCircle2 size={18} />    },
+      { name: "Overview",       href: "/hospital-manager/dashboard",     icon: <LayoutDashboard size={18} /> },
+      { name: "Setup Guide",    href: "/hospital-manager/onboarding",    icon: <CheckCircle2 size={18} />    },
       { name: "Notifications",  href: "/hospital-manager/notifications", icon: <Bell size={18} />         },
     ],
   },
 
-  // ── 2. Medical Logistics (NEW: Integrated from Booking Router) ───────────
+  // ── 2. Appointments (Simplified from Patient Operations) ─────────────────
   {
-    title: "Patient Operations",
-    icons: <ClipboardList size={20} />,
+    title: "Appointments",
+    icons: <CalendarCheck size={20} />,
     links: [
-      { name: "Upcoming Bookings",  href: "/hospital-manager/bookings/upcoming",  icon: <CalendarCheck size={18} /> },
-      { name: "All OP Records",     href: "/hospital-manager/ops",               icon: <ClipboardList size={18} /> },
-          
+      { name: "Upcoming",       href: "/hospital-manager/bookings/upcoming", icon: <CalendarCheck size={18} /> },
+      { name: "All Records",    href: "/hospital-manager/ops",               icon: <ClipboardList size={18} /> },
     ],
   },
 
-  // ── 3. Clinical Profile ──────────────────────────────────────────────────
+  // ── 3. Hospital Details (Simplified from Facility Management) ────────────
   {
-    title: "Facility Management",
+    title: "Hospital Details",
     icons: <Hospital size={20} />,
     links: [
-      { name: "Hospital Profile", href: "/hospital-manager/profile",       icon: <Hospital size={18} />  },
-      { name: "Location & GPS",   href: "/hospital-manager/location",      icon: <MapPin size={18} />    },
-      { name: "Operating Hours",  href: "/hospital-manager/operating-hours",icon: <Clock size={18} />     },
-      { name: "Gallery & Logo",   href: "/hospital-manager/gallery",       icon: <ImageIcon size={18} /> },
-      { name: "Legal & Licenses", href: "/hospital-manager/registration",  icon: <FileText size={18} />  },
+      { name: "Profile",        href: "/hospital-manager/profile",         icon: <Hospital size={18} />  },
+      { name: "Location",       href: "/hospital-manager/location",        icon: <MapPin size={18} />    },
+      { name: "Timings",        href: "/hospital-manager/operating-hours", icon: <Clock size={18} />     },
+      { name: "Photos",         href: "/hospital-manager/gallery",         icon: <ImageIcon size={18} /> },
+      { name: "Documents",      href: "/hospital-manager/registration",    icon: <FileText size={18} />  },
     ],
   },
 
-  // ── 4. Doctor Network ────────────────────────────────────────────────────
+  // ── 4. Doctors (Simplified from Medical Staff) ───────────────────────────
   {
-    title: "Medical Staff",
+    title: "Doctors",
     icons: <Stethoscope size={20} />,
     links: [
-      { name: "Linked Doctors",  href: "/hospital-manager/doctors",        icon: <Users size={18} />       },
-      { name: "Find & Link",     href: "/hospital-manager/doctors/search", icon: <Search size={18} />      },
-      { name: "Staff Stats",     href: "/hospital-manager/doctors/stats",  icon: <UserCog size={18} />     },
-      { name: "Availability",    href: "/hospital-manager/doctors/availability", icon: <CalendarDays size={18} /> },
+      { name: "Our Doctors",    href: "/hospital-manager/doctors",              icon: <Users size={18} />       },
+      { name: "Add Doctor",     href: "/hospital-manager/doctors/search",       icon: <Search size={18} />      },
+      { name: "Performance",    href: "/hospital-manager/doctors/stats",        icon: <UserCog size={18} />     },
+      { name: "Schedules",      href: "/hospital-manager/doctors/availability", icon: <CalendarDays size={18} /> },
     ],
   },
 
-  // ── 5. Financials ────────────────────────────────────────────────────────
+  // ── 5. Pricing (Simplified from Commercials) ─────────────────────────────
   {
-    title: "Commercials",
+    title: "Pricing",
     icons: <CircleDollarSign size={20} />,
     links: [
-      { name: "Consultation Pricing", href: "/hospital-manager/pricing", icon: <CircleDollarSign size={18} /> },
+      { name: "Doctor Fees",    href: "/hospital-manager/pricing", icon: <CircleDollarSign size={18} /> },
     ],
   },
 
-  // ── 6. Account & Security ────────────────────────────────────────────────
+  // ── 6. Settings (Simplified from Settings & Security) ────────────────────
   {
-    title: "Settings & Security",
-    icons: <Settings2 size={20} />,
+    title: "Settings",
+    icons: <Settings size={20} />,
     links: [
-      { name: "Account Details",    href: "/hospital-manager/settings/account", icon: <UserRound size={18} />    },
-      { name: "Active Sessions",    href: "/hospital-manager/security/sessions", icon: <Smartphone size={18} />  },
-      { name: "Security & Password", href: "/hospital-manager/security/password", icon: <KeyRound size={18} />    },
-      
+      { name: "My Account",     href: "/hospital-manager/settings/account",  icon: <UserRound size={18} />   },
+      { name: "Security",       href: "/hospital-manager/security/password", icon: <KeyRound size={18} />    },
+      { name: "Active Devices", href: "/hospital-manager/security/sessions", icon: <Smartphone size={18} />  },
+    ],
+  },
+
+  // ── 7. Help & Support (NEW) ──────────────────────────────────────────────
+  {
+    title: "Help & Support",
+    icons: <Headset size={20} />,
+    links: [
+      { name: "Contact Support", href: "/hospital-manager/support", icon: <Headset size={18} /> },
     ],
   },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TOP-RIGHT QUICK ACCESS (Updated with Booking actions)
+// TOP-RIGHT QUICK ACCESS (Simplified names & Added Support)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const HOSPITAL_MANAGER_TOP_RIGHT_LINKS = [
-  { name: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/hospital-manager/dashboard" },
+  { name: "Home",    icon: <LayoutDashboard size={18} />, href: "/hospital-manager/dashboard" },
+  { name: "Support", icon: <Headset size={18} />,         href: "/hospital-manager/support" }, // New Quick Access
   {
     name: "Quick Actions",
     icon: <UserCog size={18} />,
     links: [
-      { name: "Confirm Appts", href: "/hospital-manager/bookings/upcoming", icon: <CalendarCheck size={18} /> },
-      { name: "Link Doctor",   href: "/hospital-manager/doctors/search",   icon: <Users size={18} /> },
-      { name: "Update Prices", href: "/hospital-manager/pricing",          icon: <CircleDollarSign size={18} /> },
+      { name: "Appointments", href: "/hospital-manager/bookings/upcoming", icon: <CalendarCheck size={18} /> },
+      { name: "Add Doctor",   href: "/hospital-manager/doctors/search",    icon: <Users size={18} /> },
+      { name: "Update Fees",  href: "/hospital-manager/pricing",           icon: <CircleDollarSign size={18} /> },
     ],
   },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PROFILE DROPDOWN
+// PROFILE DROPDOWN (Removed redundant links & Added Support)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const HOSPITAL_MANAGER_PROFILE_LINKS = [
-  { name: "Manager Profile", href: "/hospital-manager/settings/account", icon: <UserRound size={18} />  },
-  { name: "Active Sessions", href: "/hospital-manager/security/sessions", icon: <ShieldCheck size={18} /> },
-  { name: 'Settings',    href: '/settings',            icon: <Settings size={18}/>        },
-  { name: 'My Account',  href: '/settings/account',    icon: <SquareUserRound size={18} /> },
-  { name: 'Security',    href: '/settings/security',   icon: <Shield size={18} />          },
-  { name: "Logout",          href: "/logout",                            icon: <LogOut size={18} />      },
+  { name: "My Profile",  href: "/hospital-manager/settings/account",  icon: <UserRound size={18} />  },
+  { name: "Security",    href: "/hospital-manager/security/password", icon: <Shield size={18} />     },
+  { name: "Settings",    href: "/settings",                           icon: <Settings size={18}/>    },
+  { name: "Support",     href: "/hospital-manager/support",           icon: <Headset size={18} />    }, // New Profile Link
+  { name: "Logout",      href: "/logout",                             icon: <LogOut size={18} />     },
 ];

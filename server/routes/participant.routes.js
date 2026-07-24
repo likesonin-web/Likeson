@@ -1,16 +1,28 @@
-// routes/participant.routes.js
+/**
+ * participant.routes.js — Likeson.in
+ * Business logic lives in controllers/participant.controller.js.
+ * This file only wires paths + middleware + controller functions.
+ *
+ * NOTE: mergeParams MUST be true here because this router is mounted
+ * as a nested router under a parent path that contains :ticketId, e.g.:
+ *   app.use('/api/tickets/:ticketId/participants', participantRoutes);
+ * Without mergeParams, req.params.ticketId is undefined inside this
+ * router, which is why ticketIdParamSchema validation was failing.
+ */
 
-import { Router } from 'express';
-import asyncHandler from '../utils/asyncHandler.js';
+import express from 'express';
 import { protect, getDeviceInfo } from '../middleware/authMiddleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import { mongoSanitize } from '../middleware/mongoSanitize.middleware.js';
 import { loadTicketAndCheckAccess } from '../middleware/ticketAccess.middleware.js';
-import { addParticipantSchema, removeParticipantSchema } from '../validators/ticket.validator.js';
-import { ticketIdParamSchema } from '../validators/ticket.validator.js';
-import * as participantService from '../services/participant.service.js';
+import {
+  addParticipantSchema,
+  removeParticipantSchema,
+  ticketIdParamSchema,
+} from '../validators/ticket.validator.js';
+import * as ctrl from '../controllers/participant.controller.js';
 
-const router = Router({ mergeParams: true });
+const router = express.Router({ mergeParams: true }); // ✅ fix: was express.Router() with no mergeParams
 
 router.use(protect, getDeviceInfo, mongoSanitize);
 
@@ -18,10 +30,7 @@ router.get(
   '/',
   validate(ticketIdParamSchema, 'params'),
   loadTicketAndCheckAccess,
-  asyncHandler(async (req, res) => {
-    const participants = await participantService.listParticipants(req.params.ticketId);
-    res.status(200).json({ success: true, data: participants });
-  })
+  ctrl.get
 );
 
 router.post(
@@ -29,17 +38,7 @@ router.post(
   validate(ticketIdParamSchema, 'params'),
   validate(addParticipantSchema),
   loadTicketAndCheckAccess,
-  asyncHandler(async (req, res) => {
-    const participant = await participantService.addParticipant({
-      ticketId: req.params.ticketId,
-      actor: req.user,
-      deviceInfo: req.deviceInfo,
-      userId: req.body.userId,
-      role: req.body.role,
-      io: req.app.get('io'),
-    });
-    res.status(201).json({ success: true, data: participant });
-  })
+  ctrl.post
 );
 
 router.delete(
@@ -47,17 +46,7 @@ router.delete(
   validate(ticketIdParamSchema, 'params'),
   validate(removeParticipantSchema),
   loadTicketAndCheckAccess,
-  asyncHandler(async (req, res) => {
-    const participant = await participantService.removeParticipant({
-      ticketId: req.params.ticketId,
-      actor: req.user,
-      deviceInfo: req.deviceInfo,
-      userId: req.params.userId,
-      reason: req.body.reason,
-      io: req.app.get('io'),
-    });
-    res.status(200).json({ success: true, data: participant });
-  })
+  ctrl.deleteByUserId
 );
 
 export default router;

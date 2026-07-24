@@ -133,24 +133,20 @@ export default function AvailabilityPage() {
   const activeStatus = STATUS_OPTIONS.find((s) => s.key === currentStatus) || STATUS_OPTIONS[2];
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--base-100)" }}>
+    <div className="min-h-screen bg-base-100">
       {/* ── Sticky header ── */}
       <div
-        className="sticky top-0 z-20 px-4 pt-5 pb-3"
-        style={{
-          background: "color-mix(in srgb, var(--base-100) 92%, transparent)",
-          backdropFilter: "blur(14px)",
-          borderBottom: "1px solid var(--base-300)",
-        }}
+        className="sticky top-0 z-20 px-4 pt-5 pb-3 bg-[color-mix(in srgb, var(--base-100) 92%, transparent)] backdrop-blur-[14px] border-b border-base-300"
+       
       >
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-          <p className="text-[11px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "var(--primary)" }}>
+          <p className="text-[11px] font-bold uppercase tracking-widest mb-0.5 text-primary">
             Work Status
           </p>
-          <h1 className="!text-xl !font-black !leading-tight" style={{ color: "var(--base-content)" }}>
+          <h1 className="!text-xl !font-black !leading-tight text-base-content">
             Availability
           </h1>
-          <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+          <p className="text-xs mt-0.5 text-base-content opacity-50">
             Control when and where you accept care bookings
           </p>
         </motion.div>
@@ -180,8 +176,8 @@ export default function AvailabilityPage() {
           <div className="relative">
             {isOnline && (
               <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{ background: "var(--success)" }}
+                className="absolute inset-0 rounded-full bg-success"
+               
                 animate={{ scale: [1, 1.5, 1], opacity: [0.4, 0, 0.4] }}
                 transition={{ duration: 2, repeat: Infinity }}
               />
@@ -195,20 +191,20 @@ export default function AvailabilityPage() {
               }}
             >
               {isOnline
-                ? <Wifi size={32} style={{ color: "var(--success)" }} />
-                : <WifiOff size={32} style={{ color: "var(--base-content)", opacity: 0.4 }} />
+                ? <Wifi size={32} className="text-success" />
+                : <WifiOff size={32} className="text-base-content opacity-40" />
               }
             </div>
           </div>
 
           <div className="text-center">
-            <p className="text-base font-black" style={{ color: "var(--base-content)" }}>
+            <p className="text-base font-black text-base-content">
               You are currently{" "}
               <span style={{ color: isOnline ? "var(--success)" : "var(--base-content)" }}>
                 {isOnline ? "Online" : "Offline"}
               </span>
             </p>
-            <p className="text-xs mt-1" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+            <p className="text-xs mt-1 text-base-content opacity-50">
               {isOnline
                 ? "Patients can find and book you right now"
                 : "You won't receive any booking requests"}
@@ -219,29 +215,26 @@ export default function AvailabilityPage() {
           <button
             onClick={handleToggle}
             disabled={toggling || loading.availability}
-            className="relative w-20 h-10 rounded-full transition-all duration-300 flex items-center"
-            style={{
-              background: isOnline ? "var(--success)" : "var(--base-300)",
-              padding: "3px",
-            }}
+            className="relative w-20 h-10 rounded-full transition-all duration-300 flex items-center p-[3px]"
+            style={{ background: isOnline ? "var(--success)" : "var(--base-300)" }}
           >
             <motion.div
               layout
-              className="w-8 h-8 rounded-full flex items-center justify-center shadow-md"
-              style={{ background: "white" }}
+              className="w-8 h-8 rounded-full flex items-center justify-center shadow-md bg-[white]"
+             
               animate={{ x: isOnline ? 40 : 0 }}
               transition={{ type: "spring", stiffness: 500, damping: 30 }}
             >
               {toggling
-                ? <Loader2 size={14} className="animate-spin" style={{ color: "var(--base-300)" }} />
+                ? <Loader2 size={14} className="animate-spin text-base-300" />
                 : isOnline
-                  ? <Sun size={14} style={{ color: "var(--success)" }} />
-                  : <Moon size={14} style={{ color: "var(--base-300)" }} />
+                  ? <Sun size={14} className="text-success" />
+                  : <Moon size={14} className="text-base-300" />
               }
             </motion.div>
           </button>
 
-          <p className="text-[11px] text-center" style={{ color: "var(--base-content)", opacity: 0.4 }}>
+          <p className="text-[11px] text-center text-base-content opacity-40">
             {toggling ? "Updating your status…" : "Tap the toggle to go online or offline"}
           </p>
         </motion.div>
@@ -256,17 +249,17 @@ export default function AvailabilityPage() {
               className="space-y-3"
             >
               <div className="flex items-center gap-2 px-1">
-                <Activity size={14} style={{ color: "var(--primary)" }} />
-                <p className="text-xs font-bold" style={{ color: "var(--base-content)" }}>
+                <Activity size={14} className="text-primary" />
+                <p className="text-xs font-bold text-base-content">
                   Current Activity Status
                 </p>
               </div>
               <div
-                className="flex items-start gap-2 px-3 py-2 rounded-xl"
-                style={{ background: "color-mix(in srgb, var(--info), transparent 90%)" }}
+                className="flex items-start gap-2 px-3 py-2 rounded-xl bg-[color-mix(in srgb, var(--info), transparent 90%)]"
+               
               >
-                <Info size={12} className="shrink-0 mt-0.5" style={{ color: "var(--info)" }} />
-                <p className="text-[11px]" style={{ color: "var(--info)" }}>
+                <Info size={12} className="shrink-0 mt-0.5 text-info" />
+                <p className="text-[11px] text-info">
                   Set your current activity so patients know if you're ready, on a short break, or stepping away.
                 </p>
               </div>
@@ -305,7 +298,7 @@ export default function AvailabilityPage() {
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] mt-0.5" style={{ color: "var(--base-content)", opacity: 0.55 }}>
+                        <p className="text-[11px] mt-0.5 text-base-content opacity-55">
                           {s.note}
                         </p>
                       </div>
@@ -323,12 +316,12 @@ export default function AvailabilityPage() {
         {/* ── Current City ── */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <MapPin size={14} style={{ color: "var(--primary)" }} />
-            <label className="text-xs font-bold" style={{ color: "var(--base-content)" }}>
+            <MapPin size={14} className="text-primary" />
+            <label className="text-xs font-bold text-base-content">
               Current City / Area
             </label>
           </div>
-          <p className="text-[11px] px-1" style={{ color: "var(--base-content)", opacity: 0.45 }}>
+          <p className="text-[11px] px-1 text-base-content opacity-45">
             Tell patients which city or neighbourhood you're working in today. This helps them find you faster and improves your booking matches.
           </p>
           <input
@@ -343,12 +336,12 @@ export default function AvailabilityPage() {
         {/* ── Minimum Notice ── */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Clock size={14} style={{ color: "var(--primary)" }} />
-            <label className="text-xs font-bold" style={{ color: "var(--base-content)" }}>
+            <Clock size={14} className="text-primary" />
+            <label className="text-xs font-bold text-base-content">
               Minimum Notice Time
             </label>
           </div>
-          <p className="text-[11px] px-1" style={{ color: "var(--base-content)", opacity: 0.45 }}>
+          <p className="text-[11px] px-1 text-base-content opacity-45">
             The minimum time you need before starting a booking after accepting it. Choose a realistic buffer so you can always arrive on time.
           </p>
           <div className="grid grid-cols-2 gap-2">
@@ -367,7 +360,7 @@ export default function AvailabilityPage() {
                   <p className="text-sm font-bold" style={{ color: isActive ? "var(--primary)" : "var(--base-content)" }}>
                     {opt.label}
                   </p>
-                  <p className="text-[10px] mt-0.5" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+                  <p className="text-[10px] mt-0.5 text-base-content opacity-50">
                     {opt.note}
                   </p>
                 </button>
@@ -401,8 +394,8 @@ export default function AvailabilityPage() {
         {/* ── Info card ── */}
         <div className="glass-card p-4 space-y-2">
           <div className="flex items-center gap-2">
-            <Bell size={13} style={{ color: "var(--primary)" }} />
-            <p className="text-xs font-bold" style={{ color: "var(--base-content)" }}>How availability works</p>
+            <Bell size={13} className="text-primary" />
+            <p className="text-xs font-bold text-base-content">How availability works</p>
           </div>
           {[
             "Go Online to start receiving booking requests from patients nearby.",
@@ -411,10 +404,10 @@ export default function AvailabilityPage() {
             "Your city helps the system match you with nearby patients accurately.",
           ].map((tip, i) => (
             <div key={i} className="flex items-start gap-2">
-              <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: "color-mix(in srgb, var(--primary), transparent 85%)" }}>
-                <span className="text-[9px] font-black" style={{ color: "var(--primary)" }}>{i + 1}</span>
+              <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-[color-mix(in srgb, var(--primary), transparent 85%)]">
+                <span className="text-[9px] font-black text-primary">{i + 1}</span>
               </div>
-              <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.6 }}>{tip}</p>
+              <p className="text-[11px] text-base-content opacity-60">{tip}</p>
             </div>
           ))}
         </div>

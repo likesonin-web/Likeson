@@ -45,7 +45,7 @@ async function geocodeAddress(address) {
   if (!GOOGLE_MAPS_KEY) return null;
   try {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-      address
+      address,
     )}&key=${GOOGLE_MAPS_KEY}`;
     const res = await fetch(url);
     const data = await res.json();
@@ -70,10 +70,10 @@ function formatDistance(metres) {
 const ACCRED_COLOR = {
   NABH: "bg-primary/10 text-primary border-primary/20",
   NABL: "bg-secondary/20 text-secondary border-secondary/30",
-  JCI:  "bg-accent/10 text-accent border-accent/30",
-  ISO:  "bg-success/10 text-success border-success/40",
+  JCI: "bg-accent/10 text-accent border-accent/30",
+  ISO: "bg-success/10 text-success border-success/40",
   AHPI: "bg-info/10 text-info border-info/30",
-  Other:"bg-base-300/60 text-base-content/60 border-base-300",
+  Other: "bg-base-300/60 text-base-content/60 border-base-300",
 };
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -88,10 +88,17 @@ HospitalCardSkeleton.displayName = "HospitalCardSkeleton";
 
 // ─── Facility Pill ────────────────────────────────────────────────────────────
 
-const FacilityPill = ({ icon: Icon, label, active, colorClass = "text-primary" }) => {
+const FacilityPill = ({
+  icon: Icon,
+  label,
+  active,
+  colorClass = "text-primary",
+}) => {
   if (!active) return null;
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-bold uppercase tracking-wider bg-base-100 border-base-300 ${colorClass}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-bold uppercase tracking-wider bg-base-100 border-base-300 ${colorClass}`}
+    >
       <Icon size={9} />
       {label}
     </span>
@@ -102,11 +109,17 @@ const FacilityPill = ({ icon: Icon, label, active, colorClass = "text-primary" }
 
 const HospitalCard = memo(({ hospital, index }) => {
   const isPriority = index < 3;
-  const imageSrc   = hospital?.logo || hospital?.images?.[0] || "/api/placeholder/800/1200";
-  const distLabel  = formatDistance(hospital?.distance);
+  const imageSrc =
+    hospital?.logo || hospital?.images?.[0] || "/api/placeholder/800/1200";
+ // Backend already formats `distance` as a string (e.g. "69.3 km") for
+  // nearby results. Only fall back to formatDistance() if we get raw metres.
+  const distLabel =
+    typeof hospital?.distance === "string"
+      ? hospital.distance
+      : formatDistance(hospital?.distanceMetres ?? hospital?.distance);
 
   const accreditations = hospital?.accreditations?.slice(0, 3) ?? [];
-  const specialties    = hospital?.specialties?.slice(0, 3) ?? [];
+  const specialties = hospital?.specialties?.slice(0, 3) ?? [];
 
   return (
     <article
@@ -125,11 +138,7 @@ const HospitalCard = memo(({ hospital, index }) => {
         />
         {/* Dual gradient: top fade + strong bottom fade */}
         <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "linear-gradient(to top, var(--base-100) 0%, color-mix(in oklch,var(--base-100) 60%,transparent) 45%, transparent 100%), linear-gradient(to bottom, color-mix(in oklch,var(--base-100) 30%,transparent) 0%, transparent 35%)",
-          }}
+          className="absolute inset-0 pointer-events-none bg-[linear-gradient(to top, var(--base-100) 0%, color-mix(in oklch,var(--base-100) 60%,transparent) 45%, transparent 100%), linear-gradient(to bottom, color-mix(in oklch,var(--base-100) 30%,transparent) 0%, transparent 35%)]"
           aria-hidden="true"
         />
       </div>
@@ -154,7 +163,11 @@ const HospitalCard = memo(({ hospital, index }) => {
         {/* Right: rating + distance */}
         <div className="flex flex-col items-end gap-1.5">
           <div className="flex items-center gap-1.5 bg-base-100/90 backdrop-blur-md border border-base-300 px-2.5 py-1.5 rounded-full shadow">
-            <Star size={11} className="text-accent fill-accent" aria-hidden="true" />
+            <Star
+              size={11}
+              className="text-accent fill-accent"
+              aria-hidden="true"
+            />
             <span className="text-xs font-black text-base-content font-poppins leading-none">
               {hospital.rating?.averageRating?.toFixed(1) ?? "—"}
             </span>
@@ -175,7 +188,6 @@ const HospitalCard = memo(({ hospital, index }) => {
 
       {/* ── Bottom Slide-up Panel ── */}
       <div className="absolute inset-x-0 bottom-0 z-10 transform translate-y-[148px] group-hover:translate-y-0 transition-transform duration-500 ease-in-out">
-
         {/* Accreditation pills — visible above the card fold */}
         {accreditations.length > 0 && (
           <div className="flex gap-1.5 px-5 pb-2 flex-wrap">
@@ -192,7 +204,6 @@ const HospitalCard = memo(({ hospital, index }) => {
         )}
 
         <div className="bg-base-100 border-t border-base-300 p-5">
-
           {/* Status + 24/7 */}
           <div className="flex items-center gap-2 mb-3">
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-success/10 text-success text-[10px] font-black uppercase border border-success/20">
@@ -222,7 +233,11 @@ const HospitalCard = memo(({ hospital, index }) => {
           {(hospital.address?.city || hospital.address?.line1) && (
             <p className="text-[10px] text-base-content/50 font-poppins mb-3 line-clamp-1 flex items-center gap-1">
               <MapPin size={9} />
-              {[hospital.address.line1, hospital.address.city, hospital.address.state]
+              {[
+                hospital.address.line1,
+                hospital.address.city,
+                hospital.address.state,
+              ]
                 .filter(Boolean)
                 .join(", ")}
             </p>
@@ -230,18 +245,58 @@ const HospitalCard = memo(({ hospital, index }) => {
 
           {/* Stats grid */}
           <div className="grid grid-cols-4 gap-0 border border-base-300 mb-3 rounded-[var(--r-field)] overflow-hidden bg-base-200/50">
-            <StatCell icon={Bed} value={hospital.bedCount?.total ?? 0} label="Beds" color="text-primary" />
-            <StatCell icon={Bed} value={hospital.bedCount?.icu ?? 0} label="ICU" color="text-error" />
-            <StatCell icon={Stethoscope} value={hospital.specialties?.length ?? 0} label="Depts" color="text-secondary" />
-            <StatCell icon={Users} value={hospital.linkedDoctors?.length ?? 0} label="Doctors" color="text-accent" />
+            <StatCell
+              icon={Bed}
+              value={hospital.bedCount?.total ?? 0}
+              label="Beds"
+              color="text-primary"
+            />
+            <StatCell
+              icon={Bed}
+              value={hospital.bedCount?.icu ?? 0}
+              label="ICU"
+              color="text-error"
+            />
+            <StatCell
+              icon={Stethoscope}
+              value={hospital.specialties?.length ?? 0}
+              label="Depts"
+              color="text-secondary"
+            />
+            <StatCell
+              icon={Users}
+              value={hospital.linkedDoctors?.length ?? 0}
+              label="Doctors"
+              color="text-accent"
+            />
           </div>
 
           {/* Facility pills */}
           <div className="flex flex-wrap gap-1 mb-3">
-            <FacilityPill icon={Droplets}     label="Blood Bank" active={hospital.hasBloodBank}  colorClass="text-error" />
-            <FacilityPill icon={FlaskConical}  label="Diagnostics" active={hospital.hasDiagnostics} colorClass="text-secondary" />
-            <FacilityPill icon={Heart}         label="ICU"        active={hospital.hasICU}        colorClass="text-primary" />
-            <FacilityPill icon={Building2}     label="Pharmacy"   active={hospital.hasPharmacy}   colorClass="text-success" />
+            <FacilityPill
+              icon={Droplets}
+              label="Blood Bank"
+              active={hospital.hasBloodBank}
+              colorClass="text-error"
+            />
+            <FacilityPill
+              icon={FlaskConical}
+              label="Diagnostics"
+              active={hospital.hasDiagnostics}
+              colorClass="text-secondary"
+            />
+            <FacilityPill
+              icon={Heart}
+              label="ICU"
+              active={hospital.hasICU}
+              colorClass="text-primary"
+            />
+            <FacilityPill
+              icon={Building2}
+              label="Pharmacy"
+              active={hospital.hasPharmacy}
+              colorClass="text-success"
+            />
           </div>
 
           {/* Specialties */}
@@ -273,7 +328,9 @@ const HospitalCard = memo(({ hospital, index }) => {
               <Phone size={10} />
               {hospital.contact.emergencyPhone || hospital.contact.phone}
               {hospital.contact.emergencyPhone && (
-                <span className="text-error text-[10px] font-black uppercase ml-1">Emergency</span>
+                <span className="text-error text-[10px] font-black uppercase ml-1">
+                  Emergency
+                </span>
               )}
             </a>
           )}
@@ -304,101 +361,139 @@ HospitalCard.displayName = "HospitalCard";
 
 // ─── Stat Cell ────────────────────────────────────────────────────────────────
 
-const StatCell = memo(({ icon: Icon, value, label, color = "text-primary" }) => (
-  <div className="flex flex-col items-center justify-center p-2.5 border-r border-base-300 last:border-r-0">
-    <Icon size={13} className={`${color} mb-0.5`} aria-hidden="true" />
-    <span className="text-base-content font-black text-sm font-poppins leading-none">{value}</span>
-    <span className="text-base-content/40 text-[7px] uppercase font-bold tracking-tight mt-0.5">{label}</span>
-  </div>
-));
+const StatCell = memo(
+  ({ icon: Icon, value, label, color = "text-primary" }) => (
+    <div className="flex flex-col items-center justify-center p-2.5 border-r border-base-300 last:border-r-0">
+      <Icon size={13} className={`${color} mb-0.5`} aria-hidden="true" />
+      <span className="text-base-content font-black text-sm font-poppins leading-none">
+        {value}
+      </span>
+      <span className="text-base-content/40 text-[7px] uppercase font-bold tracking-tight mt-0.5">
+        {label}
+      </span>
+    </div>
+  ),
+);
 StatCell.displayName = "StatCell";
 
 // ─── Location Bar ─────────────────────────────────────────────────────────────
 
-const LocationBar = memo(({ mode, manualAddress, locationLabel, onUseGPS, onManualSearch, onClear, gpsLoading, gpsError }) => {
-  const [inputVal, setInputVal] = useState(manualAddress || "");
+const LocationBar = memo(
+  ({
+    mode,
+    manualAddress,
+    locationLabel,
+    onUseGPS,
+    onManualSearch,
+    onClear,
+    gpsLoading,
+    gpsError,
+  }) => {
+    const [inputVal, setInputVal] = useState(manualAddress || "");
 
-  const isGPSActive = mode === "nearby" || mode === "user";
+    const isGPSActive = mode === "nearby" || mode === "user";
 
-  const modeLabel =
-    mode === "user"         ? `📍 Near ${locationLabel || "your saved location"} • 100 km`
-    : mode === "nearby"     ? "📍 Near your current location • 100 km"
-    : mode === "manual-near"? `🔍 Near "${manualAddress}" • 100 km`
-    : mode === "manual"     ? `🔍 Filtered by "${manualAddress}"`
-    : "Showing all hospitals";
+    const modeLabel =
+      mode === "user"
+        ? `📍 Near ${locationLabel || "your saved location"} • 100 km`
+        : mode === "nearby"
+          ? "📍 Near your current location • 100 km"
+          : mode === "manual-near"
+            ? `🔍 Near "${manualAddress}" • 100 km`
+            : mode === "manual"
+              ? `🔍 Filtered by "${manualAddress}"`
+              : "Showing all hospitals";
 
-  return (
-    <div className="flex flex-wrap items-center gap-2.5 mb-10 px-4">
-      {/* GPS Button */}
-      <button
-        onClick={onUseGPS}
-        disabled={gpsLoading || mode === "user"}
-        className={`flex items-center gap-2 h-10 px-4 rounded-[var(--r-field)] border text-[10px] font-black uppercase tracking-widest transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed
-          ${isGPSActive
-            ? "bg-primary text-primary-content border-primary shadow-primary"
-            : "bg-base-100 text-base-content border-base-300 hover:border-primary hover:text-primary"
+    return (
+      <div className="flex flex-wrap items-center gap-2.5 mb-10 px-4">
+        {/* GPS Button */}
+        <button
+          onClick={onUseGPS}
+          disabled={gpsLoading || mode === "user"}
+          className={`flex items-center gap-2 h-10 px-4 rounded-[var(--r-field)] border text-[10px] font-black uppercase tracking-widest transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed
+          ${
+            isGPSActive
+              ? "bg-primary text-primary-content border-primary shadow-primary"
+              : "bg-base-100 text-base-content border-base-300 hover:border-primary hover:text-primary"
           }`}
-      >
-        {gpsLoading
-          ? <Loader2 size={13} className="animate-spin" />
-          : <Navigation size={13} />
-        }
-        {mode === "user"    ? "Location Active ✓"
-        : mode === "nearby" ? "Near Me ✓"
-        : "Use My Location"}
-      </button>
+        >
+          {gpsLoading ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <Navigation size={13} />
+          )}
+          {mode === "user"
+            ? "Location Active ✓"
+            : mode === "nearby"
+              ? "Near Me ✓"
+              : "Use My Location"}
+        </button>
 
-      {/* Manual Input */}
-      <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-xs h-10 px-3 rounded-[var(--r-field)] border border-base-300 bg-base-100 focus-within:border-primary transition-colors">
-        <MapPin size={12} className="text-base-content/30 shrink-0" />
-        <input
-          type="text"
-          value={inputVal}
-          onChange={(e) => setInputVal(e.target.value)}
-          onKeyDown={(e) =>
-            e.key === "Enter" && inputVal.trim().length > 2 && onManualSearch(inputVal.trim())
+        {/* Manual Input */}
+        <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-xs h-10 px-3 rounded-[var(--r-field)] border border-base-300 bg-base-100 focus-within:border-primary transition-colors">
+          <MapPin size={12} className="text-base-content/30 shrink-0" />
+          <input
+            type="text"
+            value={inputVal}
+            onChange={(e) => setInputVal(e.target.value)}
+            onKeyDown={(e) =>
+              e.key === "Enter" &&
+              inputVal.trim().length > 2 &&
+              onManualSearch(inputVal.trim())
+            }
+            placeholder="City or area…"
+            className="flex-1 bg-transparent text-xs text-base-content placeholder:text-base-content/30 outline-none font-poppins"
+          />
+          {inputVal && (
+            <button
+              onClick={() => {
+                setInputVal("");
+                onClear();
+              }}
+              className="text-base-content/30 hover:text-base-content transition-colors"
+              aria-label="Clear search"
+            >
+              <X size={11} />
+            </button>
+          )}
+        </div>
+
+        {/* Search Button */}
+        <button
+          onClick={() =>
+            inputVal.trim().length > 2 && onManualSearch(inputVal.trim())
           }
-          placeholder="City or area…"
-          className="flex-1 bg-transparent text-xs text-base-content placeholder:text-base-content/30 outline-none font-poppins"
-        />
-        {inputVal && (
-          <button
-            onClick={() => { setInputVal(""); onClear(); }}
-            className="text-base-content/30 hover:text-base-content transition-colors"
-            aria-label="Clear search"
-          >
-            <X size={11} />
-          </button>
+          className="flex items-center gap-2 h-10 px-4 rounded-[var(--r-field)] border border-base-300 bg-base-100 text-[10px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <Search size={12} /> Search
+        </button>
+
+        {/* Mode label */}
+        <span className="text-[10px] text-base-content/40 font-poppins hidden sm:block">
+          {modeLabel}
+        </span>
+
+        {gpsError && (
+          <span className="text-[10px] text-error font-poppins font-bold">
+            {gpsError}
+          </span>
         )}
       </div>
-
-      {/* Search Button */}
-      <button
-        onClick={() => inputVal.trim().length > 2 && onManualSearch(inputVal.trim())}
-        className="flex items-center gap-2 h-10 px-4 rounded-[var(--r-field)] border border-base-300 bg-base-100 text-[10px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary"
-      >
-        <Search size={12} /> Search
-      </button>
-
-      {/* Mode label */}
-      <span className="text-[10px] text-base-content/40 font-poppins hidden sm:block">
-        {modeLabel}
-      </span>
-
-      {gpsError && (
-        <span className="text-[10px] text-error font-poppins font-bold">{gpsError}</span>
-      )}
-    </div>
-  );
-});
+    );
+  },
+);
 LocationBar.displayName = "LocationBar";
 
 // ─── Section Header Stat ──────────────────────────────────────────────────────
 
 const HeaderStat = memo(({ value, label }) => (
   <div className="flex flex-col items-center px-6 py-3 border border-base-300 rounded-[var(--r-box)] bg-base-100">
-    <span className="text-2xl font-black text-primary font-montserrat leading-none">{value}</span>
-    <span className="text-[11px] font-bold text-base-content/40 uppercase tracking-widest mt-1 font-poppins">{label}</span>
+    <span className="text-2xl font-black text-primary font-montserrat leading-none">
+      {value}
+    </span>
+    <span className="text-[11px] font-bold text-base-content/40 uppercase tracking-widest mt-1 font-poppins">
+      {label}
+    </span>
   </div>
 ));
 HeaderStat.displayName = "HeaderStat";
@@ -407,39 +502,50 @@ HeaderStat.displayName = "HeaderStat";
 
 const HomeHospitals = () => {
   const scrollRef = useRef(null);
-  const dispatch  = useDispatch();
+  const dispatch = useDispatch();
 
-  const user            = useSelector((s) => s.user?.user) ?? null;
-  const allHospitals    = useSelector(selectHospitals);
+  const user = useSelector((s) => s.user?.user) ?? null;
+  const allHospitals = useSelector(selectHospitals);
   const nearbyHospitals = useSelector(selectNearbyHospitals);
-  const loadingAll      = useSelector(selectIsLoadingHospitals);
-  const loadingNearby   = useSelector(selectIsLoadingNearbyHospitals);
+  const loadingAll = useSelector(selectIsLoadingHospitals);
+  const loadingNearby = useSelector(selectIsLoadingNearbyHospitals);
 
-  const [mode, setMode]                   = useState("all");
+  const [mode, setMode] = useState("all");
   const [manualAddress, setManualAddress] = useState("");
   const [locationLabel, setLocationLabel] = useState("");
-  const [gpsLoading, setGpsLoading]       = useState(false);
-  const [gpsError, setGpsError]           = useState("");
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState("");
 
-  const isNearbyMode = mode === "user" || mode === "nearby" || mode === "manual-near";
-  const hospitals    = isNearbyMode ? nearbyHospitals : allHospitals;
-  const loading      = isNearbyMode ? loadingNearby   : loadingAll;
+  const isNearbyMode =
+    mode === "user" || mode === "nearby" || mode === "manual-near";
+  const hospitals = isNearbyMode ? nearbyHospitals : allHospitals;
+  const loading = isNearbyMode ? loadingNearby : loadingAll;
 
-  // ── Initial fetch ─────────────────────────────────────────────────────────
+  // ── Initial fetch + react to header location changes ───────────────────────
+  const savedLng = user?.location?.coordinates?.[0];
+  const savedLat = user?.location?.coordinates?.[1];
+
   useEffect(() => {
-    if (user?.location?.coordinates) {
-      const [lng, lat] = user.location.coordinates;
-      if (lng !== 0 || lat !== 0) {
-        dispatch(fetchNearbyHospitals({ lat, lng, limit: 12 }));
-        setMode("user");
-        setLocationLabel(user.lastKnownAddress || "your saved location");
-        return;
-      }
+    // Don't override an active GPS / manual search the user picked on this page.
+    if (mode === "nearby" || mode === "manual" || mode === "manual-near")
+      return;
+
+    if (
+      savedLat != null &&
+      savedLng != null &&
+      (savedLng !== 0 || savedLat !== 0)
+    ) {
+      dispatch(
+        fetchNearbyHospitals({ lat: savedLat, lng: savedLng, limit: 12 }),
+      );
+      setMode("user");
+      setLocationLabel(user.lastKnownAddress || "your saved location");
+      return;
     }
     if (!allHospitals?.length) dispatch(fetchAllHospitals({ limit: 12 }));
     setMode("all");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?._id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?._id, savedLat, savedLng]);
 
   // ── GPS ───────────────────────────────────────────────────────────────────
   const handleUseGPS = useCallback(() => {
@@ -452,7 +558,13 @@ const HomeHospitals = () => {
     setGpsError("");
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
-        dispatch(fetchNearbyHospitals({ lat: coords.latitude, lng: coords.longitude, limit: 12 }));
+        dispatch(
+          fetchNearbyHospitals({
+            lat: coords.latitude,
+            lng: coords.longitude,
+            limit: 12,
+          }),
+        );
         setMode("nearby");
         setManualAddress("");
         setGpsLoading(false);
@@ -461,27 +573,32 @@ const HomeHospitals = () => {
         setGpsError(
           err.code === 1
             ? "Permission denied. Enter your area manually."
-            : "Could not get location. Enter manually."
+            : "Could not get location. Enter manually.",
         );
         setGpsLoading(false);
       },
-      { timeout: 10000, maximumAge: 60000 }
+      { timeout: 10000, maximumAge: 60000 },
     );
   }, [dispatch, mode]);
 
   // ── Manual search ─────────────────────────────────────────────────────────
-  const handleManualSearch = useCallback(async (address) => {
-    setGpsError("");
-    const coords = await geocodeAddress(address);
-    if (coords) {
-      dispatch(fetchNearbyHospitals({ lat: coords.lat, lng: coords.lng, limit: 12 }));
-      setMode("manual-near");
-    } else {
-      dispatch(fetchAllHospitals({ city: address, limit: 12 }));
-      setMode("manual");
-    }
-    setManualAddress(address);
-  }, [dispatch]);
+  const handleManualSearch = useCallback(
+    async (address) => {
+      setGpsError("");
+      const coords = await geocodeAddress(address);
+      if (coords) {
+        dispatch(
+          fetchNearbyHospitals({ lat: coords.lat, lng: coords.lng, limit: 12 }),
+        );
+        setMode("manual-near");
+      } else {
+        dispatch(fetchAllHospitals({ city: address, limit: 12 }));
+        setMode("manual");
+      }
+      setManualAddress(address);
+    },
+    [dispatch],
+  );
 
   // ── Clear ─────────────────────────────────────────────────────────────────
   const handleClear = useCallback(() => {
@@ -500,7 +617,10 @@ const HomeHospitals = () => {
   }, [dispatch, user, allHospitals]);
 
   const scroll = useCallback((dir) => {
-    scrollRef.current?.scrollBy({ left: dir === "left" ? -420 : 420, behavior: "smooth" });
+    scrollRef.current?.scrollBy({
+      left: dir === "left" ? -420 : 420,
+      behavior: "smooth",
+    });
   }, []);
 
   const hospitalCount = hospitals?.length ?? 0;
@@ -517,13 +637,11 @@ const HomeHospitals = () => {
       />
       {/* Subtle radial accent */}
       <div
-        className="absolute top-0 right-0 w-[600px] h-[600px] pointer-events-none opacity-5"
-        style={{ background: "radial-gradient(circle at top right, var(--primary), transparent 70%)" }}
+        className="absolute top-0 right-0 w-[600px] h-[600px] pointer-events-none opacity-5 bg-[radial-gradient(circle at top right, var(--primary), transparent 70%)]"
         aria-hidden="true"
       />
 
       <div className="  relative z-10">
-
         {/* ── Header ── */}
         <header className="flex flex-col xl:flex-row xl:items-end justify-between mb-12 px-4 gap-10">
           <div className="max-w-2xl">
@@ -534,23 +652,27 @@ const HomeHospitals = () => {
             </div>
 
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-base-content tracking-tighter leading-[1.02] mb-5 font-montserrat">
-              Find{" "}
-              <span className="text-gradient-primary">Top-Rated</span>
+              Find <span className="text-gradient-primary">Top-Rated</span>
               <br className="hidden md:block" />
               Hospitals &amp; Clinics
             </h2>
 
             <div
-              className="h-1 w-20 mb-6 rounded-full"
-              style={{ background: "var(--bg-gradient-primary)" }}
+              className="h-1 w-20 mb-6 rounded-full bg-bg-gradient-primary"
               aria-hidden="true"
             />
 
             <p className="text-base-content/60 text-sm md:text-base font-medium max-w-lg leading-relaxed font-poppins">
-              Real-time <strong className="text-base-content">bed availability</strong>,{" "}
-              <span className="text-primary font-semibold">specialist departments</span>,{" "}
-              accreditation status, and{" "}
-              <span className="text-error font-semibold">emergency contacts</span> — all in one place.
+              Real-time{" "}
+              <strong className="text-base-content">bed availability</strong>,{" "}
+              <span className="text-primary font-semibold">
+                specialist departments
+              </span>
+              , accreditation status, and{" "}
+              <span className="text-error font-semibold">
+                emergency contacts
+              </span>{" "}
+              — all in one place.
             </p>
           </div>
 
@@ -558,7 +680,10 @@ const HomeHospitals = () => {
           <div className="flex flex-col items-start xl:items-end gap-5">
             {/* Quick stats */}
             <div className="flex items-center gap-3">
-              <HeaderStat value={hospitalCount > 0 ? `${hospitalCount}+` : "—"} label="Facilities" />
+              <HeaderStat
+                value={hospitalCount > 0 ? `${hospitalCount}+` : "—"}
+                label="Facilities"
+              />
               <HeaderStat value="100 km" label="Search Radius" />
               <HeaderStat value="24/7" label="ER Access" />
             </div>
@@ -610,7 +735,11 @@ const HomeHospitals = () => {
           ) : hospitals?.length > 0 ? (
             <>
               {hospitals.map((hospital, index) => (
-                <HospitalCard key={hospital._id} hospital={hospital} index={index} />
+                <HospitalCard
+                  key={hospital._id}
+                  hospital={hospital}
+                  index={index}
+                />
               ))}
 
               {/* View All card */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import {
@@ -19,12 +19,13 @@ import {
   Clock,
   Shield,
   MapPin,
+  MessageCircleQuestion,
 } from "lucide-react";
 import Subscription from "@/app/(page)/Subscription";
 
 /* ─────────────────────────────────────────
    DATA
-   bookingType values must match STEPS_MAP keys in BookingSystem.jsx:
+   bookingType values must match STEPS_MAP keys in BookingSystem. JSX:
    full_care_ride | doctor_consultation | doctor_online | physiotherapist |
    care_assistant | diagnostic_center   | diagnostic_home | patient_transport | follow_up
 ───────────────────────────────────────── */
@@ -37,7 +38,7 @@ const SERVICES = [
     title: "Patient Transportation",
     tagline: "We take you there. Safely. Always.",
     description:
-      "Pre-scheduled, wheelchair-accessible rides with real-time GPS tracking — built specifically for elderly and mobility-challenged patients.",
+      "Pre-scheduled, wheelchair-accessible rides with real-time GPS tracking—built specifically for elderly and mobility-challenged patients.",
     color: "oklch(54% 0.20 192)",
     accent: "oklch(74% 0.18 68)",
     gradient: "linear-gradient(135deg, oklch(54% 0.20 192) 0%, oklch(44% 0.08 215) 100%)",
@@ -51,7 +52,6 @@ const SERVICES = [
     ],
     stats: { value: "250+", label: "Rides / Year" },
     emoji: "🚗",
-    // Booking link — maps to patient_transport type in BookingSystem
     bookingType: "patient_transport",
     bookingPath: "/book-appointment?type=patient_transport",
   },
@@ -63,7 +63,7 @@ const SERVICES = [
     title: "Care Assistant",
     tagline: "Never face the hospital alone.",
     description:
-      "Background-verified care companions escort you through every step — registration, waiting lines, lab collections, and the ride home.",
+      "Background-verified care companions escort you through every step—registration, waiting lines, lab collections, and the ride home.",
     color: "oklch(58% 0.20 12)",
     accent: "oklch(76% 0.15 82)",
     gradient: "linear-gradient(135deg, oklch(58% 0.20 12) 0%, oklch(62% 0.16 345) 100%)",
@@ -104,7 +104,6 @@ const SERVICES = [
     emoji: "👨‍⚕️",
     bookingType: "doctor_consultation",
     bookingPath: "/book-appointment?type=doctor_consultation",
-    // Secondary quick links shown under the main CTA
     quickLinks: [
       { label: "Video Call", path: "/book-appointment?type=doctor_online" },
       { label: "Follow-Up", path: "/book-appointment?type=follow_up" },
@@ -118,7 +117,7 @@ const SERVICES = [
     title: "Diagnostic Services",
     tagline: "Lab-grade tests at your doorstep.",
     description:
-      "NABL-accredited sample collection at home — CBC, sugar, thyroid, lipid panel and more. Digital reports delivered in 6–48 hours.",
+      "NABL-accredited sample collection at home—CBC, sugar, thyroid, lipid panel, and more. Digital reports delivered in 6–48 hours.",
     color: "oklch(55% 0.24 285)",
     accent: "oklch(74% 0.20 102)",
     gradient: "linear-gradient(135deg, oklch(55% 0.24 285) 0%, oklch(48% 0.20 265) 100%)",
@@ -146,7 +145,7 @@ const SERVICES = [
     title: "Pharmacy Services",
     tagline: "Medicines. At your door in hours.",
     description:
-      "E-prescription linked delivery within 2–24 hours. Auto-refill plans for chronic conditions so you never miss a dose.",
+      "E-prescription-linked delivery within 2–24 hours. Auto-refill plans for chronic conditions so you never miss a dose.",
     color: "oklch(50% 0.22 158)",
     accent: "oklch(72% 0.18 88)",
     gradient: "linear-gradient(135deg, oklch(50% 0.22 158) 0%, oklch(62% 0.15 172) 100%)",
@@ -160,8 +159,6 @@ const SERVICES = [
     ],
     stats: { value: "24hr", label: "Max Delivery" },
     emoji: "💊",
-    // Pharmacy has no booking flow in BookingSystem yet — link to full care ride
-    // which covers medicine collection via the care assistant
     bookingType: "full_care_ride",
     bookingPath: "/book-appointment?type=full_care_ride",
   },
@@ -232,7 +229,7 @@ function ServiceCard({ service, index }) {
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, margin: "-60px" }}
-      className="relative group rounded-3xl border overflow-hidden"
+      className="relative group rounded-3xl border overflow-hidden transition-shadow hover:shadow-xl"
       style={{
         background: "var(--base-100)",
         borderColor: "var(--base-300)",
@@ -249,7 +246,6 @@ function ServiceCard({ service, index }) {
         {/* Header row */}
         <div className="flex items-start justify-between mb-5">
           <div className="flex items-center gap-4">
-            {/* Icon bubble */}
             <motion.div
               className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-sm"
               style={{ background: service.softBg }}
@@ -269,37 +265,42 @@ function ServiceCard({ service, index }) {
               >
                 {service.badge}
               </span>
-              <h3 className="font-extrabold text-[20px] font-montserrat leading-tight" style={{ color: "var(--base-content)" }}>
+              <h3
+                className="font-extrabold text-[20px] font-montserrat leading-tight"
+                style={{ color: "var(--base-content)" }}
+              >
                 {service.title}
               </h3>
             </div>
           </div>
 
-          {/* Stat pill */}
           <div className="text-right shrink-0">
             <div className="font-display font-black text-2xl" style={{ color: service.color }}>
               {service.stats.value}
             </div>
-            <div className="text-[8px] font-semibold" style={{ color: "color-mix(in oklch, var(--base-content) 50%, transparent)" }}>
+            <div
+              className="text-[8px] font-semibold"
+              style={{ color: "color-mix(in oklch, var(--base-content) 50%, transparent)" }}
+            >
               {service.stats.label}
             </div>
           </div>
         </div>
 
-        {/* Tagline */}
         <p className="font-display font-bold text-sm mb-2" style={{ color: service.color }}>
           {service.tagline}
         </p>
 
-        {/* Description */}
-        <p className="text-xs leading-relaxed mb-5" style={{ color: "color-mix(in oklch, var(--base-content) 70%, transparent)" }}>
+        <p
+          className="text-xs leading-relaxed mb-5"
+          style={{ color: "color-mix(in oklch, var(--base-content) 70%, transparent)" }}
+        >
           {service.description}
         </p>
 
-        {/* Features toggle */}
         <button
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider mb-3 transition-colors"
+          className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider mb-3 transition-colors cursor-pointer hover:opacity-80"
           style={{ color: service.color }}
         >
           <span>{open ? "Hide details" : "See what's included"}</span>
@@ -334,12 +335,11 @@ function ServiceCard({ service, index }) {
           )}
         </AnimatePresence>
 
-        {/* Primary CTA — navigates to /book with correct type param */}
         <motion.button
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           onClick={handleBookNow}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-bold transition-all"
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer"
           style={{
             background: service.gradient,
             color: "#fff",
@@ -349,14 +349,13 @@ function ServiceCard({ service, index }) {
           Book Now <ArrowRight size={15} />
         </motion.button>
 
-        {/* Quick-link secondary buttons (e.g. Video Call / Follow-Up / Visit Lab) */}
         {service.quickLinks?.length > 0 && (
           <div className="flex gap-2 mt-3">
             {service.quickLinks.map((ql) => (
               <button
                 key={ql.path}
                 onClick={() => handleQuickLink(ql.path)}
-                className="flex-1 py-2 rounded-xl text-[10px] font-bold border-2 transition-all hover:opacity-80"
+                className="flex-1 py-2 rounded-xl text-[10px] font-bold border-2 transition-all hover:opacity-80 cursor-pointer"
                 style={{
                   borderColor: `${service.color}50`,
                   color: service.color,
@@ -373,87 +372,6 @@ function ServiceCard({ service, index }) {
   );
 }
 
-function PlanCard({ plan, index }) {
-  return (
-    <motion.div
-      variants={scaleIn}
-      custom={index}
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, margin: "-40px" }}
-      className="relative rounded-3xl border overflow-hidden"
-      style={{
-        background: plan.popular
-          ? `linear-gradient(160deg, ${plan.color}18 0%, ${plan.color}08 100%)`
-          : "var(--base-100)",
-        borderColor: plan.popular ? `${plan.color}60` : "var(--base-300)",
-        boxShadow: plan.popular ? `0 16px 48px ${plan.color}30` : "none",
-      }}
-      whileHover={{ y: -5, transition: { duration: 0.3 } }}
-    >
-      {plan.popular && (
-        <div
-          className="absolute top-0 left-0 right-0 h-1"
-          style={{ background: `linear-gradient(90deg, ${plan.color}, ${plan.color}88)` }}
-        />
-      )}
-
-      {plan.popular && (
-        <div
-          className="absolute top-4 right-4 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5"
-          style={{ background: plan.color, color: "#fff" }}
-        >
-          <Star size={10} fill="currentColor" /> Most Popular
-        </div>
-      )}
-
-      <div className="p-7">
-        <h4 className="font-display font-black text-md mb-1" style={{ color: "var(--base-content)" }}>
-          {plan.name}
-        </h4>
-        <p className="text-[10px] mb-5" style={{ color: "color-mix(in oklch, var(--base-content) 50%, transparent)" }}>
-          Ideal for: {plan.ideal}
-        </p>
-
-        <div className="flex items-end gap-1 mb-6">
-          <span className="font-display font-black text-4xl" style={{ color: plan.color }}>
-            {plan.price}
-          </span>
-          <span className="text-xs mb-1.5" style={{ color: "color-mix(in oklch, var(--base-content) 50%, transparent)" }}>
-            {plan.period}
-          </span>
-        </div>
-
-        <ul className="space-y-2.5 mb-7">
-          {plan.perks.map((p, i) => (
-            <li key={i} className="flex items-start gap-2.5 text-xs" style={{ color: "var(--base-content)" }}>
-              <CheckCircle2 size={15} style={{ color: plan.color, flexShrink: 0, marginTop: 1 }} />
-              {p}
-            </li>
-          ))}
-        </ul>
-
-        <motion.button
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
-          className="w-full py-3 rounded-2xl text-xs font-bold border-2 transition-all"
-          style={
-            plan.popular
-              ? { background: plan.color, color: "#fff", borderColor: plan.color }
-              : {
-                  background: "transparent",
-                  color: plan.color,
-                  borderColor: `${plan.color}60`,
-                }
-          }
-        >
-          Choose {plan.name}
-        </motion.button>
-      </div>
-    </motion.div>
-  );
-}
-
 function TrustBadge({ icon: Icon, title, desc }) {
   return (
     <motion.div
@@ -461,7 +379,7 @@ function TrustBadge({ icon: Icon, title, desc }) {
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true }}
-      className="flex items-start gap-4 p-5 rounded-2xl border"
+      className="flex items-start gap-4 p-5 rounded-2xl border transition-colors hover:border-primary/40 cursor-default"
       style={{ background: "var(--base-200)", borderColor: "var(--base-300)" }}
     >
       <div
@@ -471,8 +389,15 @@ function TrustBadge({ icon: Icon, title, desc }) {
         <Icon size={20} style={{ color: "var(--primary)" }} />
       </div>
       <div>
-        <p className="font-bold text-xs mb-0.5" style={{ color: "var(--base-content)" }}>{title}</p>
-        <p className="text-[10px]" style={{ color: "color-mix(in oklch, var(--base-content) 55%, transparent)" }}>{desc}</p>
+        <p className="font-bold text-xs mb-0.5" style={{ color: "var(--base-content)" }}>
+          {title}
+        </p>
+        <p
+          className="text-[10px]"
+          style={{ color: "color-mix(in oklch, var(--base-content) 55%, transparent)" }}
+        >
+          {desc}
+        </p>
       </div>
     </motion.div>
   );
@@ -525,7 +450,7 @@ function ServicesHero() {
           className="font-display font-black text-5xl md:text-7xl leading-none mb-6"
           style={{ color: "var(--base-content)" }}
         >
-          Care that
+          Care that{" "}
           <span
             className="block"
             style={{
@@ -547,8 +472,7 @@ function ServicesHero() {
           className="text-lg md:text-md max-w-2xl mx-auto mb-10 leading-relaxed"
           style={{ color: "color-mix(in oklch, var(--base-content) 65%, transparent)" }}
         >
-          From your home to the hospital and back — Likeson.in bundles transport, doctors,
-          diagnostics, care assistants, and medicines into one seamless journey.
+          From your home to the hospital and back, Likeson.in bundles transport, doctors, diagnostics, care assistants, and medicines into one seamless journey.
         </motion.p>
 
         <motion.div
@@ -558,29 +482,33 @@ function ServicesHero() {
           animate="visible"
           className="flex flex-col sm:flex-row items-center justify-center gap-4"
         >
-          {/* Primary CTA — opens booking with full_care_ride pre-selected */}
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.96 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => router.push("/book-appointment?type=full_care_ride")}
-            className="btn-primary-cta flex items-center gap-2"
+            className="flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl text-sm font-bold text-white transition-all cursor-pointer"
+            style={{
+              background: "var(--bg-gradient-primary)",
+              boxShadow: "0 8px 25px color-mix(in oklch, var(--primary) 40%, transparent)",
+            }}
           >
             <Phone size={16} /> Book a Service
           </motion.button>
 
-          {/* Anchor scroll to plans */}
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.96 }}
-            onClick={() => document.getElementById("plans-section")?.scrollIntoView({ behavior: "smooth" })}
-            className="px-6 py-3 rounded-2xl text-xs font-bold border-2 transition-all"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() =>
+              document.getElementById("plans-section")?.scrollIntoView({ behavior: "smooth" })
+            }
+            className="px-8 py-3.5 rounded-2xl text-sm font-bold border-2 transition-all cursor-pointer hover:bg-primary/5"
             style={{
               borderColor: "color-mix(in oklch, var(--primary) 40%, transparent)",
               color: "var(--primary)",
               background: "transparent",
             }}
           >
-            View Plans Below ↓
+            Explore Subscription Plans
           </motion.button>
         </motion.div>
       </div>
@@ -594,14 +522,13 @@ function ServicesHero() {
 function JourneyStrip() {
   const router = useRouter();
 
-  // Each step links to the matching booking type
   const steps = [
-    { icon: "📱", label: "Book on App",         path: "/book" },
-    { icon: "🚗", label: "Ride Arrives",         path: "/book-appointment?type=patient_transport" },
-    { icon: "🤝", label: "Care Assistant",        path: "/book-appointment?type=care_assistant" },
-    { icon: "👨‍⚕️", label: "Doctor Visit",         path: "/book-appointment?type=doctor_consultation" },
-    { icon: "🔬", label: "Lab Tests",             path: "/book-appointment?type=diagnostic_home" },
-    { icon: "💊", label: "Medicines Delivered",   path: "/book-appointment?type=full_care_ride" },
+    { icon: "📱", label: "Book on App", path: "/book" },
+    { icon: "🚗", label: "Ride Arrives", path: "/book-appointment?type=patient_transport" },
+    { icon: "🤝", label: "Care Assistant", path: "/book-appointment?type=care_assistant" },
+    { icon: "👨‍⚕️", label: "Doctor Visit", path: "/book-appointment?type=doctor_consultation" },
+    { icon: "🔬", label: "Lab Tests", path: "/book-appointment?type=diagnostic_home" },
+    { icon: "💊", label: "Medicines Delivered", path: "/book-appointment?type=full_care_ride" },
   ];
 
   return (
@@ -621,7 +548,7 @@ function JourneyStrip() {
                   whileHover={{ scale: 1.1, y: -2 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => router.push(s.path)}
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl border transition-all hover:shadow-md"
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl border transition-all hover:shadow-md cursor-pointer"
                   style={{
                     background: "var(--base-200)",
                     borderColor: "var(--base-300)",
@@ -656,13 +583,40 @@ function JourneyStrip() {
 }
 
 /* ─────────────────────────────────────────
+   FLOATING CUSTOMER HELP BUTTON
+───────────────────────────────────────── */
+function CustomerHoverButton() {
+  const router = useRouter();
+
+  return (
+    <motion.button
+      initial={{ y: 50, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ delay: 0.8 }}
+      onClick={() => router.push("/contact")}
+      className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-primary text-primary-content p-3.5 rounded-full shadow-2xl transition-all hover:pr-5 group cursor-pointer"
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+    >
+      <MessageCircleQuestion size={22} />
+      <span className="w-0 overflow-hidden opacity-0 group-hover:w-auto group-hover:opacity-100 whitespace-nowrap text-sm font-bold transition-all duration-300 ease-in-out">
+        Need Help?
+      </span>
+    </motion.button>
+  );
+}
+
+/* ─────────────────────────────────────────
    MAIN PAGE
 ───────────────────────────────────────── */
 export default function Services() {
   const router = useRouter();
 
   return (
-    <main style={{ background: "var(--base-100)", color: "var(--base-content)" }} className="md:mx-20">
+    <main style={{ background: "var(--base-100)", color: "var(--base-content)" }} className="md:mx-20 relative">
+
+      {/* Floating Action Button */}
+      <CustomerHoverButton />
 
       {/* ── HERO ── */}
       <ServicesHero />
@@ -674,10 +628,10 @@ export default function Services() {
       <section className="py-10 px-4">
         <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { icon: Shield,  title: "Verified Partners",   desc: "NABL/NABH accredited labs & licensed pharmacies" },
-            { icon: Clock,   title: "On-Demand",            desc: "Book in minutes, served within hours" },
-            { icon: MapPin,  title: "Real-Time Tracking",   desc: "Know exactly where your ride is" },
-            { icon: Heart,   title: "Human Care",           desc: "Trained assistants at every step" },
+            { icon: Shield, title: "Verified Partners", desc: "NABL/NABH accredited labs & licensed pharmacies" },
+            { icon: Clock, title: "On-Demand", desc: "Book in minutes, served within hours" },
+            { icon: MapPin, title: "Real-Time Tracking", desc: "Know exactly where your ride is" },
+            { icon: Heart, title: "Human Care", desc: "Trained assistants at every step" },
           ].map((b, i) => (
             <TrustBadge key={i} {...b} />
           ))}
@@ -698,7 +652,7 @@ export default function Services() {
               className="font-display font-black text-4xl md:text-5xl mt-4 mb-3"
               style={{ color: "var(--base-content)" }}
             >
-              Everything you need.
+              Everything you need.{" "}
               <span
                 className="block"
                 style={{
@@ -752,8 +706,14 @@ export default function Services() {
             }}
           >
             {/* decorative circles */}
-            <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full opacity-20" style={{ background: "#fff" }} />
-            <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full opacity-10" style={{ background: "#fff" }} />
+            <div
+              className="absolute -top-12 -right-12 w-40 h-40 rounded-full opacity-20"
+              style={{ background: "#fff" }}
+            />
+            <div
+              className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full opacity-10"
+              style={{ background: "#fff" }}
+            />
 
             <div className="relative z-10">
               <div className="text-5xl mb-4">❤️</div>
@@ -763,21 +723,19 @@ export default function Services() {
               <p className="text-white/75 mb-8 text-base max-w-lg mx-auto">
                 Likeson.in was built for families separated by distance. One app, one call — and your loved one is cared for.
               </p>
-              {/* CTA goes to full_care_ride which is the flagship service covering all needs */}
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={() => router.push("/book-appointment?type=full_care_ride")}
-                className="inline-flex items-center gap-2 bg-white font-bold text-xs px-8 py-4 rounded-2xl transition-all"
+                className="inline-flex items-center gap-2 bg-white font-bold text-sm px-8 py-4 rounded-2xl transition-all shadow-lg cursor-pointer hover:bg-gray-50"
                 style={{ color: "var(--primary)" }}
               >
-                <Phone size={16} /> Get Started Today
+                <Phone size={18} /> Get Started Today
               </motion.button>
             </div>
           </motion.div>
         </div>
       </section>
-
     </main>
   );
 }

@@ -53,7 +53,7 @@ function SettingSection({ icon: Icon, title, desc, color, children, badge }) {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <p className="font-display font-black text-base" style={{ color: "var(--base-content)" }}>{title}</p>
+              <p className="font-display font-black text-base text-base-content">{title}</p>
               {badge && (
                 <span className="badge badge-primary !text-[10px] !py-0.5">{badge}</span>
               )}
@@ -81,7 +81,7 @@ function SettingRow({ label, desc, children }) {
     <div className="flex items-center justify-between py-3.5 border-b last:border-0"
       style={{ borderColor: "var(--base-300)" }}>
       <div className="flex-1 mr-6">
-        <p className="text-sm font-semibold" style={{ color: "var(--base-content)" }}>{label}</p>
+        <p className="text-sm font-semibold text-base-content">{label}</p>
         {desc && <p className="text-xs opacity-45 mt-0.5">{desc}</p>}
       </div>
       <div className="flex-shrink-0">{children}</div>
@@ -101,7 +101,7 @@ function StatBlock({ icon: Icon, label, value, color, trend }) {
           <Icon size={15} style={{ color }} />
         </div>
       </div>
-      <p className="font-display font-black text-3xl" style={{ color: "var(--base-content)" }}>
+      <p className="font-display font-black text-3xl text-base-content">
         {value ?? "—"}
       </p>
       {trend !== undefined && (
@@ -222,7 +222,7 @@ export default function GlobalSettings() {
   const s = analytics?.summary;
 
   return (
-    <div className="min-h-screen p-6" style={{ background: "var(--base-100)" }}>
+    <div className="min-h-screen p-6 bg-base-100">
       <div className="max-w-5xl mx-auto space-y-8">
 
         {/* Header */}
@@ -232,7 +232,7 @@ export default function GlobalSettings() {
             <div className="flex items-center gap-2 mb-1">
               <Link href="/admin/users" className="text-xs opacity-50 hover:opacity-80 transition-opacity">Admin</Link>
               <ChevronRight size={12} className="opacity-30" />
-              <span className="text-xs font-semibold" style={{ color: "var(--primary)" }}>Global Settings</span>
+              <span className="text-xs font-semibold text-primary">Global Settings</span>
             </div>
             <h1 className="section-heading !mb-0">Global Settings</h1>
             <p className="section-subheading !mb-0">Platform-wide configuration, feature flags &amp; analytics</p>
@@ -260,7 +260,7 @@ export default function GlobalSettings() {
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               className="alert alert-warning">
-              <AlertTriangle size={16} style={{ color: "var(--warning)" }} />
+              <AlertTriangle size={16} className="text-warning" />
               <div>
                 <p className="font-bold text-sm">Maintenance Mode Active</p>
                 <p className="text-xs opacity-70">The platform is currently in maintenance mode. Only admins can access it.</p>

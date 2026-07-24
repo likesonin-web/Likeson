@@ -313,7 +313,7 @@ useEffect(() => {
   }
 
   return (
-    <div data-theme="doctor" className="min-h-screen bg-base-100 text-base-content selection:bg-primary/20">
+    <div data-theme="doctor" className=" bg-base-100 text-base-content selection:bg-primary/20">
       {/* Mobile backdrop */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -625,7 +625,7 @@ useEffect(() => {
         </header>
 
         {/* ── Page Content ────────────────────────────────────────────────── */}
-        <section className="flex-1 w-full max-w-[1600px] mx-auto p-2">
+        <section className="flex-1 w-full max-w-[1600px] h-[150vh] mx-auto p-2">
           {/* Breadcrumbs */}
           <div className="mb-5 flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-widest text-base-content/20">
             <Link
@@ -645,7 +645,7 @@ useEffect(() => {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="md:rounded-md rounded-md border border-base-300 bg-base-200/40 min-h-[75vh] shadow-inner relative overflow-hidden backdrop-blur-sm"
+            className="md:rounded-md rounded-md h-[150vh] border border-base-300 bg-base-200/40 min-h-[75vh] shadow-inner relative overflow-hidden backdrop-blur-sm"
           >
             {/* Decorative medical-teal glow */}
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 blur-[130px] rounded-full pointer-events-none" />
@@ -674,62 +674,7 @@ useEffect(() => {
           </motion.div>
         </section>
 
-        {/* ── Footer ──────────────────────────────────────────────────────── */}
-        <footer className="p-4 lg:p-6 mt-auto">
-          <div className="flex flex-col xl:flex-row items-center justify-between gap-4 p-5 border border-base-300 rounded-md bg-base-200/50">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                <Stethoscope size={20} />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-base-content/60">
-                  Likeson Doctor Portal
-                </p>
-                <p className="text-[9px] font-bold text-base-content/20 uppercase">
-                  v3.4.0 — Clinical Hub
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full xl:w-auto">
-              {[
-                {
-                  name: "Analytics",
-                  icon: <AreaChart size={17} />,
-                  href: "/doctor/analytics",
-                },
-                {
-                  name: "My Hospitals",
-                  icon: <Hospital size={17} />,
-                  href: "/doctor/hospitals",
-                },
-                {
-                  name: "Availability",
-                  icon: <Clock size={17} />,
-                  href: "/doctor/availability",
-                },
-                {
-                  name: "KYC Status",
-                  icon: <ShieldCheck size={17} />,
-                  href: "/doctor/kyc",
-                },
-              ].map((sc, idx) => (
-                <Link
-                  key={idx}
-                  href={sc.href}
-                  className="flex items-center gap-3 px-4 py-3.5 bg-base-100/50 border border-base-300 rounded-md hover:border-primary/40 hover:bg-primary/10 transition-all group"
-                >
-                  <span className="text-primary/60 group-hover:text-primary group-hover:scale-110 transition-all">
-                    {sc.icon}
-                  </span>
-                  <span className="text-[10px] font-bold text-base-content/40 group-hover:text-base-content uppercase tracking-widest">
-                    {sc.name}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </footer>
+       
       </main>
 
       {/* ── Command / Search Overlay ───────────────────────────────────── */}

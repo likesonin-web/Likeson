@@ -75,14 +75,8 @@ function StatusBadge({ status }) {
   const cfg = getStatusCfg(status);
   return (
     <span
-      className="badge text-xs font-semibold"
-      style={{
-        backgroundColor: cfg.bg,
-        color: cfg.color,
-        border: `1px solid ${cfg.color}`,
-        borderRadius: 'var(--r-selector)',
-        padding: '2px 10px',
-      }}
+      className="badge text-xs font-semibold rounded-[var(--r-selector)] py-[2px] px-[10px]"
+      style={{ backgroundColor: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}` }}
     >
       {cfg.label}
     </span>
@@ -103,43 +97,30 @@ function BookingCard({ booking, onClick }) {
       whileHover={{ scale: 1.015, y: -2 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onClick(booking)}
-      className="w-full text-left"
-      style={{ marginBottom: 10 }}
+      className="w-full text-left mb-[10px]"
+     
     >
       <div
-        className="card"
-        style={{
-          padding: '14px 16px',
-          borderLeft: `4px solid ${cfg.color}`,
-          borderRadius: 'var(--r-box)',
-          display: 'flex',
-          gap: 12,
-          alignItems: 'center',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease',
-        }}
+        className="card py-[14px] px-[16px] rounded-[var(--r-box)] flex gap-[12px] items-center cursor-pointer"
+        style={{ borderLeft: `4px solid ${cfg.color}`, transition: 'all 0.2s ease' }}
       >
-        <div style={{ flexShrink: 0 }}>
+        <div className="shrink-0">
           <div
-            style={{
-              width: 38, height: 38, borderRadius: '50%',
-              background: cfg.bg,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
+            className="w-[38px] h-[38px] rounded-[50%] flex items-center justify-center" style={{ background: cfg.bg }}
           >
             <HeartPulse size={18} style={{ color: cfg.color }} />
           </div>
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontWeight: 700, fontSize: 14, margin: 0, color: 'var(--base-content)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-[14px] m-[0px] text-base-content whitespace-nowrap overflow-hidden text-ellipsis">
             {patient}
           </p>
-          <p style={{ fontSize: 12, color: 'color-mix(in oklch, var(--base-content) 60%, transparent)', margin: '2px 0 0', textTransform: 'capitalize' }}>
+          <p className="text-[12px] text-[color-mix(in oklch, var(--base-content) 60%, transparent)] mt-[2px] mx-[0px] mb-[0px] capitalize">
             {type}
           </p>
         </div>
-        <div style={{ flexShrink: 0, textAlign: 'right' }}>
-          <p style={{ fontSize: 12, fontWeight: 600, color: cfg.color, margin: 0 }}>{time}</p>
+        <div className="shrink-0 text-right">
+          <p className="text-[12px] font-semibold m-[0px]" style={{ color: cfg.color }}>{time}</p>
           <StatusBadge status={booking.status} />
         </div>
       </div>
@@ -160,12 +141,7 @@ function BookingDetailDrawer({ booking, onClose }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 50,
-        background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-        padding: '0',
-      }}
+      className="fixed inset-0 z-[50] bg-black/45 flex items-end justify-center p-[0px]"
     >
       <motion.div
         initial={{ y: '100%', opacity: 0 }}
@@ -173,45 +149,33 @@ function BookingDetailDrawer({ booking, onClose }) {
         exit={{ y: '100%', opacity: 0 }}
         transition={{ type: 'spring', damping: 26, stiffness: 300 }}
         onClick={e => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: 600,
-          background: 'var(--base-100)',
-          borderRadius: 'var(--r-box) var(--r-box) 0 0',
-          maxHeight: '88vh',
-          overflowY: 'auto',
-          boxShadow: '0 -8px 40px rgba(0,0,0,0.18)',
-        }}
+        className="w-full max-w-[600px] bg-base-100 rounded-[var(--r-box) var(--r-box) 0 0] max-h-[88vh] overflow-y-auto shadow-[0_-8px_40px_rgba(0,0,0,0.18)]"
       >
         {/* Handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12 }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--base-300)' }} />
+        <div className="flex justify-center pt-[12px]">
+          <div className="w-[40px] h-[4px] rounded-[2px] bg-base-300" />
         </div>
 
         {/* Header */}
-        <div style={{ padding: '16px 20px 12px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="pt-[16px] px-[20px] pb-[12px] flex items-center gap-[12px]">
           <div
-            style={{
-              width: 48, height: 48, borderRadius: '50%',
-              background: 'color-mix(in oklch, var(--primary) 12%, transparent)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}
+            className="w-[48px] h-[48px] rounded-[50%] bg-[color-mix(in oklch, var(--primary) 12%, transparent)] flex items-center justify-center shrink-0"
           >
-            <CalendarCheck size={22} style={{ color: 'var(--primary)' }} />
+            <CalendarCheck size={22} className="text-primary" />
           </div>
-          <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--base-content)', lineHeight: 1.2 }}>
+          <div className="flex-1">
+            <p className="m-[0px] text-[18px] font-bold text-base-content leading-[1.2]">
               {patient.name || customer.name || 'Patient'}
             </p>
-            <p style={{ margin: '2px 0 0', fontSize: 13, color: 'color-mix(in oklch, var(--base-content) 55%, transparent)', textTransform: 'capitalize' }}>
+            <p className="mt-[2px] mx-[0px] mb-[0px] text-[13px] text-[color-mix(in oklch, var(--base-content) 55%, transparent)] capitalize">
               {type}
             </p>
           </div>
           <StatusBadge status={booking.status} />
           <button
             onClick={onClose}
-            className="btn btn-ghost btn-circle btn-sm"
-            style={{ flexShrink: 0 }}
+            className="btn btn-ghost btn-circle btn-sm shrink-0"
+           
             aria-label="Close"
           >
             <X size={18} />
@@ -219,10 +183,10 @@ function BookingDetailDrawer({ booking, onClose }) {
         </div>
 
         {/* Divider */}
-        <div style={{ height: 1, background: 'var(--base-300)', margin: '0 20px' }} />
+        <div className="h-[1px] bg-base-300 my-[0px] mx-[20px]" />
 
         {/* Body */}
-        <div style={{ padding: '16px 20px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div className="pt-[16px] px-[20px] pb-[32px] flex flex-col gap-[20px]">
 
           {/* Time & Date */}
           <Section icon={<Clock size={16} />} title="Schedule">
@@ -271,7 +235,7 @@ function BookingDetailDrawer({ booking, onClose }) {
               {booking.fareBreakdown.platformFee > 0      && <InfoRow label="Platform Fee" value={`₹${booking.fareBreakdown.platformFee}`} />}
               {booking.fareBreakdown.taxes > 0            && <InfoRow label="Taxes" value={`₹${booking.fareBreakdown.taxes}`} />}
               {booking.fareBreakdown.discount > 0         && <InfoRow label="Discount" value={`-₹${booking.fareBreakdown.discount}`} />}
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--base-300)' }}>
+              <div className="mt-[8px] pt-[8px] border-t border-base-300">
                 <InfoRow label="Total" value={`₹${booking.fareBreakdown.totalAmount}`} bold />
               </div>
             </Section>
@@ -290,19 +254,14 @@ function BookingDetailDrawer({ booking, onClose }) {
 function Section({ icon, title, children }) {
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-        <span style={{ color: 'var(--primary)' }}>{icon}</span>
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'color-mix(in oklch, var(--base-content) 50%, transparent)' }}>
+      <div className="flex items-center gap-[6px] mb-[10px]">
+        <span className="text-primary">{icon}</span>
+        <p className="m-[0px] text-[12px] font-bold tracking-[0.07em] uppercase text-[color-mix(in oklch, var(--base-content) 50%, transparent)]">
           {title}
         </p>
       </div>
       <div
-        style={{
-          background: 'var(--base-200)',
-          borderRadius: 'var(--r-field)',
-          padding: '10px 14px',
-          display: 'flex', flexDirection: 'column', gap: 8,
-        }}
+        className="bg-base-200 rounded-[var(--r-field)] py-[10px] px-[14px] flex flex-col gap-[8px]"
       >
         {children}
       </div>
@@ -312,19 +271,12 @@ function Section({ icon, title, children }) {
 
 function InfoRow({ label, value, icon, mono, bold }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-      <span style={{ fontSize: 13, color: 'color-mix(in oklch, var(--base-content) 55%, transparent)', flexShrink: 0 }}>
+    <div className="flex justify-between items-center gap-[8px]">
+      <span className="text-[13px] text-[color-mix(in oklch, var(--base-content) 55%, transparent)] shrink-0">
         {label}
       </span>
       <span
-        style={{
-          fontSize: 13,
-          fontWeight: bold ? 700 : 500,
-          color: bold ? 'var(--primary)' : 'var(--base-content)',
-          fontFamily: mono ? 'monospace' : undefined,
-          textAlign: 'right',
-          display: 'flex', alignItems: 'center', gap: 4,
-        }}
+        className="text-[13px] text-right flex items-center gap-[4px]" style={{ fontWeight: bold ? 700 : 500, color: bold ? 'var(--primary)' : 'var(--base-content)', fontFamily: mono ? 'monospace' : undefined }}
       >
         {icon}{value}
       </span>
@@ -392,37 +344,27 @@ export default function Schedule() {
 
   return (
     <div
-      style={{
-        minHeight: '100vh',
-        background: 'var(--base-100)',
-        paddingBottom: 40,
-        fontFamily: 'var(--font-family-poppins, sans-serif)',
-      }}
+      className="min-h-[100vh] bg-base-100 pb-[40px]" style={{ fontFamily: 'var(--font-family-poppins, sans-serif)' }}
     >
       {/* ── Header ── */}
       <div
-        style={{
-          position: 'sticky', top: 0, zIndex: 30,
-          background: 'var(--base-100)',
-          borderBottom: '1px solid var(--base-300)',
-          padding: '12px 16px',
-        }}
+        className="sticky top-[0px] z-[30] bg-base-100 border-b border-base-300 py-[12px] px-[16px]"
       >
-        <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="max-w-[640px] my-[0px] mx-[auto] flex items-center gap-[12px]">
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => router.back()}
             className="btn btn-ghost btn-circle btn-sm"
             aria-label="Go back"
           >
-            <ArrowLeft size={20} style={{ color: 'var(--primary)' }} />
+            <ArrowLeft size={20} className="text-primary" />
           </motion.button>
 
-          <div style={{ flex: 1 }}>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--base-content)', lineHeight: 1.2, fontFamily: 'var(--font-family-montserrat, sans-serif)' }}>
+          <div className="flex-1">
+            <h1 className="m-[0px] text-[20px] font-bold text-base-content leading-[1.2]" style={{ fontFamily: 'var(--font-family-montserrat, sans-serif)' }}>
               My Schedule
             </h1>
-            <p style={{ margin: 0, fontSize: 12, color: 'color-mix(in oklch, var(--base-content) 50%, transparent)' }}>
+            <p className="m-[0px] text-[12px] text-[color-mix(in oklch, var(--base-content) 50%, transparent)]">
               Care Assistant
             </p>
           </div>
@@ -430,8 +372,8 @@ export default function Schedule() {
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={goToday}
-            className="btn btn-outline btn-sm"
-            style={{ fontSize: 12 }}
+            className="btn btn-outline btn-sm text-[12px]"
+           
           >
             <Calendar size={14} />
             Today
@@ -439,18 +381,18 @@ export default function Schedule() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 640, margin: '0 auto', padding: '16px 16px 0' }}>
+      <div className="max-w-[640px] my-[0px] mx-[auto] pt-[16px] px-[16px] pb-[0px]">
 
         {/* ── Calendar ── */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          className="card"
-          style={{ padding: '16px', marginBottom: 20 }}
+          className="card p-[16px] mb-[20px]"
+         
         >
           {/* Month nav */}
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+          <div className="flex items-center mb-[16px]">
             <motion.button
               whileTap={{ scale: 0.88 }}
               onClick={prevMonth}
@@ -463,11 +405,7 @@ export default function Schedule() {
               key={`${year}-${month}`}
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              style={{
-                flex: 1, textAlign: 'center', margin: 0,
-                fontSize: 16, fontWeight: 700, color: 'var(--base-content)',
-                fontFamily: 'var(--font-family-montserrat, sans-serif)',
-              }}
+              className="flex-1 text-center m-[0px] text-[16px] font-bold text-base-content" style={{ fontFamily: 'var(--font-family-montserrat, sans-serif)' }}
             >
               {MONTHS[month]} {year}
             </motion.h2>
@@ -482,16 +420,16 @@ export default function Schedule() {
           </div>
 
           {/* Day labels */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 6 }}>
+          <div className="grid grid-cols-[repeat(7,_1fr)] mb-[6px]">
             {DAYS_SHORT.map(d => (
-              <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'color-mix(in oklch, var(--base-content) 45%, transparent)', padding: '4px 0', letterSpacing: '0.04em' }}>
+              <div key={d} className="text-center text-[11px] font-semibold text-[color-mix(in oklch, var(--base-content) 45%, transparent)] py-[4px] px-[0px] tracking-[0.04em]">
                 {d}
               </div>
             ))}
           </div>
 
           {/* Date cells */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+          <div className="grid grid-cols-[repeat(7,_1fr)] gap-[4px]">
             {calDays.map((day, idx) => {
               if (!day) return <div key={`empty-${idx}`} />;
 
@@ -507,48 +445,29 @@ export default function Schedule() {
                   key={ymd}
                   whileTap={{ scale: 0.88 }}
                   onClick={() => handleDateClick(dateObj)}
-                  style={{
-                    position: 'relative',
-                    display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center',
-                    height: 42,
-                    borderRadius: 'var(--r-field)',
-                    border: isSelected
+                  className="relative flex flex-col items-center justify-center h-[42px] rounded-[var(--r-field)] cursor-pointer" style={{ border: isSelected
                       ? '2px solid var(--primary)'
                       : isToday
                         ? '1.5px solid color-mix(in oklch, var(--primary) 40%, transparent)'
-                        : '1px solid transparent',
-                    background: isSelected
+                        : '1px solid transparent', background: isSelected
                       ? 'var(--primary)'
                       : isToday
                         ? 'color-mix(in oklch, var(--primary) 10%, transparent)'
-                        : 'transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.18s ease',
-                    opacity: isPast && !isToday && !isSelected ? 0.45 : 1,
-                  }}
+                        : 'transparent', transition: 'all 0.18s ease', opacity: isPast && !isToday && !isSelected ? 0.45 : 1 }}
                   aria-label={`${day} ${MONTHS[month]}`}
                 >
                   <span
-                    style={{
-                      fontSize: 13, fontWeight: isToday || isSelected ? 700 : 500,
-                      color: isSelected
+                    className="text-[13px] leading-[1]" style={{ fontWeight: isToday || isSelected ? 700 : 500, color: isSelected
                         ? 'var(--primary-content)'
                         : isToday
                           ? 'var(--primary)'
-                          : 'var(--base-content)',
-                      lineHeight: 1,
-                    }}
+                          : 'var(--base-content)' }}
                   >
                     {day}
                   </span>
                   {hasBooking && (
                     <span
-                      style={{
-                        position: 'absolute', bottom: 5,
-                        width: 5, height: 5, borderRadius: '50%',
-                        background: isSelected ? 'var(--primary-content)' : 'var(--accent)',
-                      }}
+                      className="absolute bottom-[5px] w-[5px] h-[5px] rounded-[50%]" style={{ background: isSelected ? 'var(--primary-content)' : 'var(--accent)' }}
                     />
                   )}
                 </motion.button>
@@ -558,19 +477,15 @@ export default function Schedule() {
         </motion.div>
 
         {/* ── Legend ── */}
-        <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap', padding: '0 2px' }}>
+        <div className="flex gap-[16px] mb-[16px] flex-wrap py-[0px] px-[2px]">
           {[
             { dot: 'var(--accent)', label: 'Has bookings' },
             { dot: 'var(--primary)', label: 'Selected' },
             { dot: 'color-mix(in oklch, var(--primary) 40%, transparent)', label: 'Today', border: true },
           ].map(({ dot, label, border }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{
-                width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
-                background: dot,
-                border: border ? `1.5px solid ${dot}` : undefined,
-              }} />
-              <span style={{ fontSize: 12, color: 'color-mix(in oklch, var(--base-content) 55%, transparent)' }}>{label}</span>
+            <div key={label} className="flex items-center gap-[6px]">
+              <span className="w-[10px] h-[10px] rounded-[50%] shrink-0" style={{ background: dot, border: border ? `1.5px solid ${dot}` : undefined }} />
+              <span className="text-[12px] text-[color-mix(in oklch, var(--base-content) 55%, transparent)]">{label}</span>
             </div>
           ))}
         </div>
@@ -586,14 +501,14 @@ export default function Schedule() {
               transition={{ duration: 0.25 }}
             >
               {/* Section title */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--base-content)', fontFamily: 'var(--font-family-montserrat, sans-serif)' }}>
+              <div className="flex items-center justify-between mb-[12px]">
+                <p className="m-[0px] text-[15px] font-bold text-base-content" style={{ fontFamily: 'var(--font-family-montserrat, sans-serif)' }}>
                   {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </p>
                 {dateBookings.length > 0 && (
                   <span
-                    className="badge badge-primary"
-                    style={{ fontSize: 12 }}
+                    className="badge badge-primary text-[12px]"
+                   
                   >
                     {dateBookings.length} booking{dateBookings.length > 1 ? 's' : ''}
                   </span>
@@ -601,26 +516,22 @@ export default function Schedule() {
               </div>
 
               {isLoading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
-                  <Loader2 size={28} style={{ color: 'var(--primary)', animation: 'spin 1s linear infinite' }} />
+                <div className="flex justify-center py-[32px] px-[0px]">
+                  <Loader2 size={28} className="text-primary" style={{ animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : error ? (
-                <div className="alert alert-error" style={{ marginBottom: 12 }}>
+                <div className="alert alert-error mb-[12px]">
                   <AlertCircle size={16} />
-                  <span style={{ fontSize: 13 }}>{error}</span>
+                  <span className="text-[13px]">{error}</span>
                 </div>
               ) : dateBookings.length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  style={{
-                    textAlign: 'center', padding: '36px 20px',
-                    background: 'var(--base-200)',
-                    borderRadius: 'var(--r-box)',
-                  }}
+                  className="text-center py-[36px] px-[20px] bg-base-200 rounded-[var(--r-box)]"
                 >
-                  <Calendar size={36} style={{ color: 'color-mix(in oklch, var(--base-content) 25%, transparent)', margin: '0 auto 10px' }} />
-                  <p style={{ margin: 0, color: 'color-mix(in oklch, var(--base-content) 45%, transparent)', fontSize: 14 }}>
+                  <Calendar size={36} className="text-[color-mix(in oklch, var(--base-content) 25%, transparent)] mt-[0px] mx-[auto] mb-[10px]" />
+                  <p className="m-[0px] text-[color-mix(in oklch, var(--base-content) 45%, transparent)] text-[14px]">
                     No bookings for this day
                   </p>
                 </motion.div>
@@ -646,17 +557,13 @@ export default function Schedule() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              style={{
-                textAlign: 'center', padding: '40px 20px',
-                background: 'var(--base-200)',
-                borderRadius: 'var(--r-box)',
-              }}
+              className="text-center py-[40px] px-[20px] bg-base-200 rounded-[var(--r-box)]"
             >
-              <Calendar size={40} style={{ color: 'color-mix(in oklch, var(--primary) 50%, transparent)', margin: '0 auto 12px' }} />
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--base-content)' }}>
+              <Calendar size={40} className="text-[color-mix(in oklch, var(--primary) 50%, transparent)] mt-[0px] mx-[auto] mb-[12px]" />
+              <p className="m-[0px] text-[15px] font-semibold text-base-content">
                 Select a date
               </p>
-              <p style={{ margin: '6px 0 0', fontSize: 13, color: 'color-mix(in oklch, var(--base-content) 45%, transparent)' }}>
+              <p className="mt-[6px] mx-[0px] mb-[0px] text-[13px] text-[color-mix(in oklch, var(--base-content) 45%, transparent)]">
                 Tap any date to view your bookings
               </p>
             </motion.div>
@@ -669,12 +576,12 @@ export default function Schedule() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            style={{ marginTop: 28 }}
+            className="mt-[28px]"
           >
-            <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'color-mix(in oklch, var(--base-content) 45%, transparent)' }}>
+            <p className="mt-[0px] mx-[0px] mb-[12px] text-[13px] font-bold tracking-[0.06em] uppercase text-[color-mix(in oklch, var(--base-content) 45%, transparent)]">
               Month Overview
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+            <div className="grid grid-cols-[repeat(2,_1fr)] gap-[10px]">
               {[
                 { label: 'Total Tasks',  value: tasks.length,                                                          icon: <CalendarCheck size={18} /> },
                 { label: 'Confirmed',    value: tasks.filter(b => b.status === 'confirmed').length,                    icon: <CheckCircle2 size={18} /> },
@@ -683,21 +590,16 @@ export default function Schedule() {
               ].map(({ label, value, icon }) => (
                 <div
                   key={label}
-                  className="stat-card"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12 }}
+                  className="stat-card flex items-center gap-[12px]"
+                 
                 >
                   <div
-                    style={{
-                      width: 36, height: 36, borderRadius: 'var(--r-field)',
-                      background: 'color-mix(in oklch, var(--primary) 12%, transparent)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: 'var(--primary)', flexShrink: 0,
-                    }}
+                    className="w-[36px] h-[36px] rounded-[var(--r-field)] bg-[color-mix(in oklch, var(--primary) 12%, transparent)] flex items-center justify-center text-primary shrink-0"
                   >
                     {icon}
                   </div>
                   <div>
-                    <p className="stat-card-value" style={{ fontSize: 22 }}>{value}</p>
+                    <p className="stat-card-value text-[22px]">{value}</p>
                     <p className="stat-card-label">{label}</p>
                   </div>
                 </div>

@@ -53,6 +53,7 @@ import ticketReducer from './slices/ticketSlice';
 import chatReducer from './slices/chatSlice';
 import socketReducer from './slices/socketSlice';
 import analyticsReducer from './slices/analyticsSlice';
+import searchReducer from './slices/searchSlice';
 // ─────────────────────────────────────────────────────────────────────────────
 // STORE CONFIGURATION
 // ─────────────────────────────────────────────────────────────────────────────
@@ -109,6 +110,7 @@ export const store = configureStore({
     wallet: walletReducer,
     partnerWallet: partnerWalletReducer,
     earnings: earningsReducer,
+    search: searchReducer,
   },
     middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

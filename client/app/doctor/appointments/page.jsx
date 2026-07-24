@@ -16,7 +16,7 @@ import {
   Plus, Eye, Activity, CalendarDays, MoreVertical, Layers,
   ClipboardList, PenLine, BadgeCheck, Radio, UserCheck, XOctagon,
   TrendingUp, LayoutDashboard, History, Star, Users,
-  Phone, QrCode, CreditCard, DollarSign, Wallet,
+  Phone, QrCode, CreditCard, DollarSign, Wallet, ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
@@ -56,6 +56,19 @@ import {
   selectConsultationList,
   selectLoading as selectConsultLoading,
 } from '@/store/slices/consultationSlice';
+
+// FIX: Accept / Confirm (doctor accepts a pending consultation, booking
+// pending -> confirmed, OP card auto-sent) live on the booking-embedded
+// consultation system (bookingRouter2 controller), wired through
+// operationsSlice — NOT consultationSlice. These were completely missing
+// from this file before, so pending appointments had no way to be
+// accepted or rejected by the doctor.
+import {
+  acceptConsultation,
+  confirmConsultation,
+  selectAcceptConsultationLoading,
+  selectConfirmConsultationLoading,
+} from '@/store/slices/operationsSlice';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -177,6 +190,12 @@ const canJoinConsult = (b) =>
   ['confirmed', 'in_progress', 'scheduled', 'waiting', 'active'].includes(b?.status) &&
   !!b?.consultationSessionId;
 
+// FIX: pending/created bookings tied to a linked Consultation doc are the
+// ones a doctor can Accept (confirm) or Reject. Once accepted, status moves
+// off pending/created so these buttons naturally disappear.
+const canConfirmReject = (b) =>
+  ['pending', 'created'].includes(b?.status) && !!b?.doctor;
+
 const bookingIdFromOP = (op) => {
   if (!op?.booking) return null;
   if (typeof op.booking === 'string') return op.booking;
@@ -188,6 +207,10 @@ const getPatientName = (b) => b?.patientInfo?.name ?? b?.customer?.name ?? '—'
 const getPatientPhone = (b) => b?.patientInfo?.phone ?? b?.customer?.phone ?? '—';
 const getInitial = (b) => (getPatientName(b)?.[0] ?? '?').toUpperCase();
 
+// FIX: this is the single source of truth for "which Consultation document
+// does this booking join?". It must ALWAYS resolve to the Consultation._id
+// (i.e. Booking.consultationSessionId), never to the Booking._id itself —
+// the /doctor/consultation/[consultationId] route expects a Consultation _id.
 const getConsultationId = (b) => {
   const rawId = b?.consultationSessionId || b?.consultationId || b?.consultation;
   if (!rawId) return null;
@@ -310,10 +333,11 @@ PatientAvatar.displayName = 'PatientAvatar';
 // ACTION MENU (PORTALED)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MenuItem = ({ icon, label, highlight = '', onClick }) => (
+const MenuItem = ({ icon, label, highlight = '', onClick, disabled = false }) => (
   <button
-    className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-base-200 text-base-content transition-colors ${highlight}`}
+    className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-base-200 text-base-content transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${highlight}`}
     onClick={onClick}
+    disabled={disabled}
     role="menuitem"
   >
     {icon}
@@ -321,7 +345,7 @@ const MenuItem = ({ icon, label, highlight = '', onClick }) => (
   </button>
 );
 
-const ActionMenu = memo(({ booking, opRecord, onComplete, onCancel, router }) => {
+const ActionMenu = memo(({ booking, opRecord, onComplete, onCancel, onConfirm, onReject, confirmLoading, router }) => {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const [mounted, setMounted] = useState(false);
@@ -332,6 +356,11 @@ const ActionMenu = memo(({ booking, opRecord, onComplete, onCancel, router }) =>
 
   const canComplete = ['in_progress', 'confirmed', 'active'].includes(booking?.status);
   const showVideo   = canJoinConsult(booking);
+  const showConfirmReject = canConfirmReject(booking);
+  // FIX: single, correct resolution of the Consultation _id — used for the
+  // join action below. Previously a second "Join by Consultation ID" item
+  // duplicated this while the first "Join Video Call" item incorrectly used
+  // booking._id, sending doctors to a consultation route with the wrong id.
   const consultationId = getConsultationId(booking);
 
   const toggleMenu = (e) => {
@@ -376,27 +405,45 @@ const ActionMenu = memo(({ booking, opRecord, onComplete, onCancel, router }) =>
           className="w-56 bg-base-100 border border-base-300 rounded-xl shadow-2xl py-1 overflow-hidden"
           role="menu"
         >
+          {/* Confirm / Reject — pending bookings only */}
+          {showConfirmReject && (
+            <>
+              <MenuItem
+                icon={<ThumbsUp size={14} className="text-success" />}
+                label="Confirm / Accept"
+                highlight="text-success hover:bg-success/10"
+                disabled={confirmLoading}
+                onClick={() => { close(); onConfirm(booking); }}
+              />
+              <MenuItem
+                icon={<ThumbsDown size={14} className="text-error" />}
+                label="Reject"
+                highlight="text-error hover:bg-error/10"
+                disabled={confirmLoading}
+                onClick={() => { close(); onReject(booking); }}
+              />
+              <div className="border-t border-base-200 my-1 mx-3" role="separator" />
+            </>
+          )}
+
           <MenuItem
             icon={<Eye size={14} className="text-primary" />}
             label="View Details"
             onClick={() => { close(); router.push(`/doctor/appointments/${booking._id}`); }}
           />
-          {showVideo && (
+
+          {/* FIX: was previously two menu items — "Join Video Call" (buggy,
+              routed on booking._id) and "Join by Consultation ID" (correct,
+              routed on consultationId). Collapsed into one correct item. */}
+          {showVideo && consultationId && (
             <MenuItem
               icon={<Video size={14} className="text-info" />}
               label="Join Video Call"
               highlight="text-info font-medium"
-              onClick={() => { close(); router.push(`/doctor/consultation/${booking._id}`); }}
-            />
-          )}
-          {consultationId && showVideo && (
-            <MenuItem
-              icon={<Video size={14} className="text-success" />}
-              label="Join by Consultation ID"
-              highlight="text-success font-medium"
               onClick={() => { close(); router.push(`/doctor/consultation/${consultationId}`); }}
             />
           )}
+
           <MenuItem
             icon={<PenLine size={14} className="text-accent" />}
             label="Write Prescription"
@@ -595,10 +642,11 @@ const LoadingRows = () => (
 // APPOINTMENT TABLE ROW
 // ─────────────────────────────────────────────────────────────────────────────
 
-const AppointmentRow = memo(({ booking, index, opByBooking, onComplete, onCancel, onPayAtService, router }) => {
+const AppointmentRow = memo(({ booking, index, opByBooking, onComplete, onCancel, onConfirm, onReject, confirmLoading, onPayAtService, router }) => {
   const op       = opByBooking[booking._id?.toString()];
   const joinable = canJoinConsult(booking);
   const consultId = getConsultationId(booking);
+  const showConfirmReject = canConfirmReject(booking);
 
   return (
     <motion.tr
@@ -646,6 +694,30 @@ const AppointmentRow = memo(({ booking, index, opByBooking, onComplete, onCancel
       </td>
       <td className="text-right">
         <div className="flex items-center justify-end gap-1">
+          {/* Confirm / Reject — pending bookings */}
+          {showConfirmReject && (
+            <>
+              <button
+                className="btn btn-success btn-xs gap-1"
+                disabled={confirmLoading}
+                title="Confirm / Accept booking"
+                onClick={() => onConfirm(booking)}
+              >
+                {confirmLoading ? <span className="loading loading-xs loading-spinner" /> : <ThumbsUp size={12} aria-hidden="true" />}
+                <span className="hidden lg:inline">Confirm</span>
+              </button>
+              <button
+                className="btn btn-error btn-xs gap-1"
+                disabled={confirmLoading}
+                title="Reject booking"
+                onClick={() => onReject(booking)}
+              >
+                <ThumbsDown size={12} aria-hidden="true" />
+                <span className="hidden lg:inline">Reject</span>
+              </button>
+            </>
+          )}
+
           {/* Call patient */}
           {booking?.patientInfo?.phone && (
              <a href={`tel:${booking.patientInfo.phone}`}
@@ -655,7 +727,7 @@ const AppointmentRow = memo(({ booking, index, opByBooking, onComplete, onCancel
               <Phone size={13} aria-hidden="true" />
             </a>
           )}
-          
+
           {/* Pay-at-service */}
           {canShowQrPay(booking) && (
             <button
@@ -680,7 +752,7 @@ const AppointmentRow = memo(({ booking, index, opByBooking, onComplete, onCancel
               <span className="hidden lg:inline">Join</span>
             </button>
           )}
-          
+
           <button
             className="btn btn-ghost btn-xs gap-1 text-accent hover:bg-accent/10"
             onClick={() => router.push(`/doctor/prescriptions/new?bookingId=${booking._id}`)}
@@ -694,6 +766,9 @@ const AppointmentRow = memo(({ booking, index, opByBooking, onComplete, onCancel
             opRecord={op}
             onComplete={onComplete}
             onCancel={onCancel}
+            onConfirm={onConfirm}
+            onReject={onReject}
+            confirmLoading={confirmLoading}
             router={router}
           />
         </div>
@@ -707,10 +782,11 @@ AppointmentRow.displayName = 'AppointmentRow';
 // MOBILE CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MobileCard = memo(({ booking, index, opByBooking, onComplete, onCancel, onPayAtService, router }) => {
+const MobileCard = memo(({ booking, index, opByBooking, onComplete, onCancel, onConfirm, onReject, confirmLoading, onPayAtService, router }) => {
   const op = opByBooking[booking._id?.toString()];
   const joinable = canJoinConsult(booking);
   const consultId = getConsultationId(booking);
+  const showConfirmReject = canConfirmReject(booking);
 
   return (
     <motion.div
@@ -740,6 +816,28 @@ const MobileCard = memo(({ booking, index, opByBooking, onComplete, onCancel, on
           <ConsultTypeBadge type={booking.consultationType} />
         </div>
       </div>
+
+      {showConfirmReject && (
+        <div className="flex gap-2">
+          <button
+            className="btn btn-success btn-sm flex-1 gap-1 text-xs"
+            disabled={confirmLoading}
+            onClick={() => onConfirm(booking)}
+          >
+            {confirmLoading ? <span className="loading loading-xs loading-spinner" /> : <ThumbsUp size={12} aria-hidden="true" />}
+            Confirm
+          </button>
+          <button
+            className="btn btn-error btn-sm flex-1 gap-1 text-xs"
+            disabled={confirmLoading}
+            onClick={() => onReject(booking)}
+          >
+            <ThumbsDown size={12} aria-hidden="true" />
+            Reject
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2 pt-1">
         {joinable && consultId && (
           <button
@@ -786,7 +884,16 @@ const MobileCard = memo(({ booking, index, opByBooking, onComplete, onCancel, on
           </button>
         )}
         <div className="flex-none">
-          <ActionMenu booking={booking} opRecord={op} onComplete={onComplete} onCancel={onCancel} router={router} />
+          <ActionMenu
+            booking={booking}
+            opRecord={op}
+            onComplete={onComplete}
+            onCancel={onCancel}
+            onConfirm={onConfirm}
+            onReject={onReject}
+            confirmLoading={confirmLoading}
+            router={router}
+          />
         </div>
       </div>
     </motion.div>
@@ -1221,7 +1328,7 @@ const PayAtServicePanel = memo(({ bookingId, bookingCode, amount, onClose }) => 
                 )}
               </div>
             )}
-            
+
             {(needsNew || !session?.shortUrl) && !session?.paid && (
               <div className="space-y-2">
                 <p className="text-xs text-base-content/60">Generate Razorpay QR link — show to customer</p>
@@ -1317,6 +1424,12 @@ export default function AppointmentsManagement() {
   const error        = useSelector(selectClinicalError('fetchDoctorAppointments'));
   const doctorStats  = useSelector(selectDoctorStats);
 
+  // Confirm/Reject loading (operationsSlice — accept & confirm share the
+  // 'accept' loading key for the button; reject reuses cancel loading below)
+  const acceptLoading  = useSelector(selectAcceptConsultationLoading);
+  const confirmLoading = useSelector(selectConfirmConsultationLoading);
+  const confirmRejectBusy = acceptLoading || confirmLoading;
+
   // ── Tab ────────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('appointments');
 
@@ -1351,6 +1464,7 @@ export default function AppointmentsManagement() {
     dispatch(fetchOPRecords({ page: 1, limit: 200 }));
     dispatch(fetchDoctorStats());
     dispatch(fetchDoctorSchedule());
+    dispatch(fetchDoctorMy({ page: 1, limit: 50 }));
   }, [dispatch, statusFilter, consType, search, from, to, page]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -1422,6 +1536,35 @@ export default function AppointmentsManagement() {
     await dispatch(cancelConsultation({ id: String(consultationId), reason: reason || 'Cancelled by doctor' }));
     fetchData();
   }, [dispatch, fetchData]);
+
+  // FIX (new): doctor Confirm/Accept a pending booking. Uses the
+  // booking-embedded consultation accept route when a Consultation is
+  // already linked (online/video bookings); falls back to the explicit
+  // confirm route (accepts consent) otherwise. Both live in operationsSlice.
+  const handleConfirmBooking = useCallback(async (booking) => {
+    const consultationId = getConsultationId(booking);
+    if (!consultationId) {
+      toast.error('No linked consultation session — ask admin to confirm this booking.');
+      return;
+    }
+    const action = booking.status === 'created'
+      ? confirmConsultation({ consultationId, consentAccepted: true })
+      : acceptConsultation({ consultationId });
+    await dispatch(action);
+    fetchData();
+  }, [dispatch, fetchData]);
+
+  // FIX (new): doctor Reject a pending booking — reuses the same
+  // cancel-consultation flow (prompts reason, cancels Consultation +
+  // booking) already wired for "Cancel Consultation" in the menu.
+  const handleRejectBooking = useCallback(async (booking) => {
+    const consultationId = getConsultationId(booking);
+    if (!consultationId) {
+      toast.error('No linked consultation session — ask admin to reject this booking.');
+      return;
+    }
+    await handleCancelConsultation(consultationId);
+  }, [handleCancelConsultation]);
 
   const clearFilters = useCallback(() => {
     setStatusFilter(''); setConsType(''); setFrom(''); setTo(''); setSearchRaw('');
@@ -1569,6 +1712,9 @@ export default function AppointmentsManagement() {
                             opByBooking={opByBooking}
                             onComplete={handleCompleteClick}
                             onCancel={handleCancelConsultation}
+                            onConfirm={handleConfirmBooking}
+                            onReject={handleRejectBooking}
+                            confirmLoading={confirmRejectBusy}
                             onPayAtService={setPayTarget}
                             router={router}
                           />
@@ -1593,6 +1739,9 @@ export default function AppointmentsManagement() {
                         opByBooking={opByBooking}
                         onComplete={handleCompleteClick}
                         onCancel={handleCancelConsultation}
+                        onConfirm={handleConfirmBooking}
+                        onReject={handleRejectBooking}
+                        confirmLoading={confirmRejectBusy}
                         onPayAtService={setPayTarget}
                         router={router}
                       />

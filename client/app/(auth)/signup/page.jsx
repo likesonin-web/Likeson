@@ -107,13 +107,13 @@ const ReferralBanner = ({ code, validating, validation, onDismiss }) => {
       <motion.div
         initial={{ opacity: 0, y: -6 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-3 px-4 py-3 rounded-md border text-xs"
-        style={{ background: 'var(--base-200)', borderColor: 'var(--base-300)' }}
+        className="flex items-center gap-3 px-4 py-3 rounded-md border text-xs bg-base-200"
+        style={{ borderColor: 'var(--base-300)' }}
       >
-        <Loader2 size={14} className="animate-spin flex-shrink-0" style={{ color: 'var(--primary)' }} />
-        <span style={{ color: 'color-mix(in oklch, var(--base-content) 55%, transparent)' }}>
+        <Loader2 size={14} className="animate-spin flex-shrink-0 text-primary" />
+        <span className="text-[color-mix(in oklch, var(--base-content) 55%, transparent)]">
           Checking code{' '}
-          <strong className="font-black" style={{ color: 'var(--base-content)' }}>{code}</strong>…
+          <strong className="font-black text-base-content">{code}</strong>…
         </span>
       </motion.div>
     );
@@ -126,43 +126,37 @@ const ReferralBanner = ({ code, validating, validation, onDismiss }) => {
         initial={{ opacity: 0, y: -6 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -6 }}
-        className="flex items-start gap-3 px-4 py-3.5 rounded-md"
-        style={{
-          background: 'color-mix(in oklch, var(--success) 10%, var(--base-100))',
-          border:     '1.5px solid color-mix(in oklch, var(--success) 30%, transparent)',
-        }}
+        className="flex items-start gap-3 px-4 py-3.5 rounded-md bg-[color-mix(in oklch, var(--success) 10%, var(--base-100))] border-[1.5px] border-[color-mix(in oklch, var(--success) 30%, transparent)]"
+       
       >
         <motion.div
-          className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
-          style={{ background: 'color-mix(in oklch, var(--success) 20%, var(--base-200))' }}
+          className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 bg-[color-mix(in oklch, var(--success) 20%, var(--base-200))]"
+         
           animate={{ rotate: [0, -10, 10, -6, 6, 0] }}
           transition={{ duration: 0.6, delay: 0.15 }}
         >
-          <Gift size={15} style={{ color: 'var(--success)' }} />
+          <Gift size={15} className="text-success" />
         </motion.div>
 
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-black" style={{ color: 'var(--success)' }}>
+          <p className="text-xs font-black text-success">
             Referral code applied!
           </p>
           <p
-            className="text-[11px] mt-0.5 leading-relaxed"
-            style={{ color: 'color-mix(in oklch, var(--base-content) 58%, transparent)' }}
+            className="text-[11px] mt-0.5 leading-relaxed text-[color-mix(in oklch, var(--base-content) 58%, transparent)]"
+           
           >
             Invited by{' '}
-            <strong className="font-black" style={{ color: 'var(--base-content)' }}>
+            <strong className="font-black text-base-content">
               {validation.referrerName ?? 'a friend'}
             </strong>
             . You&apos;ll get{' '}
-            <strong className="font-black" style={{ color: 'var(--success)' }}>{bonus}</strong>{' '}
+            <strong className="font-black text-success">{bonus}</strong>{' '}
             in coins on signup.
           </p>
           <span
-            className="inline-flex items-center gap-1 mt-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest"
-            style={{
-              background: 'color-mix(in oklch, var(--success) 15%, var(--base-200))',
-              color: 'var(--success)',
-            }}
+            className="inline-flex items-center gap-1 mt-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-[color-mix(in oklch, var(--success) 15%, var(--base-200))] text-success"
+           
           >
             <BadgeCheck size={10} /> {code}
           </span>
@@ -177,18 +171,15 @@ const ReferralBanner = ({ code, validating, validation, onDismiss }) => {
         initial={{ opacity: 0, y: -6 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -6 }}
-        className="flex items-start gap-3 px-4 py-3.5 rounded-md"
-        style={{
-          background: 'color-mix(in oklch, var(--warning) 10%, var(--base-100))',
-          border:     '1.5px solid color-mix(in oklch, var(--warning) 30%, transparent)',
-        }}
+        className="flex items-start gap-3 px-4 py-3.5 rounded-md bg-[color-mix(in oklch, var(--warning) 10%, var(--base-100))] border-[1.5px] border-[color-mix(in oklch, var(--warning) 30%, transparent)]"
+       
       >
-        <AlertTriangle size={15} style={{ color: 'var(--warning)' }} className="flex-shrink-0 mt-0.5" />
+        <AlertTriangle size={15} className="text-warning flex-shrink-0 mt-0.5" />
         <div className="flex-1">
-          <p className="text-xs font-black" style={{ color: 'var(--warning)' }}>Invalid referral code</p>
+          <p className="text-xs font-black text-warning">Invalid referral code</p>
           <p
-            className="text-[11px] mt-0.5"
-            style={{ color: 'color-mix(in oklch, var(--base-content) 50%, transparent)' }}
+            className="text-[11px] mt-0.5 text-[color-mix(in oklch, var(--base-content) 50%, transparent)]"
+           
           >
             Code <strong className="font-black">{code}</strong> wasn&apos;t found. You can still sign up without it.
           </p>
@@ -197,10 +188,10 @@ const ReferralBanner = ({ code, validating, validation, onDismiss }) => {
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss"
-          className="w-6 h-6 rounded-full flex items-center justify-center transition-colors flex-shrink-0"
-          style={{ background: 'color-mix(in oklch, var(--warning) 20%, var(--base-200))' }}
+          className="w-6 h-6 rounded-full flex items-center justify-center transition-colors flex-shrink-0 bg-[color-mix(in oklch, var(--warning) 20%, var(--base-200))]"
+         
         >
-          <X size={10} style={{ color: 'var(--warning)' }} />
+          <X size={10} className="text-warning" />
         </button>
       </motion.div>
     );
@@ -225,7 +216,7 @@ const LegalPreviewDrawer = ({ doc, type }) => {
   const effectiveDate = doc.effectiveDate;
 
   return (
-    <div className="rounded-md overflow-hidden" style={{ border: '1.5px solid var(--base-300)' }}>
+    <div className="rounded-md overflow-hidden border-[1.5px] border-base-300">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -243,15 +234,15 @@ const LegalPreviewDrawer = ({ doc, type }) => {
             }
           </div>
           <div className="text-left">
-            <p className="text-xs font-black" style={{ color: 'var(--base-content)' }}>{doc.title}</p>
-            <p className="text-[10px]" style={{ color: 'color-mix(in oklch, var(--base-content) 40%, transparent)' }}>
+            <p className="text-xs font-black text-base-content">{doc.title}</p>
+            <p className="text-[10px] text-[color-mix(in oklch, var(--base-content) 40%, transparent)]">
               v{version} · Effective {formatDate(effectiveDate)}
             </p>
           </div>
         </div>
         {open
-          ? <ChevronUp   size={14} style={{ color: 'color-mix(in oklch, var(--base-content) 35%, transparent)' }} />
-          : <ChevronDown size={14} style={{ color: 'color-mix(in oklch, var(--base-content) 35%, transparent)' }} />
+          ? <ChevronUp   size={14} className="text-[color-mix(in oklch, var(--base-content) 35%, transparent)]" />
+          : <ChevronDown size={14} className="text-[color-mix(in oklch, var(--base-content) 35%, transparent)]" />
         }
       </button>
       <AnimatePresence>
@@ -264,18 +255,15 @@ const LegalPreviewDrawer = ({ doc, type }) => {
             className="overflow-hidden"
           >
             <div
-              className="px-4 pb-4 pt-3"
-              style={{
-                borderTop:  '1px solid var(--base-300)',
-                background: 'color-mix(in oklch, var(--base-200) 50%, transparent)',
-              }}
+              className="px-4 pb-4 pt-3 border-t border-base-300 bg-[color-mix(in oklch, var(--base-200) 50%, transparent)]"
+             
             >
               {doc.summary
-                ? <p className="text-xs leading-relaxed" style={{ color: 'color-mix(in oklch, var(--base-content) 62%, transparent)' }}>{doc.summary}</p>
-                : <p className="text-xs italic" style={{ color: 'color-mix(in oklch, var(--base-content) 38%, transparent)' }}>No summary available.</p>
+                ? <p className="text-xs leading-relaxed text-[color-mix(in oklch, var(--base-content) 62%, transparent)]">{doc.summary}</p>
+                : <p className="text-xs italic text-[color-mix(in oklch, var(--base-content) 38%, transparent)]">No summary available.</p>
               }
               {doc.requiresReAcceptance && (
-                <div className="mt-3 flex items-center gap-2 text-[10px] font-bold" style={{ color: 'var(--warning)' }}>
+                <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-warning">
                   <AlertTriangle size={11} /> Re-acceptance required on future updates
                 </div>
               )}
@@ -321,7 +309,7 @@ const AnimatedCheckbox = ({ checked, onChange, accentVar, children }) => (
         )}
       </motion.div>
     </div>
-    <span className="text-xs leading-relaxed select-none" style={{ color: 'color-mix(in oklch, var(--base-content) 68%, transparent)' }}>
+    <span className="text-xs leading-relaxed select-none text-[color-mix(in oklch, var(--base-content) 68%, transparent)]">
       {children}
     </span>
   </label>
@@ -393,8 +381,8 @@ const ConsentStep = ({ onBack, onComplete }) => {
       <button
         type="button"
         onClick={onBack}
-        className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-colors"
-        style={{ color: 'color-mix(in oklch, var(--base-content) 40%, transparent)' }}
+        className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-colors text-[color-mix(in oklch, var(--base-content) 40%, transparent)]"
+       
         onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = 'color-mix(in oklch, var(--base-content) 40%, transparent)'; }}
       >
@@ -403,19 +391,16 @@ const ConsentStep = ({ onBack, onComplete }) => {
 
       <div className="flex flex-col items-center text-center gap-3">
         <motion.div
-          className="w-20 h-12 rounded-3xl flex items-center justify-center"
-          style={{
-            background: 'color-mix(in oklch, var(--primary) 10%, var(--base-200))',
-            border:     '1.5px solid color-mix(in oklch, var(--primary) 22%, var(--base-300))',
-          }}
+          className="w-20 h-12 rounded-3xl flex items-center justify-center bg-[color-mix(in oklch, var(--primary) 10%, var(--base-200))] border-[1.5px] border-[color-mix(in oklch, var(--primary) 22%, var(--base-300))]"
+         
           animate={{ scale: [1, 1.04, 1] }}
           transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
         >
-          <ShieldCheck size={38} style={{ color: 'var(--primary)' }} />
+          <ShieldCheck size={38} className="text-primary" />
         </motion.div>
         <div>
-          <p className="font-black text-lg tracking-tight" style={{ color: 'var(--base-content)' }}>One Last Step</p>
-          <p className="text-xs mt-0.5" style={{ color: 'color-mix(in oklch, var(--base-content) 50%, transparent)' }}>
+          <p className="font-black text-lg tracking-tight text-base-content">One Last Step</p>
+          <p className="text-xs mt-0.5 text-[color-mix(in oklch, var(--base-content) 50%, transparent)]">
             Review and accept our legal documents to continue
           </p>
         </div>
@@ -423,12 +408,8 @@ const ConsentStep = ({ onBack, onComplete }) => {
 
       {bothMissing ? (
         <div
-          className="p-4 rounded-md text-xs font-bold flex items-center gap-2"
-          style={{
-            background: 'color-mix(in oklch, var(--warning) 10%, var(--base-100))',
-            border:     '1.5px solid color-mix(in oklch, var(--warning) 25%, transparent)',
-            color:      'var(--warning)',
-          }}
+          className="p-4 rounded-md text-xs font-bold flex items-center gap-2 bg-[color-mix(in oklch, var(--warning) 10%, var(--base-100))] border-[1.5px] border-[color-mix(in oklch, var(--warning) 25%, transparent)] text-warning"
+         
         >
           <AlertTriangle size={15} /> No active legal documents found. Please contact support.
         </div>
@@ -445,8 +426,8 @@ const ConsentStep = ({ onBack, onComplete }) => {
                 accentVar="--primary"
               >
                 I have read and agree to the{' '}
-                <strong className="font-black" style={{ color: 'var(--primary)' }}>Terms &amp; Conditions</strong>
-                <span style={{ color: 'color-mix(in oklch, var(--base-content) 38%, transparent)' }}>
+                <strong className="font-black text-primary">Terms &amp; Conditions</strong>
+                <span className="text-[color-mix(in oklch, var(--base-content) 38%, transparent)]">
                   {' '}(v{termsVersion})
                 </span>
               </AnimatedCheckbox>
@@ -458,8 +439,8 @@ const ConsentStep = ({ onBack, onComplete }) => {
                 accentVar="--secondary"
               >
                 I have read and agree to the{' '}
-                <strong className="font-black" style={{ color: 'var(--secondary)' }}>Privacy Policy</strong>
-                <span style={{ color: 'color-mix(in oklch, var(--base-content) 38%, transparent)' }}>
+                <strong className="font-black text-secondary">Privacy Policy</strong>
+                <span className="text-[color-mix(in oklch, var(--base-content) 38%, transparent)]">
                   {' '}(v{privacyVersion})
                 </span>
               </AnimatedCheckbox>
@@ -482,8 +463,8 @@ const ConsentStep = ({ onBack, onComplete }) => {
       </motion.button>
 
       <p
-        className="text-center text-[10px] leading-relaxed"
-        style={{ color: 'color-mix(in oklch, var(--base-content) 30%, transparent)' }}
+        className="text-center text-[10px] leading-relaxed text-[color-mix(in oklch, var(--base-content) 30%, transparent)]"
+       
       >
         Your consent is recorded as required by the DPDP Act 2023. You may withdraw it at any time
         from your account settings.
@@ -502,8 +483,8 @@ const FormField = ({
 }) => (
   <div className="space-y-1.5">
     <label
-      className="text-[10px] font-black uppercase tracking-widest ml-1"
-      style={{ color: 'color-mix(in oklch, var(--base-content) 42%, transparent)' }}
+      className="text-[10px] font-black uppercase tracking-widest ml-1 text-[color-mix(in oklch, var(--base-content) 42%, transparent)]"
+     
     >
       {label}
     </label>
@@ -511,8 +492,8 @@ const FormField = ({
       {Icon && (
         <Icon
           size={17}
-          className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200"
-          style={{ color: 'color-mix(in oklch, var(--base-content) 22%, transparent)' }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 text-[color-mix(in oklch, var(--base-content) 22%, transparent)]"
+         
         />
       )}
       <input
@@ -566,11 +547,8 @@ const HeroPanel = ({ referralValidated, validation }) => (
       className="absolute inset-0 w-full h-full object-cover transition-transform duration-[1200ms] group-hover:scale-105"
     />
     <div
-      className="absolute inset-0"
-      style={{
-        background:
-          'linear-gradient(135deg, color-mix(in oklch, var(--primary) 96%, transparent) 0%, color-mix(in oklch, var(--primary) 55%, transparent) 55%, transparent 100%)',
-      }}
+      className="absolute inset-0 bg-[linear-gradient(135deg, color-mix(in oklch, var(--primary) 96%, transparent) 0%, color-mix(in oklch, var(--primary) 55%, transparent) 55%, transparent 100%)]"
+     
     />
     <div
       className="absolute inset-0 opacity-[0.07] pointer-events-none"
@@ -586,14 +564,10 @@ const HeroPanel = ({ referralValidated, validation }) => (
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="inline-flex p-4 rounded-md mb-8"
-          style={{
-            background:    'rgba(255,255,255,0.18)',
-            backdropFilter:'blur(16px)',
-            border:        '1.5px solid rgba(255,255,255,0.28)',
-          }}
+          className="inline-flex p-4 rounded-md mb-8 bg-white/18 backdrop-blur-[16px] border-[1.5px] border-[rgba(255,255,255,0.28)]"
+         
         >
-          <Heart size={36} style={{ color: 'white', fill: 'white' }} />
+          <Heart size={36} className="text-[white]" style={{ fill: 'white' }} />
         </motion.div>
 
         <motion.h1
@@ -609,8 +583,8 @@ const HeroPanel = ({ referralValidated, validation }) => (
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
-          className="text-lg leading-relaxed max-w-sm font-medium"
-          style={{ color: 'rgba(255,255,255,0.78)' }}
+          className="text-lg leading-relaxed max-w-sm font-medium text-[rgba(255,255,255,0.78)]"
+         
         >
           Join Likeson for fast medical help, expert doctors, and your health records safe in one place.
         </motion.p>
@@ -622,24 +596,20 @@ const HeroPanel = ({ referralValidated, validation }) => (
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="mb-4 flex items-center gap-4 p-5 rounded-md"
-            style={{
-              background:    'rgba(255,255,255,0.14)',
-              backdropFilter:'blur(16px)',
-              border:        '1.5px solid rgba(255,255,255,0.22)',
-            }}
+            className="mb-4 flex items-center gap-4 p-5 rounded-md bg-white/14 backdrop-blur-[16px] border-[1.5px] border-[rgba(255,255,255,0.22)]"
+           
           >
             <div
-              className="w-12 h-12 rounded-md flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(253,230,138,0.2)' }}
+              className="w-12 h-12 rounded-md flex items-center justify-center flex-shrink-0 bg-[rgba(253,230,138,0.2)]"
+             
             >
-              <Gift size={22} style={{ color: '#fde68a' }} />
+              <Gift size={22} className="text-[#fde68a]" />
             </div>
             <div>
               <p className="text-sm font-black uppercase tracking-wider text-white">Referral Bonus Active!</p>
-              <p className="text-xs mt-0.5 leading-snug" style={{ color: 'rgba(255,255,255,0.62)' }}>
+              <p className="text-xs mt-0.5 leading-snug text-[rgba(255,255,255,0.62)]">
                 You&apos;ll receive{' '}
-                <strong style={{ color: '#fde68a' }}>{parseBonusDisplay(validation)}</strong>{' '}
+                <strong className="text-[#fde68a]">{parseBonusDisplay(validation)}</strong>{' '}
                 in coins on signup.
               </p>
             </div>
@@ -662,8 +632,8 @@ const HeroPanel = ({ referralValidated, validation }) => (
             ))}
           </div>
           <p
-            className="text-xs font-bold uppercase tracking-wide"
-            style={{ color: 'rgba(255,255,255,0.65)' }}
+            className="text-xs font-bold uppercase tracking-wide text-[rgba(255,255,255,0.65)]"
+           
           >
             Used by 10,000+ people
           </p>
@@ -673,22 +643,18 @@ const HeroPanel = ({ referralValidated, validation }) => (
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="flex items-center gap-4 p-5 rounded-[1.75rem]"
-          style={{
-            background:    'rgba(255,255,255,0.10)',
-            backdropFilter:'blur(12px)',
-            border:        '1px solid rgba(255,255,255,0.12)',
-          }}
+          className="flex items-center gap-4 p-5 rounded-[1.75rem] bg-white/10 backdrop-blur-[12px] border border-[rgba(255,255,255,0.12)]"
+         
         >
           <div
-            className="p-3 rounded-xl"
-            style={{ background: 'color-mix(in oklch, var(--success) 20%, transparent)' }}
+            className="p-3 rounded-xl bg-[color-mix(in oklch, var(--success) 20%, transparent)]"
+           
           >
-            <ShieldCheck size={22} style={{ color: 'var(--success)' }} />
+            <ShieldCheck size={22} className="text-success" />
           </div>
           <div>
             <p className="text-sm font-black uppercase tracking-widest text-white">Safe &amp; Secure</p>
-            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
+            <p className="text-xs text-[rgba(255,255,255,0.55)]">
               Your private data is always protected
             </p>
           </div>
@@ -797,22 +763,22 @@ const SignUp = () => {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4 font-poppins"
-      style={{ background: 'var(--base-200)' }}
+      className="min-h-screen flex items-center justify-center p-4 font-poppins bg-base-200"
+     
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.98, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 min-h-[750px] overflow-hidden rounded-md"
-        style={{ background: 'var(--base-100)', border: '1.5px solid var(--base-300)' }}
+        className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 min-h-[750px] overflow-hidden rounded-md bg-base-100 border-[1.5px] border-base-300"
+       
       >
         <HeroPanel referralValidated={isReferralValid} validation={validation} />
 
         {/* RIGHT PANEL */}
         <div
-          className="relative flex flex-col justify-center p-8 sm:p-14"
-          style={{ background: 'var(--base-100)' }}
+          className="relative flex flex-col justify-center p-8 sm:p-14 bg-base-100"
+         
         >
           <div className="absolute top-10 right-10"><StepDots step={step} /></div>
 
@@ -827,23 +793,23 @@ const SignUp = () => {
               className="mb-8"
             >
               <div className="flex items-center gap-2 mb-3">
-                <Sparkles size={14} style={{ color: 'var(--primary)' }} />
+                <Sparkles size={14} className="text-primary" />
                 <span
-                  className="text-[10px] font-black uppercase tracking-widest"
-                  style={{ color: 'var(--primary)' }}
+                  className="text-[10px] font-black uppercase tracking-widest text-primary"
+                 
                 >
                   Step {step} of 3
                 </span>
               </div>
               <h2
-                className="font-montserrat font-black text-4xl tracking-tighter"
-                style={{ color: 'var(--base-content)' }}
+                className="font-montserrat font-black text-4xl tracking-tighter text-base-content"
+               
               >
                 {headings[step].title}
               </h2>
               <p
-                className="mt-1.5 font-medium text-sm"
-                style={{ color: 'color-mix(in oklch, var(--base-content) 50%, transparent)' }}
+                className="mt-1.5 font-medium text-sm text-[color-mix(in oklch, var(--base-content) 50%, transparent)]"
+               
               >
                 {headings[step].sub}
               </p>
@@ -860,12 +826,8 @@ const SignUp = () => {
                 className="mb-5 overflow-hidden"
               >
                 <div
-                  className="p-4 rounded-md flex items-center gap-3 text-[11px] font-bold"
-                  style={{
-                    background: 'color-mix(in oklch, var(--error) 10%, var(--base-100))',
-                    border:     '1.5px solid color-mix(in oklch, var(--error) 25%, transparent)',
-                    color:      'var(--error)',
-                  }}
+                  className="p-4 rounded-md flex items-center gap-3 text-[11px] font-bold bg-[color-mix(in oklch, var(--error) 10%, var(--base-100))] border-[1.5px] border-[color-mix(in oklch, var(--error) 25%, transparent)] text-error"
+                 
                 >
                   <ShieldAlert size={17} /> {error}
                 </div>
@@ -930,7 +892,7 @@ const SignUp = () => {
                     <button
                       type="button"
                       onClick={() => setShowPwd((v) => !v)}
-                      style={{ color: 'color-mix(in oklch, var(--base-content) 35%, transparent)' }}
+                      className="text-[color-mix(in oklch, var(--base-content) 35%, transparent)]"
                     >
                       {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
@@ -946,8 +908,8 @@ const SignUp = () => {
                         setShowRefInput((v) => !v);
                         if (showRefInput) { setReferralCode(''); resetValidation(); }
                       }}
-                      className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-colors"
-                      style={{ color: 'color-mix(in oklch, var(--primary) 65%, transparent)' }}
+                      className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-colors text-[color-mix(in oklch, var(--primary) 65%, transparent)]"
+                     
                     >
                       <Gift size={12} />
                       {showRefInput ? 'Remove referral code' : 'Have a referral code?'}
@@ -964,8 +926,8 @@ const SignUp = () => {
                           <div className="relative">
                             <Gift
                               size={16}
-                              className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
-                              style={{ color: 'color-mix(in oklch, var(--base-content) 22%, transparent)' }}
+                              className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-[color-mix(in oklch, var(--base-content) 22%, transparent)]"
+                             
                             />
                             <input
                               type="text"
@@ -975,14 +937,14 @@ const SignUp = () => {
                                 setReferralCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))
                               }
                               placeholder="e.g. A3KX9WQZ"
-                              className="input-field w-full h-12 font-black tracking-widest border-2 uppercase text-sm"
-                              style={{ paddingLeft: '3rem' }}
+                              className="input-field w-full h-12 font-black tracking-widest border-2 uppercase text-sm pl-[3rem]"
+                             
                             />
                             {validating && referralCode.length >= 6 && (
                               <Loader2
                                 size={14}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin"
-                                style={{ color: 'var(--primary)' }}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-primary"
+                               
                               />
                             )}
                           </div>
@@ -1011,8 +973,8 @@ const SignUp = () => {
                       Sign Up Now <ArrowRight size={17} />
                       {isReferralValid && (
                         <span
-                          className="ml-1 px-2 py-0.5 rounded-full text-[9px] font-black"
-                          style={{ background: 'rgba(255,255,255,0.25)', color: 'var(--primary-content)' }}
+                          className="ml-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-white/25 text-primary-content"
+                         
                         >
                           +{parseBonusDisplay(validation)}
                         </span>
@@ -1037,27 +999,24 @@ const SignUp = () => {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-colors"
-                  style={{ color: 'color-mix(in oklch, var(--base-content) 40%, transparent)' }}
+                  className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-colors text-[color-mix(in oklch, var(--base-content) 40%, transparent)]"
+                 
                 >
                   <ChevronLeft size={14} /> Go Back
                 </button>
 
                 <div className="flex flex-col items-center text-center gap-4">
                   <motion.div
-                    className="w-20 h-12 rounded-3xl flex items-center justify-center"
-                    style={{
-                      background: 'color-mix(in oklch, var(--success) 12%, var(--base-200))',
-                      border:     '1.5px solid color-mix(in oklch, var(--success) 28%, var(--base-300))',
-                    }}
+                    className="w-20 h-12 rounded-3xl flex items-center justify-center bg-[color-mix(in oklch, var(--success) 12%, var(--base-200))] border-[1.5px] border-[color-mix(in oklch, var(--success) 28%, var(--base-300))]"
+                   
                     animate={{ scale: [1, 1.05, 1] }}
                     transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
                   >
-                    <MailCheck size={38} style={{ color: 'var(--success)' }} />
+                    <MailCheck size={38} className="text-success" />
                   </motion.div>
-                  <p className="text-sm font-medium" style={{ color: 'color-mix(in oklch, var(--base-content) 58%, transparent)' }}>
+                  <p className="text-sm font-medium text-[color-mix(in oklch, var(--base-content) 58%, transparent)]">
                     Code sent to{' '}
-                    <strong className="font-black" style={{ color: 'var(--base-content)' }}>
+                    <strong className="font-black text-base-content">
                       {formData.email}
                     </strong>
                   </p>
@@ -1065,24 +1024,24 @@ const SignUp = () => {
 
                 <div className="space-y-2">
                   <label
-                    className="text-[10px] font-black uppercase tracking-widest flex justify-center"
-                    style={{ color: 'color-mix(in oklch, var(--base-content) 42%, transparent)' }}
+                    className="text-[10px] font-black uppercase tracking-widest flex justify-center text-[color-mix(in oklch, var(--base-content) 42%, transparent)]"
+                   
                   >
                     Enter 6-Digit Code
                   </label>
                   <div className="relative max-w-xs mx-auto">
                     <Fingerprint
                       size={24}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
-                      style={{ color: 'color-mix(in oklch, var(--base-content) 20%, transparent)' }}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-[color-mix(in oklch, var(--base-content) 20%, transparent)]"
+                     
                     />
                     <input
                       name="otp" type="text" maxLength="6"
                       inputMode="numeric" pattern="[0-9]*" required
                       onChange={handleChange} value={formData.otp}
                       placeholder="· · · · · ·" autoComplete="one-time-code"
-                      className="input-field w-full h-12 text-center font-black tracking-[0.4em] border-2 focus:border-primary"
-                      style={{ fontSize: '2rem', paddingLeft: '3.5rem' }}
+                      className="input-field w-full h-12 text-center font-black tracking-[0.4em] border-2 focus:border-primary text-[2rem] pl-[3.5rem]"
+                     
                     />
                   </div>
                 </div>
@@ -1104,8 +1063,8 @@ const SignUp = () => {
                     type="button"
                     disabled={loaders.otpRequest}
                     onClick={() => dispatch(requestOtp(formData.email.trim().toLowerCase()))}
-                    className="w-full text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-opacity disabled:opacity-50"
-                    style={{ color: 'var(--primary)' }}
+                    className="w-full text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-opacity disabled:opacity-50 text-primary"
+                   
                   >
                     {loaders.otpRequest
                       ? <><Loader2 className="animate-spin" size={12} /> Sending…</>
@@ -1129,25 +1088,25 @@ const SignUp = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
-              className="mt-8 pt-6 flex items-center justify-between"
-              style={{ borderTop: '1px solid var(--base-300)' }}
+              className="mt-8 pt-6 flex items-center justify-between border-t border-base-300"
+             
             >
               <p
-                className="text-xs font-medium"
-                style={{ color: 'color-mix(in oklch, var(--base-content) 42%, transparent)' }}
+                className="text-xs font-medium text-[color-mix(in oklch, var(--base-content) 42%, transparent)]"
+               
               >
                 Already have an account?{' '}
                 <Link
                   href="/login"
-                  className="font-black transition-colors"
-                  style={{ color: 'var(--primary)' }}
+                  className="font-black transition-colors text-primary"
+                 
                 >
                   Log In
                 </Link>
               </p>
               <div
-                className="flex items-center gap-1.5 text-[10px] font-black uppercase"
-                style={{ color: 'color-mix(in oklch, var(--base-content) 22%, transparent)' }}
+                className="flex items-center gap-1.5 text-[10px] font-black uppercase text-[color-mix(in oklch, var(--base-content) 22%, transparent)]"
+               
               >
                 <ShieldCheck size={11} /> Secure
               </div>

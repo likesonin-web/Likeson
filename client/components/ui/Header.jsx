@@ -650,6 +650,24 @@ function useHeaderData() {
 // SUB-COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ── NEW: IconTooltip — wraps an icon button, shows label below on hover ──────
+// Hover-only (desktop). On touch devices hover doesn't fire, so it's inert
+// there — harmless, no extra JS/state needed, pure CSS group-hover.
+const IconTooltip = memo(function IconTooltip({ label, className, children }) {
+  return (
+    <div className={cn("relative group/tip inline-flex", className)}>
+      {children}
+      <span
+        role="tooltip"
+        aria-hidden="true"
+        className="pointer-events-none capitalize absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap px-2 py-1 rounded-md text-[10px] font-bold shadow-lg opacity-0 scale-90 translate-y-[-2px] transition-all duration-150 z-[130] group-hover/tip:opacity-100 group-hover/tip:scale-100 group-hover/tip:translate-y-0 bg-base-content text-base-100"
+      >
+        {label}
+      </span>
+    </div>
+  );
+});
+
 // ── ThemeToggle ───────────────────────────────────────────────────────────────
 const ThemeToggle = memo(function ThemeToggle({ compact = false }) {
   const { theme, setTheme } = useTheme();
@@ -669,17 +687,18 @@ const ThemeToggle = memo(function ThemeToggle({ compact = false }) {
   const Icon = theme === "dark" ? Moon : Sun;
   const label = `Switch to ${theme === "dark" ? "light" : "dark"} mode`;
   return (
-    <button
-      onClick={toggleTheme}
-      aria-label={label}
-      title={label}
-      className={cn(
-        "rounded-xl border border-base-300 text-base-content/50 hover:bg-primary/5 hover:text-primary transition-all duration-200 flex items-center justify-center",
-        compact ? "w-8 h-8" : "p-2.5",
-      )}
-    >
-      <Icon size={compact ? 15 : 18} />
-    </button>
+    <IconTooltip label={label}>
+      <button
+        onClick={toggleTheme}
+        aria-label={label}
+        className={cn(
+          "rounded-xl border border-base-300 text-base-content/50 hover:bg-primary/5 hover:text-primary transition-all duration-200 flex items-center justify-center",
+          compact ? "w-8 h-8" : "p-2.5",
+        )}
+      >
+        <Icon size={compact ? 15 : 18} />
+      </button>
+    </IconTooltip>
   );
 });
 
@@ -815,6 +834,7 @@ const LocationWidget = memo(function LocationWidget({
   const wrapperRef = useRef(null);
   const inputRef = useRef(null);
   const debounceTimer = useRef(null);
+  const latestLocationRef = useRef(null); // { address, lat, lng } — last thing user actually picked
 
   const savedAddress = user?.lastKnownAddress ?? null;
   const cityLabel = useMemo(() => {
@@ -891,11 +911,31 @@ const LocationWidget = memo(function LocationWidget({
 
   const geocodeAndDispatch = useCallback(
     async (address, lat, lng) => {
+      const target = { address, lat, lng };
+      latestLocationRef.current = target;
       try {
         if (lat && lng) {
           await dispatch(updateLocationByCoords({ lat, lng, address }));
         } else {
           await dispatch(updateLocationByAddress(address));
+        }
+        // Self-heal: if a newer pick happened while this request was
+        // in flight, THIS (older) response may have just overwritten
+        // Redux with a stale address. Re-fire the newest pick so the
+        // UI never regresses to something the user already moved past.
+        if (latestLocationRef.current !== target) {
+          const latest = latestLocationRef.current;
+          if (latest.lat && latest.lng) {
+            dispatch(
+              updateLocationByCoords({
+                lat: latest.lat,
+                lng: latest.lng,
+                address: latest.address,
+              }),
+            );
+          } else {
+            dispatch(updateLocationByAddress(latest.address));
+          }
         }
       } catch {}
     },
@@ -961,7 +1001,23 @@ const LocationWidget = memo(function LocationWidget({
                   status === "OK" && results?.[0]
                     ? results[0].formatted_address
                     : undefined;
+                const target = { address, lat, lng };
+                latestLocationRef.current = target;
                 await dispatch(updateLocationByCoords({ lat, lng, address }));
+                if (latestLocationRef.current !== target) {
+                  const latest = latestLocationRef.current;
+                  if (latest.lat && latest.lng) {
+                    dispatch(
+                      updateLocationByCoords({
+                        lat: latest.lat,
+                        lng: latest.lng,
+                        address: latest.address,
+                      }),
+                    );
+                  } else {
+                    dispatch(updateLocationByAddress(latest.address));
+                  }
+                }
                 setLocalGPSLoading(false);
                 setOpen(false);
               },
@@ -1476,43 +1532,45 @@ const AvatarDropdown = memo(function AvatarDropdown({
 
   return (
     <div className="relative hidden md:block" ref={dropdownRef}>
-      <MotionButton
-        ref={triggerRef}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setOpen((p) => !p)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label={`Account menu for ${user.name}`}
-        className="relative h-10 w-10 rounded-full p-0 overflow-visible focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-        style={{
-          border: `2px solid ${accentColor}`,
-          transition: "border-color 0.3s",
-        }}
-      >
-        <Image
-          src={userAvatar}
-          alt={`${user.name} profile picture`}
-          fill
-          className="rounded-full object-cover"
-          sizes="40px"
-          priority
-          unoptimized={userAvatar.includes("ui-avatars.com")}
-        />
-        <span
-          className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5"
-          aria-label="Online"
+      <IconTooltip label={user?.name ?? "Account"}>
+        <MotionButton
+          ref={triggerRef}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setOpen((p) => !p)}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          aria-label={`Account menu for ${user.name}`}
+          className="relative h-10 w-10 rounded-full p-0 overflow-visible focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+          style={{
+            border: `2px solid ${accentColor}`,
+            transition: "border-color 0.3s",
+          }}
         >
-          <span
-            className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60 bg-green-500"
-            aria-hidden="true"
+          <Image
+            src={userAvatar}
+            alt={`${user.name} profile picture`}
+            fill
+            className="rounded-full object-cover"
+            sizes="40px"
+            priority
+            unoptimized={userAvatar.includes("ui-avatars.com")}
           />
           <span
-            className="relative inline-flex rounded-full h-3.5 w-3.5 bg-green-500 border-2 border-base-100"
-            aria-hidden="true"
-          />
-        </span>
-      </MotionButton>
+            className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5"
+            aria-label="Online"
+          >
+            <span
+              className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60 bg-green-500"
+              aria-hidden="true"
+            />
+            <span
+              className="relative inline-flex rounded-full h-3.5 w-3.5 bg-green-500 border-2 border-base-100"
+              aria-hidden="true"
+            />
+          </span>
+        </MotionButton>
+      </IconTooltip>
 
       <AnimatePresence>
         {open && (
@@ -2141,6 +2199,30 @@ const Header = () => {
               role="navigation"
               aria-label="Account actions"
             >
+              {/* ── NEW: mobile-only Book icon — renders for ANY customer   */}
+              {/* (guest or logged-in), so guests get the icon too. Sits    */}
+              {/* outside the user/guest split on purpose.                 */}
+              {isCustomer && (
+                <IconTooltip label="Book Appointment" className="md:hidden">
+                  <Link href="/book-appointment" aria-label="Book appointment">
+                    <MotionDiv
+                      whileTap={{ scale: 0.92 }}
+                      // Changed w-9 to px-4 to allow it to expand, and added gap-2
+                      className="h-9 px-4 rounded-full flex items-center justify-center gap-2 text-white flex-shrink-0"
+                      style={{
+                        background: mood?.barGradient ?? "var(--primary)",
+                      }}
+                    >
+                      <Calendar size={16} aria-hidden="true" />
+                      {/* Added the text label */}
+                      <span className="text-sm font-semibold tracking-wide font-poppins">
+                        Book
+                      </span>
+                    </MotionDiv>
+                  </Link>
+                </IconTooltip>
+              )}
+
               {/* ───── LOGGED IN ───── */}
               {user ? (
                 <>
@@ -2198,13 +2280,72 @@ const Header = () => {
 
                   {/* Cart — customer/pharmacy — visible on MOBILE too */}
                   {(isCustomer || userRole === "pharmacy") && (
+                    <IconTooltip label={`Cart (${cartCount})`}>
+                      <Link
+                        href="/pharmacy/cart"
+                        aria-label={`Shopping cart with ${cartCount} item${cartCount !== 1 ? "s" : ""}`}
+                      >
+                        <MotionDiv
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          className="relative"
+                        >
+                          <button
+                            className="relative h-9 w-9 md:h-10 md:w-10 rounded-full flex items-center justify-center text-base-content/60 hover:bg-base-200 transition-colors"
+                            tabIndex={-1}
+                            aria-hidden="true"
+                          >
+                            <MotionDiv
+                              variants={CART_FLOAT}
+                              animate={cartCount > 0 ? "float" : "idle"}
+                              aria-hidden="true"
+                            >
+                              <ShoppingCart size={18} aria-hidden="true" />
+                            </MotionDiv>
+                          </button>
+                          {cartCount > 0 && (
+                            <MotionSpan
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              aria-hidden="true"
+                              className="absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-[16px] md:min-w-[18px] md:h-[18px] px-1 rounded-full text-[9px] md:text-[10px] font-black text-white shadow-lg"
+                              style={{
+                                background: mood?.accent ?? "var(--primary)",
+                                boxShadow: mood
+                                  ? `0 2px 8px ${mood.shadowColor}`
+                                  : "none",
+                              }}
+                            >
+                              {cartCount > 99 ? "99+" : cartCount}
+                              <span
+                                className="absolute inset-0 rounded-full animate-ping opacity-40"
+                                style={{
+                                  background: mood?.accent ?? "var(--primary)",
+                                }}
+                                aria-hidden="true"
+                              />
+                            </MotionSpan>
+                          )}
+                        </MotionDiv>
+                      </Link>
+                    </IconTooltip>
+                  )}
+
+                  {/* Notifications — visible on MOBILE too */}
+                  <IconTooltip
+                    label={
+                      unreadCount > 0
+                        ? `Notifications (${unreadCount})`
+                        : "Notifications"
+                    }
+                  >
                     <Link
-                      href="/pharmacy/cart"
-                      aria-label={`Shopping cart with ${cartCount} item${cartCount !== 1 ? "s" : ""}`}
+                      href="/notifications"
+                      aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ", none unread"}`}
                     >
                       <MotionDiv
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
+                        whileHover={{ scale: 1.08 }}
+                        whileTap={{ scale: 0.92 }}
                         className="relative"
                       >
                         <button
@@ -2213,108 +2354,41 @@ const Header = () => {
                           aria-hidden="true"
                         >
                           <MotionDiv
-                            variants={CART_FLOAT}
-                            animate={cartCount > 0 ? "float" : "idle"}
+                            variants={BELL_RING}
+                            animate={unreadCount > 0 ? "ring" : "idle"}
                             aria-hidden="true"
                           >
-                            <ShoppingCart size={18} aria-hidden="true" />
+                            <Bell size={18} aria-hidden="true" />
                           </MotionDiv>
+                          {unreadCount > 0 && (
+                            <>
+                              <span
+                                aria-hidden="true"
+                                className="absolute top-2 right-2.5 w-2 h-2 rounded-full border-2 border-base-100 z-10"
+                                style={{
+                                  background: mood?.accent ?? "var(--accent)",
+                                }}
+                              />
+                              <span
+                                aria-hidden="true"
+                                className="absolute top-2 right-2.5 w-2 h-2 rounded-full animate-ping"
+                                style={{
+                                  background: mood?.accent ?? "var(--accent)",
+                                  opacity: 0.6,
+                                }}
+                              />
+                            </>
+                          )}
                         </button>
-                        {cartCount > 0 && (
-                          <MotionSpan
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            aria-hidden="true"
-                            className="absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-[16px] md:min-w-[18px] md:h-[18px] px-1 rounded-full text-[9px] md:text-[10px] font-black text-white shadow-lg"
-                            style={{
-                              background: mood?.accent ?? "var(--primary)",
-                              boxShadow: mood
-                                ? `0 2px 8px ${mood.shadowColor}`
-                                : "none",
-                            }}
-                          >
-                            {cartCount > 99 ? "99+" : cartCount}
-                            <span
-                              className="absolute inset-0 rounded-full animate-ping opacity-40"
-                              style={{
-                                background: mood?.accent ?? "var(--primary)",
-                              }}
-                              aria-hidden="true"
-                            />
-                          </MotionSpan>
-                        )}
                       </MotionDiv>
                     </Link>
-                  )}
-
-                  {/* Notifications — visible on MOBILE too */}
-                  <Link
-                    href="/notifications"
-                    aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ", none unread"}`}
-                  >
-                    <MotionDiv
-                      whileHover={{ scale: 1.08 }}
-                      whileTap={{ scale: 0.92 }}
-                      className="relative"
-                    >
-                      <button
-                        className="relative h-9 w-9 md:h-10 md:w-10 rounded-full flex items-center justify-center text-base-content/60 hover:bg-base-200 transition-colors"
-                        tabIndex={-1}
-                        aria-hidden="true"
-                      >
-                        <MotionDiv
-                          variants={BELL_RING}
-                          animate={unreadCount > 0 ? "ring" : "idle"}
-                          aria-hidden="true"
-                        >
-                          <Bell size={18} aria-hidden="true" />
-                        </MotionDiv>
-                        {unreadCount > 0 && (
-                          <>
-                            <span
-                              aria-hidden="true"
-                              className="absolute top-2 right-2.5 w-2 h-2 rounded-full border-2 border-base-100 z-10"
-                              style={{
-                                background: mood?.accent ?? "var(--accent)",
-                              }}
-                            />
-                            <span
-                              aria-hidden="true"
-                              className="absolute top-2 right-2.5 w-2 h-2 rounded-full animate-ping"
-                              style={{
-                                background: mood?.accent ?? "var(--accent)",
-                                opacity: 0.6,
-                              }}
-                            />
-                          </>
-                        )}
-                      </button>
-                    </MotionDiv>
-                  </Link>
+                  </IconTooltip>
 
                   {/* Theme toggle */}
                   <ThemeToggle compact />
 
-                  {/* Book Now — mobile visible, customer only */}
-                  {isCustomer && (
-                    <Link
-                      href="/book-appointment"
-                      className="md:hidden"
-                      aria-label="Book appointment"
-                    >
-                      <MotionDiv
-                        whileTap={{ scale: 0.92 }}
-                        className="h-9 w-9 rounded-full flex items-center justify-center text-white flex-shrink-0"
-                        style={{
-                          background: mood?.barGradient ?? "var(--primary)",
-                        }}
-                      >
-                        <Calendar size={16} aria-hidden="true" />
-                      </MotionDiv>
-                    </Link>
-                  )}
-
-                  {/* Book Now — desktop, customer only */}
+                  {/* Book Now — desktop, customer only (mobile icon now lives
+                      above, outside this branch, so it shows for guests too) */}
                   {isCustomer && (
                     <Link
                       href="/book-appointment"
@@ -2347,41 +2421,46 @@ const Header = () => {
                   />
 
                   {/* Mobile: Hamburger menu */}
-                  <MotionButton
-                    whileTap={{ scale: 0.9 }}
-                    onClick={toggleMobile}
-                    aria-label={mobileOpen ? "Close menu" : "Open menu"}
-                    aria-expanded={mobileOpen}
-                    aria-controls="mobile-menu"
-                    className="md:hidden h-9 w-9 rounded-full flex items-center justify-center bg-base-200 text-base-content z-[110] relative focus-visible:outline-none focus-visible:ring-2 flex-shrink-0"
-                    style={{
-                      border: `1.5px solid ${mood ? `color-mix(in srgb, ${mood.accent} 40%, transparent)` : "var(--base-300)"}`,
-                    }}
+                  <IconTooltip
+                    label={mobileOpen ? "Close menu" : "Menu"}
+                    className="md:hidden"
                   >
-                    <AnimatePresence mode="wait">
-                      {mobileOpen ? (
-                        <MotionSpan
-                          key="x"
-                          initial={{ rotate: -90, opacity: 0 }}
-                          animate={{ rotate: 0, opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          aria-hidden="true"
-                        >
-                          <X size={18} />
-                        </MotionSpan>
-                      ) : (
-                        <MotionSpan
-                          key="menu"
-                          initial={{ rotate: 90, opacity: 0 }}
-                          animate={{ rotate: 0, opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          aria-hidden="true"
-                        >
-                          <Menu size={18} />
-                        </MotionSpan>
-                      )}
-                    </AnimatePresence>
-                  </MotionButton>
+                    <MotionButton
+                      whileTap={{ scale: 0.9 }}
+                      onClick={toggleMobile}
+                      aria-label={mobileOpen ? "Close menu" : "Open menu"}
+                      aria-expanded={mobileOpen}
+                      aria-controls="mobile-menu"
+                      className="h-9 w-9 rounded-full flex items-center justify-center bg-base-200 text-base-content z-[110] relative focus-visible:outline-none focus-visible:ring-2 flex-shrink-0"
+                      style={{
+                        border: `1.5px solid ${mood ? `color-mix(in srgb, ${mood.accent} 40%, transparent)` : "var(--base-300)"}`,
+                      }}
+                    >
+                      <AnimatePresence mode="wait">
+                        {mobileOpen ? (
+                          <MotionSpan
+                            key="x"
+                            initial={{ rotate: -90, opacity: 0 }}
+                            animate={{ rotate: 0, opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            aria-hidden="true"
+                          >
+                            <X size={18} />
+                          </MotionSpan>
+                        ) : (
+                          <MotionSpan
+                            key="menu"
+                            initial={{ rotate: 90, opacity: 0 }}
+                            animate={{ rotate: 0, opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            aria-hidden="true"
+                          >
+                            <Menu size={18} />
+                          </MotionSpan>
+                        )}
+                      </AnimatePresence>
+                    </MotionButton>
+                  </IconTooltip>
                 </>
               ) : (
                 /* ───── GUEST ───── */
@@ -2420,41 +2499,63 @@ const Header = () => {
                     </Link>
                   )}
 
+                  {/* Mobile: direct Login button — visible without opening hamburger */}
+                  <Link
+                    href="/login"
+                    className="sm:hidden"
+                    aria-label="Sign in"
+                  >
+                    <MotionButton
+                      whileTap={{ scale: 0.94 }}
+                      className="h-9 px-3.5 rounded-full text-[11px] font-black uppercase tracking-wide text-white flex items-center justify-center flex-shrink-0"
+                      style={{
+                        background: mood?.barGradient ?? "var(--primary)",
+                      }}
+                    >
+                      Login
+                    </MotionButton>
+                  </Link>
+
                   {/* Mobile: Theme toggle + Menu */}
                   <ThemeToggle compact />
-                  <MotionButton
-                    whileTap={{ scale: 0.9 }}
-                    onClick={toggleMobile}
-                    aria-label={mobileOpen ? "Close menu" : "Open menu"}
-                    aria-expanded={mobileOpen}
-                    aria-controls="mobile-menu"
-                    className="md:hidden h-9 w-9 rounded-full flex items-center justify-center bg-base-200 text-base-content z-[110] relative focus-visible:outline-none focus-visible:ring-2"
-                    style={{ border: "1.5px solid var(--base-300)" }}
+                  <IconTooltip
+                    label={mobileOpen ? "Close menu" : "Menu"}
+                    className="md:hidden"
                   >
-                    <AnimatePresence mode="wait">
-                      {mobileOpen ? (
-                        <MotionSpan
-                          key="x"
-                          initial={{ rotate: -90, opacity: 0 }}
-                          animate={{ rotate: 0, opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          aria-hidden="true"
-                        >
-                          <X size={18} />
-                        </MotionSpan>
-                      ) : (
-                        <MotionSpan
-                          key="menu"
-                          initial={{ rotate: 90, opacity: 0 }}
-                          animate={{ rotate: 0, opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          aria-hidden="true"
-                        >
-                          <Menu size={18} />
-                        </MotionSpan>
-                      )}
-                    </AnimatePresence>
-                  </MotionButton>
+                    <MotionButton
+                      whileTap={{ scale: 0.9 }}
+                      onClick={toggleMobile}
+                      aria-label={mobileOpen ? "Close menu" : "Open menu"}
+                      aria-expanded={mobileOpen}
+                      aria-controls="mobile-menu"
+                      className="h-9 w-9 rounded-full flex items-center justify-center bg-base-200 text-base-content z-[110] relative focus-visible:outline-none focus-visible:ring-2"
+                      style={{ border: "1.5px solid var(--base-300)" }}
+                    >
+                      <AnimatePresence mode="wait">
+                        {mobileOpen ? (
+                          <MotionSpan
+                            key="x"
+                            initial={{ rotate: -90, opacity: 0 }}
+                            animate={{ rotate: 0, opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            aria-hidden="true"
+                          >
+                            <X size={18} />
+                          </MotionSpan>
+                        ) : (
+                          <MotionSpan
+                            key="menu"
+                            initial={{ rotate: 90, opacity: 0 }}
+                            animate={{ rotate: 0, opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            aria-hidden="true"
+                          >
+                            <Menu size={18} />
+                          </MotionSpan>
+                        )}
+                      </AnimatePresence>
+                    </MotionButton>
+                  </IconTooltip>
                 </>
               )}
             </div>

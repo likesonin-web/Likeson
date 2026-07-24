@@ -1114,8 +1114,6 @@ CreateStoreModal.displayName = 'CreateStoreModal';
 
 const Pagination = memo(({ pagination, onPageChange }) => {
   const { currentPage = 1, totalPages = 1 } = pagination ?? {};
-  if (totalPages <= 1) return null;
-
   const pages = useMemo(() => {
     const out = [];
     for (let i = 1; i <= totalPages; i++) {
@@ -1127,6 +1125,7 @@ const Pagination = memo(({ pagination, onPageChange }) => {
     }
     return out;
   }, [currentPage, totalPages]);
+  if (totalPages <= 1) return null;
 
   return (
     <nav aria-label="Pagination" className="flex items-center justify-center gap-1.5 mt-10">
@@ -1256,8 +1255,8 @@ export default function PharmacyManagement() {
         >
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-1.5 h-6 rounded-full"
-                style={{ background: 'var(--bg-gradient-primary)' }} aria-hidden="true" />
+              <div className="w-1.5 h-6 rounded-full bg-bg-gradient-primary"
+                aria-hidden="true" />
               <span className="text-xs font-bold text-primary uppercase tracking-widest">
                 {user?.role === 'superadmin' ? 'Super Admin' : 'Admin'} · Pharmacy Network
               </span>

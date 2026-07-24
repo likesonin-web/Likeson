@@ -48,23 +48,19 @@ const InfoRow = ({ label, value, masked, note }) => (
     style={{ borderColor: "var(--base-300)" }}
   >
     <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wide"
-        style={{ color: "var(--base-content)", opacity: 0.45 }}>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-base-content opacity-45"
+       >
         {label}
       </p>
       {note && (
-        <p className="text-[10px] mt-0.5" style={{ color: "var(--base-content)", opacity: 0.35 }}>
+        <p className="text-[10px] mt-0.5 text-base-content opacity-35">
           {note}
         </p>
       )}
     </div>
     <p
-      className="text-sm font-semibold text-right tracking-wider"
-      style={{
-        color:      "var(--base-content)",
-        fontFamily: masked ? "monospace" : undefined,
-        opacity:    value ? 1 : 0.3,
-      }}
+      className="text-sm font-semibold text-right tracking-wider text-base-content"
+      style={{ fontFamily: masked ? "monospace" : undefined, opacity: value ? 1 : 0.3 }}
     >
       {value || "—"}
     </p>
@@ -133,31 +129,27 @@ export default function BankPage() {
   const isLoading = loading.bank;
 
   return (
-    <div data-theme="care-assistant" className="min-h-screen" style={{ background: "var(--base-100)" }}>
+    <div data-theme="care-assistant" className="min-h-screen bg-base-100">
 
       {/* ── sticky header ── */}
       <div
-        className="sticky top-0 z-20 px-4 pt-5 pb-4"
-        style={{
-          background:     "color-mix(in srgb, var(--base-100) 92%, transparent)",
-          backdropFilter: "blur(14px)",
-          borderBottom:   "1px solid var(--base-300)",
-        }}
+        className="sticky top-0 z-20 px-4 pt-5 pb-4 bg-[color-mix(in srgb, var(--base-100) 92%, transparent)] backdrop-blur-[14px] border-b border-base-300"
+       
       >
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
                      <BackButton className='my-3' />
           
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest mb-0.5"
-                style={{ color: "var(--accent)" }}>
+              <p className="text-[11px] font-bold uppercase tracking-widest mb-0.5 text-accent"
+               >
                 Payout Setup
               </p>
-              <h1 className="!text-xl !font-black !leading-tight"
-                style={{ color: "var(--base-content)" }}>
+              <h1 className="!text-xl !font-black !leading-tight text-base-content"
+               >
                 Bank Account
               </h1>
-              <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+              <p className="text-xs mt-0.5 text-base-content opacity-50">
                 Earnings are transferred to this account every week
               </p>
             </div>
@@ -209,8 +201,8 @@ export default function BankPage() {
 
         <div className="glass-card p-4">
           <div className="flex items-start gap-2.5">
-            <IndianRupee size={15} className="shrink-0 mt-0.5" style={{ color: "var(--success)" }} />
-            <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.7 }}>
+            <IndianRupee size={15} className="shrink-0 mt-0.5 text-success" />
+            <p className="text-xs text-base-content opacity-70">
               Payouts are processed every Friday. Admin verifies your bank details before the first
               transfer. Keep your account number and IFSC code accurate.
             </p>
@@ -228,27 +220,24 @@ export default function BankPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div
-                  className="w-9 h-9 rounded-2xl flex items-center justify-center"
-                  style={{ background: "color-mix(in srgb, var(--primary), transparent 85%)" }}
+                  className="w-9 h-9 rounded-2xl flex items-center justify-center bg-[color-mix(in srgb, var(--primary), transparent 85%)]"
+                 
                 >
-                  <Banknote size={18} style={{ color: "var(--primary)" }} />
+                  <Banknote size={18} className="text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold" style={{ color: "var(--base-content)" }}>
+                  <p className="text-sm font-bold text-base-content">
                     {bankDetails?.bankName || "Bank Details"}
                   </p>
-                  <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.45 }}>
+                  <p className="text-[11px] text-base-content opacity-45">
                     {bankDetails?.isBankVerified ? "Admin verified account" : "Pending admin verification"}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setEditMode(true)}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all"
-                style={{
-                  background: "color-mix(in srgb, var(--primary), transparent 88%)",
-                  color:      "var(--primary)",
-                }}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all bg-[color-mix(in srgb, var(--primary), transparent 88%)] text-primary"
+               
               >
                 <Edit3 size={13} /> Edit
               </button>
@@ -263,20 +252,20 @@ export default function BankPage() {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="mt-4 rounded-2xl p-4 flex flex-col items-center gap-3"
-                style={{ background: "var(--base-200)" }}
+                className="mt-4 rounded-2xl p-4 flex flex-col items-center gap-3 bg-base-200"
+               
               >
                 <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                  style={{ background: "color-mix(in srgb, var(--primary), transparent 85%)" }}
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color-mix(in srgb, var(--primary), transparent 85%)]"
+                 
                 >
-                  <Banknote size={22} style={{ color: "var(--primary)" }} />
+                  <Banknote size={22} className="text-primary" />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-semibold" style={{ color: "var(--base-content)" }}>
+                  <p className="text-sm font-semibold text-base-content">
                     No bank account added
                   </p>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+                  <p className="text-xs mt-0.5 text-base-content opacity-50">
                     Add your bank details to receive weekly payouts
                   </p>
                 </div>
@@ -295,14 +284,14 @@ export default function BankPage() {
             className="space-y-5"
           >
             <div className="flex items-center justify-between">
-              <p className="text-sm font-bold" style={{ color: "var(--base-content)" }}>
+              <p className="text-sm font-bold text-base-content">
                 {bankDetails?.accountHolderName ? "Update Bank Details" : "Add Bank Account"}
               </p>
               <button
                 type="button"
                 onClick={() => { setEditMode(false); setFieldErrors({}); }}
-                className="flex items-center gap-1 text-xs font-semibold"
-                style={{ color: "var(--base-content)", opacity: 0.5 }}
+                className="flex items-center gap-1 text-xs font-semibold text-base-content opacity-50"
+               
               >
                 <X size={13} /> Cancel
               </button>
@@ -311,13 +300,13 @@ export default function BankPage() {
             {FIELDS.map((f) => (
               <div key={f.key} className="space-y-1.5">
                 <label
-                  className="text-xs font-semibold flex items-center gap-1.5"
-                  style={{ color: "var(--base-content)" }}
+                  className="text-xs font-semibold flex items-center gap-1.5 text-base-content"
+                 
                 >
-                  <span style={{ color: "var(--primary)", opacity: 0.7 }}>{f.icon}</span>
+                  <span className="text-primary opacity-70">{f.icon}</span>
                   {f.label}
                 </label>
-                <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.48 }}>
+                <p className="text-[11px] text-base-content opacity-48">
                   {f.note}
                 </p>
 
@@ -337,16 +326,16 @@ export default function BankPage() {
                           initial={{ opacity: 0, y: -4 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -4 }}
-                          className="absolute z-30 left-0 right-0 mt-1 rounded-2xl overflow-hidden shadow-lg"
-                          style={{ background: "var(--base-200)", border: "1px solid var(--base-300)" }}
+                          className="absolute z-30 left-0 right-0 mt-1 rounded-2xl overflow-hidden shadow-lg bg-base-200 border border-base-300"
+                         
                         >
                           {bankSuggestions.map((b) => (
                             <button
                               key={b}
                               type="button"
                               onMouseDown={() => { set("bankName", b); setShowSuggestions(false); }}
-                              className="w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--base-300)]"
-                              style={{ color: "var(--base-content)" }}
+                              className="w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-[var(--base-300)] text-base-content"
+                             
                             >
                               {b}
                             </button>
@@ -367,8 +356,8 @@ export default function BankPage() {
                     <button
                       type="button"
                       onClick={() => setShowAccount((p) => !p)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2"
-                      style={{ color: "var(--base-content)", opacity: 0.4 }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content opacity-40"
+                     
                     >
                       {showAccount ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
@@ -386,7 +375,7 @@ export default function BankPage() {
                 )}
 
                 {fieldErrors[f.key] && (
-                  <p className="text-[11px] flex items-center gap-1" style={{ color: "var(--error)" }}>
+                  <p className="text-[11px] flex items-center gap-1 text-error">
                     <X size={11} /> {fieldErrors[f.key]}
                   </p>
                 )}
@@ -424,16 +413,13 @@ export default function BankPage() {
         )}
 
         <div
-          className="rounded-2xl p-4 flex items-start gap-3"
-          style={{
-            background: "color-mix(in srgb, var(--success), transparent 92%)",
-            border:     "1px solid color-mix(in srgb, var(--success), transparent 75%)",
-          }}
+          className="rounded-2xl p-4 flex items-start gap-3 bg-[color-mix(in srgb, var(--success), transparent 92%)] border border-[color-mix(in srgb, var(--success), transparent 75%)]"
+         
         >
-          <ShieldCheck size={16} className="shrink-0 mt-0.5" style={{ color: "var(--success)" }} />
+          <ShieldCheck size={16} className="shrink-0 mt-0.5 text-success" />
           <div>
-            <p className="text-xs font-bold" style={{ color: "var(--success)" }}>Bank-grade security</p>
-            <p className="text-[11px] mt-0.5" style={{ color: "var(--base-content)", opacity: 0.6 }}>
+            <p className="text-xs font-bold text-success">Bank-grade security</p>
+            <p className="text-[11px] mt-0.5 text-base-content opacity-60">
               Account numbers are encrypted at rest. Only the last 4 digits are visible to you and
               our team. Payouts require admin-verified details.
             </p>

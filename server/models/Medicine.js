@@ -272,6 +272,68 @@ medicineSchema.index({ manufacturer: 1 });
 medicineSchema.index({ slug: 1 });
 medicineSchema.index({ createdAt: -1 });
 
+// Medicine.js (Replace the Indexes section at the bottom of your file)
+
+// ── Indexes ───────────────────────────────────────────────────────────────────
+
+// COMPREHENSIVE TEXT SEARCH INDEX
+// This powers the global search across all critical medical properties
+medicineSchema.index(
+  { 
+    name: 'text', 
+    brandName: 'text', 
+    genericName: 'text', 
+    'saltComposition.ingredient': 'text', // Targets nested salt arrays
+    category: 'text', 
+    drugForm: 'text', 
+    manufacturer: 'text',
+    searchKeywords: 'text' 
+  },
+  { 
+    weights: { 
+      brandName: 10, 
+      name: 10, 
+      genericName: 8, 
+      'saltComposition.ingredient': 8, // High priority for salt searches
+      searchKeywords: 6,
+      category: 4,
+      drugForm: 4,
+      manufacturer: 3
+    },
+    name: "Medicine_Comprehensive_TextSearch"
+  }
+);
+
+medicineSchema.index({ hsnCode: 1 });
+medicineSchema.index({ isDiscontinued: 1, isApproved: 1, isDeleted: 1 });
+medicineSchema.index({ category: 1, isApproved: 1 });
+medicineSchema.index({ therapeuticClass: 1 });
+medicineSchema.index({ manufacturer: 1 });
+medicineSchema.index({ slug: 1 });
+medicineSchema.index({ createdAt: -1 });
+
+// ── Statics ───────────────────────────────────────────────────────────────────
+
+/**
+ * Search catalogue by keyword. Returns active, approved, non-deleted medicines.
+ */
+medicineSchema.statics.searchCatalogue = function (keyword, limit = 50, skip = 0) {
+  return this.find(
+    {
+      $text: { $search: keyword },
+      isApproved: true,
+      isDiscontinued: false,
+      isDeleted: false,
+    },
+    { score: { $meta: 'textScore' } }
+  )
+    .sort({ score: { $meta: 'textScore' } }) // Sorts by best match relevance
+    .skip(skip)
+    .limit(limit)
+    .lean();
+};
+ 
+
 // ── Export ────────────────────────────────────────────────────────────────────
 
 const Medicine = mongoose.model('Medicine', medicineSchema);

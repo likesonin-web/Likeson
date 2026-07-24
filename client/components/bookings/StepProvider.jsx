@@ -16,7 +16,12 @@ import {
 } from "lucide-react";
 import { Field, Inp, Sel, SCard, AvailPill } from "./atoms";
 import { SubCoverageBanner, DiagSubBanner } from "./banners";
-import { PP, BOOKING_TYPES, CONSULT_TYPES, REPORT_MODES } from "@/lib/constants";
+import {
+  PP,
+  BOOKING_TYPES,
+  CONSULT_TYPES,
+  REPORT_MODES,
+} from "@/lib/constants";
 import { fmt } from "@/lib/helpers";
 import { labSupportsHomeCollection } from "@/lib/feeResolvers";
 
@@ -57,9 +62,13 @@ export function StepProvider({
   const providerAccent = isDiag ? "#06b6d4" : isOnline ? "#8b5cf6" : "#0ea5e9";
   const providerIcon = isDiag ? FlaskConical : Stethoscope;
 
+  // ─── Fetch ALL Online Doctors once (no search — dropdown lists everyone) ──
   useEffect(() => {
-    if (isOnline && !allDoctors?.length && !allDoctorsLoading)
-      onLoadAllDoctors?.({ consultationType: "video", isOnline: "true" });
+    if (!isOnline || allDoctors?.length) return;
+    onLoadAllDoctors?.({
+      consultationType: "video",
+      isOnline: "true",
+    });
   }, [isOnline]);
 
   useEffect(() => {
@@ -109,11 +118,10 @@ export function StepProvider({
     const spec = d.specialization || d.doctorSpec || "";
     const parts = [name];
     if (spec) parts.push(`— ${spec}`);
-    if (isOnline) {
-      if (fees?.videoFee > 0) parts.push(`· Video: ${fmt(fees.videoFee)}`);
-    } else {
-      if (fees?.inPersonFee > 0) parts.push(`· ${fmt(fees.inPersonFee)}`);
-    }
+    // Online: name — specialization only. Fee shown separately in the
+    // Fee Schedule card below once selected, no need to clutter the option.
+    if (!isOnline && fees?.inPersonFee > 0)
+      parts.push(`· ${fmt(fees.inPersonFee)}`);
     return parts.join(" ");
   };
 
@@ -515,32 +523,6 @@ export function StepProvider({
             </Field>
           )}
 
-          {isOnline && (
-            <Field
-              label="Search Doctors"
-              note="Filter by name or specialization (auto-updates)"
-            >
-              <div className="relative">
-                <Search
-                  size={12}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40 pointer-events-none"
-                />
-                <Inp
-                  placeholder="e.g. Cardiologist, Dr. Kumar…"
-                  value={form.doctorSearch || ""}
-                  onChange={(e) => set("doctorSearch", e.target.value)}
-                  className="pl-8 pr-8"
-                />
-                {allDoctorsLoading && (
-                  <Loader2
-                    size={12}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin opacity-50"
-                  />
-                )}
-              </div>
-            </Field>
-          )}
-
           {isDoctorListLoading && (
             <div
               className="flex items-center gap-2 text-xs text-base-content/40 py-1"
@@ -554,7 +536,11 @@ export function StepProvider({
           {doctorList.length > 0 && (
             <Field
               label={isOnline ? "Select Doctor" : "Doctor"}
-              note="Fee shown in option"
+              note={
+                isOnline
+                  ? "Fee shown below once selected"
+                  : "Fee shown in option"
+              }
               error={errors.doctorId}
             >
               <Sel
@@ -576,22 +562,11 @@ export function StepProvider({
                 }}
               >
                 <option value="">— Select doctor —</option>
-                {doctorList
-                  .filter((d) => {
-                    if (!form.doctorSearch) return true;
-                    const q = form.doctorSearch.toLowerCase();
-                    return (
-                      (d.user?.name || d.name || "")
-                        .toLowerCase()
-                        .includes(q) ||
-                      (d.specialization || "").toLowerCase().includes(q)
-                    );
-                  })
-                  .map((d) => (
-                    <option key={d._id} value={d._id}>
-                      {buildDoctorOptionText(d)}
-                    </option>
-                  ))}
+                {doctorList.map((d) => (
+                  <option key={d._id} value={d._id}>
+                    {buildDoctorOptionText(d)}
+                  </option>
+                ))}
               </Sel>
             </Field>
           )}
@@ -875,15 +850,27 @@ export function StepProvider({
               animate={{ opacity: 1, y: 0 }}
               className="flex items-start gap-2 p-2.5 rounded-xl border border-warning/30 bg-warning/5"
             >
-              <UserCheck size={13} className="text-warning flex-shrink-0 mt-0.5" />
+              <UserCheck
+                size={13}
+                className="text-warning flex-shrink-0 mt-0.5"
+              />
               <div>
-                <p className="text-[11px] font-black text-warning leading-tight" style={PP}>
+                <p
+                  className="text-[11px] font-black text-warning leading-tight"
+                  style={PP}
+                >
                   Patient name & phone must match original consultation
                 </p>
-                <p className="text-[10px] text-warning/70 font-semibold mt-0.5 leading-snug" style={PP}>
+                <p
+                  className="text-[10px] text-warning/70 font-semibold mt-0.5 leading-snug"
+                  style={PP}
+                >
                   Enter exact details in the Patient step. Mismatch = booking
                   rejected and follow-up fee charged. Original patient:{" "}
-                  <strong>{followUpCheck.originalPatientName ?? "on file"}</strong>.
+                  <strong>
+                    {followUpCheck.originalPatientName ?? "on file"}
+                  </strong>
+                  .
                 </p>
               </div>
             </motion.div>

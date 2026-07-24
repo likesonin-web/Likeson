@@ -174,19 +174,19 @@ function StatusSection({ kycStatus, dispatch, loading }) {
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-sm font-black" style={{ color: "var(--primary)" }}>{completion}%</span>
+            <span className="text-sm font-black text-primary">{completion}%</span>
           </div>
         </div>
         <div>
-          <p className="font-semibold text-sm" style={{ color: "var(--base-content)" }}>Profile Completion</p>
-          <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.55 }}>
+          <p className="font-semibold text-sm text-base-content">Profile Completion</p>
+          <p className="text-xs mt-0.5 text-base-content opacity-55">
             Complete KYC to unlock bookings
           </p>
           <div className="flex items-center gap-1.5 mt-2">
             <button
               onClick={() => dispatch(getKycStatus())}
-              className="flex items-center gap-1 text-xs font-semibold"
-              style={{ color: "var(--primary)" }}
+              className="flex items-center gap-1 text-xs font-semibold text-primary"
+             
             >
               <RefreshCw size={11} /> Refresh
             </button>
@@ -213,15 +213,15 @@ function StatusSection({ kycStatus, dispatch, loading }) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <p className="text-sm font-semibold" style={{ color: "var(--base-content)" }}>
+              <p className="text-sm font-semibold text-base-content">
                 {item.label}
               </p>
               <StatusBadge status={item.status} />
             </div>
-            <p className="text-[11px] mt-0.5" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+            <p className="text-[11px] mt-0.5 text-base-content opacity-50">
               {item.note}
             </p>
-            <p className="text-xs mt-1.5 font-medium" style={{ color: "var(--base-content)", opacity: 0.65 }}>
+            <p className="text-xs mt-1.5 font-medium text-base-content opacity-65">
               {item.details}
             </p>
           </div>
@@ -241,8 +241,8 @@ function StatusSection({ kycStatus, dispatch, loading }) {
             </p>
             <Link
               href="/care-assistant/kyc/submit"
-              className="text-xs font-bold mt-1.5 inline-flex items-center gap-1"
-              style={{ color: "var(--warning)" }}
+              className="text-xs font-bold mt-1.5 inline-flex items-center gap-1 text-warning"
+             
             >
               Go to Submit <ChevronRight size={12} />
             </Link>
@@ -321,8 +321,8 @@ function SubmitKycSection({ kycStatus, dispatch, loading }) {
       {/* info card */}
       <div className="glass-card p-4">
         <div className="flex items-start gap-2">
-          <Info size={14} className="mt-0.5 shrink-0" style={{ color: "var(--info)" }} />
-          <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.7 }}>
+          <Info size={14} className="mt-0.5 shrink-0 text-info" />
+          <p className="text-xs text-base-content opacity-70">
             Your Aadhaar and PAN numbers are encrypted and stored securely. They are never shared
             with third parties. Only the last 4 digits of Aadhaar are shown on your profile.
           </p>
@@ -333,13 +333,13 @@ function SubmitKycSection({ kycStatus, dispatch, loading }) {
         {/* Aadhaar */}
         <div className="space-y-1.5">
           <label
-            className="text-xs font-semibold flex items-center gap-1.5"
-            style={{ color: "var(--base-content)" }}
+            className="text-xs font-semibold flex items-center gap-1.5 text-base-content"
+           
           >
-            <Fingerprint size={13} style={{ color: "var(--primary)" }} />
+            <Fingerprint size={13} className="text-primary" />
             Aadhaar Number
           </label>
-          <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+          <p className="text-[11px] text-base-content opacity-50">
             12-digit UIDAI number printed on your Aadhaar card
           </p>
           <div className="relative">
@@ -356,19 +356,19 @@ function SubmitKycSection({ kycStatus, dispatch, loading }) {
             <button
               type="button"
               onClick={() => setShowAadhaar((p) => !p)}
-              className="absolute right-3 top-1/2 -translate-y-1/2"
-              style={{ color: "var(--base-content)", opacity: 0.4 }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content opacity-40"
+             
             >
               {showAadhaar ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
           {errors.aadhaarNumber && (
-            <p className="text-[11px] flex items-center gap-1" style={{ color: "var(--error)" }}>
+            <p className="text-[11px] flex items-center gap-1 text-error">
               <X size={11} /> {errors.aadhaarNumber}
             </p>
           )}
           {kyc.aadhaarLast4 && (
-            <p className="text-[11px]" style={{ color: "var(--success)" }}>
+            <p className="text-[11px] text-success">
               ✓ Previously saved — ending in ****{kyc.aadhaarLast4}
             </p>
           )}
@@ -377,13 +377,13 @@ function SubmitKycSection({ kycStatus, dispatch, loading }) {
         {/* PAN */}
         <div className="space-y-1.5">
           <label
-            className="text-xs font-semibold flex items-center gap-1.5"
-            style={{ color: "var(--base-content)" }}
+            className="text-xs font-semibold flex items-center gap-1.5 text-base-content"
+           
           >
-            <CreditCard size={13} style={{ color: "var(--primary)" }} />
+            <CreditCard size={13} className="text-primary" />
             PAN Number
           </label>
-          <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+          <p className="text-[11px] text-base-content opacity-50">
             10-character alphanumeric ID (format: ABCDE1234F). Required for payouts above ₹50,000/year.
           </p>
           <input
@@ -398,12 +398,12 @@ function SubmitKycSection({ kycStatus, dispatch, loading }) {
             }`}
           />
           {errors.panNumber && (
-            <p className="text-[11px] flex items-center gap-1" style={{ color: "var(--error)" }}>
+            <p className="text-[11px] flex items-center gap-1 text-error">
               <X size={11} /> {errors.panNumber}
             </p>
           )}
           {kyc.panVerified && (
-            <p className="text-[11px]" style={{ color: "var(--success)" }}>✓ PAN already verified</p>
+            <p className="text-[11px] text-success">✓ PAN already verified</p>
           )}
         </div>
 
@@ -424,10 +424,10 @@ function SubmitKycSection({ kycStatus, dispatch, loading }) {
       </form>
 
       <div
-        className="rounded-2xl p-4"
-        style={{ background: "color-mix(in srgb, var(--base-200), transparent 30%)" }}
+        className="rounded-2xl p-4 bg-[color-mix(in srgb, var(--base-200), transparent 30%)]"
+       
       >
-        <p className="text-xs font-semibold mb-2" style={{ color: "var(--base-content)" }}>
+        <p className="text-xs font-semibold mb-2 text-base-content">
           What happens next?
         </p>
         {[
@@ -437,12 +437,12 @@ function SubmitKycSection({ kycStatus, dispatch, loading }) {
         ].map((s, i) => (
           <div key={i} className="flex items-start gap-2 mb-1.5">
             <span
-              className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5"
-              style={{ background: "var(--primary)", color: "var(--primary-content)" }}
+              className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 bg-primary text-primary-content"
+             
             >
               {i + 1}
             </span>
-            <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.65 }}>{s}</p>
+            <p className="text-xs text-base-content opacity-65">{s}</p>
           </div>
         ))}
       </div>
@@ -527,8 +527,8 @@ function UploadDocumentsSection({ kycStatus, dispatch, loading }) {
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
       <div className="glass-card p-4">
         <div className="flex items-start gap-2">
-          <AlertCircle size={14} className="mt-0.5 shrink-0" style={{ color: "var(--warning)" }} />
-          <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.7 }}>
+          <AlertCircle size={14} className="mt-0.5 shrink-0 text-warning" />
+          <p className="text-xs text-base-content opacity-70">
             Upload clear, well-lit images (JPEG/PNG/WEBP) or PDF. Max size 5 MB. Blurry or cropped
             documents will be rejected.
           </p>
@@ -537,10 +537,10 @@ function UploadDocumentsSection({ kycStatus, dispatch, loading }) {
 
       {/* doc type selector */}
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold" style={{ color: "var(--base-content)" }}>
+        <label className="text-xs font-semibold text-base-content">
           Document Type
         </label>
-        <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+        <p className="text-[11px] text-base-content opacity-50">
           Select the document you are uploading
         </p>
         <div className="grid grid-cols-1 gap-2">
@@ -564,15 +564,15 @@ function UploadDocumentsSection({ kycStatus, dispatch, loading }) {
               }}
             >
               <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: "var(--base-300)", color: "var(--primary)" }}
+                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-base-300 text-primary"
+               
               >
                 {d.icon}
               </div>
               <div className="flex-1 min-w-0">
                 <p
-                  className="text-xs font-semibold flex items-center gap-1.5"
-                  style={{ color: "var(--base-content)" }}
+                  className="text-xs font-semibold flex items-center gap-1.5 text-base-content"
+                 
                 >
                   {d.label}
                   {d.existing && (
@@ -580,14 +580,14 @@ function UploadDocumentsSection({ kycStatus, dispatch, loading }) {
                   )}
                 </p>
                 <p
-                  className="text-[11px] mt-0.5 truncate"
-                  style={{ color: "var(--base-content)", opacity: 0.5 }}
+                  className="text-[11px] mt-0.5 truncate text-base-content opacity-50"
+                 
                 >
                   {d.note}
                 </p>
               </div>
               {selectedDocType === d.value && (
-                <CheckCircle2 size={16} style={{ color: "var(--primary)" }} />
+                <CheckCircle2 size={16} className="text-primary" />
               )}
             </button>
           ))}
@@ -596,10 +596,10 @@ function UploadDocumentsSection({ kycStatus, dispatch, loading }) {
 
       {/* drop zone */}
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold" style={{ color: "var(--base-content)" }}>
+        <label className="text-xs font-semibold text-base-content">
           Upload File
         </label>
-        <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+        <p className="text-[11px] text-base-content opacity-50">
           Drag & drop or tap to choose — JPEG, PNG, WEBP or PDF, max 5 MB
         </p>
 
@@ -627,8 +627,8 @@ function UploadDocumentsSection({ kycStatus, dispatch, loading }) {
                 />
               ) : (
                 <div
-                  className="flex flex-col items-center gap-2 py-4"
-                  style={{ color: "var(--primary)" }}
+                  className="flex flex-col items-center gap-2 py-4 text-primary"
+                 
                 >
                   <FileText size={28} />
                   <p className="text-xs font-semibold">{selectedFile?.name}</p>
@@ -640,8 +640,8 @@ function UploadDocumentsSection({ kycStatus, dispatch, loading }) {
                   setPreview(null);
                   setSelectedFile(null);
                 }}
-                className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center"
-                style={{ background: "var(--error)", color: "var(--error-content)" }}
+                className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center bg-error text-error-content"
+               
               >
                 <X size={12} />
               </button>
@@ -649,18 +649,16 @@ function UploadDocumentsSection({ kycStatus, dispatch, loading }) {
           ) : (
             <>
               <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                style={{
-                  background: "color-mix(in srgb, var(--primary), transparent 85%)",
-                }}
+                className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[color-mix(in srgb, var(--primary), transparent 85%)]"
+               
               >
-                <Upload size={22} style={{ color: "var(--primary)" }} />
+                <Upload size={22} className="text-primary" />
               </div>
               <div className="text-center">
-                <p className="text-sm font-semibold" style={{ color: "var(--base-content)" }}>
+                <p className="text-sm font-semibold text-base-content">
                   Tap to upload
                 </p>
-                <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.45 }}>
+                <p className="text-xs mt-0.5 text-base-content opacity-45">
                   or drag & drop here
                 </p>
               </div>
@@ -737,16 +735,12 @@ export default function KycPage() {
 
   return (
     // ← Care-assistant theme applied at the root of this page
-    <div data-theme="care-assistant" className="min-h-screen" style={{ background: "var(--base-100)" }}>
+    <div data-theme="care-assistant" className="min-h-screen bg-base-100">
 
       {/* ── header ── */}
       <div
-        className="sticky top-0 z-20 px-4 pt-5 pb-3"
-        style={{
-          background:     "color-mix(in srgb, var(--base-100) 92%, transparent)",
-          backdropFilter: "blur(12px)",
-          borderBottom:   "1px solid var(--base-300)",
-        }}
+        className="sticky top-0 z-20 px-4 pt-5 pb-3 bg-[color-mix(in srgb, var(--base-100) 92%, transparent)] backdrop-blur-[12px] border-b border-base-300"
+       
       >
         <BackButton />
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
@@ -757,12 +751,12 @@ export default function KycPage() {
             KYC & Identity Verification
           </p>
           <h1
-            className="!text-xl !font-black !leading-tight"
-            style={{ color: "var(--base-content)" }}
+            className="!text-xl !font-black !leading-tight text-base-content"
+           
           >
             {sectionTitle}
           </h1>
-          <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.55 }}>
+          <p className="text-xs mt-0.5 text-base-content opacity-55">
             {sectionSubtitle}
           </p>
         </motion.div>
@@ -781,8 +775,8 @@ export default function KycPage() {
           </div>
           {profile && (
             <div
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ml-auto"
-              style={{ background: "var(--base-200)", color: "var(--base-content)" }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ml-auto bg-base-200 text-base-content"
+             
             >
               Profile {profile.profileCompletionPercent ?? 0}% complete
             </div>

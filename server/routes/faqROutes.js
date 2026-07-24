@@ -1,290 +1,62 @@
+/**
+ * faqROutes.js — Likeson.in
+ * Business logic lives in controllers/faq.controller.js.
+ * This file only wires paths + middleware + controller functions.
+ */
+
 import express from 'express';
-import mongoose from 'mongoose';
 import { body, query, param, validationResult } from 'express-validator';
-import FAQ from '../models/FAQ.js'; // Adjust path based on your structure
 import { protect, authorize } from '../middleware/authMiddleware.js';
+import * as ctrl from '../controllers/faq.controller.js';
 
 const router = express.Router();
 
-/**
- * @section HELPERS & MIDDLEWARES
- * Internal utilities to maintain clean code without external controller files.
- */
-
-// Centralized Async Handler to eliminate try-catch boilerplate
-const asyncHandler = (fn) => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch(next);
-};
-
-// Validation Formatter
+// 1. Define the validate middleware to resolve your ReferenceError
 const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ 
-      success: false, 
-      errors: errors.array().map(err => ({ field: err.param, message: err.msg })) 
-    });
+    return res.status(400).json({ errors: errors.array() });
   }
   next();
 };
 
-/**
- * @section VALIDATION SCHEMES
- */
+// 2. Define faqValidation rules (this was also missing and would cause a crash)
+// Note: Adjust the fields here if your FAQ schema requires different ones!
 const faqValidation = [
-  body('question').notEmpty().withMessage('Question is required').trim().escape(),
-  body('answer').notEmpty().withMessage('Answer is required').trim(),
-  body('category').isIn([
-    'Medical Transportation', 'Care Assistant', 'Doctor Consultation', 
-    'Diagnostics', 'Pharmacy Services', 'Subscription Plans', 'General'
-  ]).withMessage('Invalid category'),
-  validate
+  body('question').trim().notEmpty().withMessage('Question is required'),
+  body('answer').trim().notEmpty().withMessage('Answer is required'),
+  body('category').optional().isString(),
+  validate // Automatically catches errors for these body checks
 ];
 
-/**
- * @section ROUTES
- */
-
-/**
- * @route   GET /api/faqs
- * @desc    Fetch all FAQs with advanced filtering, search, and pagination
- * @access  Public
- */
-router.get(
-  '/',
-  [
+router.get('/', [
     query('page').optional().isInt({ min: 1 }).toInt(),
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
     query('category').optional().isString(),
     query('search').optional().isString(),
     validate
-  ],
-  asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, category, search, isActive } = req.query;
-    const skip = (page - 1) * limit;
+  ], ctrl.get);
 
-    // Build optimized query object
-    const queryObj = {};
-    if (category) queryObj.category = category;
-    
-    // Admin/Staff can see inactive FAQs; Customers/Public only see active ones
-    if (req.user && ['admin', 'superadmin'].includes(req.user.role)) {
-        if (isActive !== undefined) queryObj.isActive = isActive === 'true';
-    } else {
-        queryObj.isActive = true;
-    }
+router.post('/', protect, authorize('admin', 'superadmin'), faqValidation, ctrl.post);
 
-    // Full-text search simulation (use MongoDB Indexes for production)
-    if (search) {
-      queryObj.$or = [
-        { question: { $regex: search, $options: 'i' } },
-        { answer: { $regex: search, $options: 'i' } }
-      ];
-    }
+router.patch('/:id/like', protect, [
+    param('id').isMongoId().withMessage('Invalid ID format'), 
+    validate
+  ], ctrl.patchByIdLike);
 
-    // Execute query with lean() for high performance (read-only)
-    const [faqs, total] = await Promise.all([
-      FAQ.find(queryObj)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      FAQ.countDocuments(queryObj)
-    ]);
-
-    res.status(200).json({
-      success: true,
-      count: faqs.length,
-      pagination: {
-        total,
-        page,
-        pages: Math.ceil(total / limit)
-      },
-      data: faqs
-    });
-  })
-);
-
-/**
- * @route   POST /api/faqs
- * @desc    Create a new FAQ
- * @access  Private (Admin/Superadmin)
- */
-router.post(
-  '/',
-  protect,
-  authorize('admin', 'superadmin'),
-  faqValidation,
-  asyncHandler(async (req, res) => {
-    const { question, answer, category, isActive } = req.body;
-
-    const faq = await FAQ.create({
-      question,
-      answer,
-      category,
-      isActive
-    });
-
-    // Audit Log Simulation
-    console.log(`[AUDIT] FAQ Created: ID ${faq._id} by User ${req.user._id}`);
-
-    res.status(201).json({
-      success: true,
-      data: faq
-    });
-  })
-);
-
-/**
- * @route   PATCH /api/faqs/:id/like
- * @desc    Toggle Like on an FAQ (Atomic Update)
- * @access  Private (Authenticated)
- */
-router.patch(
-  '/:id/like',
-  protect,
-  [param('id').isMongoId().withMessage('Invalid ID format'), validate],
-  asyncHandler(async (req, res) => {
-    const faq = await FAQ.findById(req.params.id);
-
-    if (!faq) {
-      return res.status(404).json({ success: false, message: 'FAQ not found' });
-    }
-
-    const isLiked = faq.likes.includes(req.user._id);
-
-    if (isLiked) {
-      // Pull and decrement using atomic operations to prevent race conditions
-      await FAQ.findByIdAndUpdate(req.params.id, {
-        $pull: { likes: req.user._id },
-        $inc: { likeCount: -1 }
-      });
-    } else {
-      // Push and increment
-      await FAQ.findByIdAndUpdate(req.params.id, {
-        $addToSet: { likes: req.user._id },
-        $inc: { likeCount: 1 }
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: isLiked ? 'Unliked' : 'Liked'
-    });
-  })
-);
-
-/**
- * @route   PUT /api/faqs/:id
- * @desc    Update an existing FAQ
- * @access  Private (Admin/Superadmin)
- */
-router.put(
-  '/:id',
-  protect,
-  authorize('admin', 'superadmin'),
-  [
+router.put('/:id', protect, authorize('admin', 'superadmin'), [
     param('id').isMongoId().withMessage('Invalid ID format'),
-    ...faqValidation
-  ],
-  asyncHandler(async (req, res) => {
-    let faq = await FAQ.findById(req.params.id);
+    ...faqValidation 
+  ], ctrl.putById);
 
-    if (!faq) {
-      return res.status(404).json({ success: false, message: 'FAQ not found' });
-    }
+router.delete('/:id', protect, authorize('superadmin'), [
+    param('id').isMongoId().withMessage('Invalid ID format'), 
+    validate
+  ], ctrl.deleteById);
 
-    faq = await FAQ.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true
-    });
+router.get('/stats/by-category', protect, authorize('admin', 'superadmin', 'doctor'), ctrl.getStatsByCategory);
 
-    res.status(200).json({
-      success: true,
-      data: faq
-    });
-  })
-);
-
-/**
- * @route   DELETE /api/faqs/:id
- * @desc    Delete an FAQ
- * @access  Private (Superadmin only)
- */
-router.delete(
-  '/:id',
-  protect,
-  authorize('superadmin'),
-  [param('id').isMongoId().withMessage('Invalid ID format'), validate],
-  asyncHandler(async (req, res) => {
-    const faq = await FAQ.findByIdAndDelete(req.params.id);
-
-    if (!faq) {
-      return res.status(404).json({ success: false, message: 'FAQ not found' });
-    }
-
-    console.log(`[AUDIT] FAQ Deleted: ID ${req.params.id} by User ${req.user._id}`);
-
-    res.status(200).json({
-      success: true,
-      message: 'FAQ removed successfully'
-    });
-  })
-);
-
-/**
- * @section AGGREGATION PIPELINE
- * @route   GET /api/faqs/stats/by-category
- * @desc    Get counts and like metrics grouped by category
- * @access  Private (Staff/Admin)
- */
-router.get(
-  '/stats/by-category',
-  protect,
-  authorize('admin', 'superadmin', 'doctor'),
-  asyncHandler(async (req, res) => {
-    const stats = await FAQ.aggregate([
-      {
-        $group: {
-          _id: '$category',
-          totalFaqs: { $sum: 1 },
-          avgLikes: { $avg: '$likeCount' },
-          totalLikes: { $sum: '$likeCount' }
-        }
-      },
-      { $sort: { totalFaqs: -1 } }
-    ]);
-
-    res.status(200).json({
-      success: true,
-      data: stats
-    });
-  })
-);
-
-/**
- * @section ERROR HANDLING MIDDLEWARE
- * Localized error handling for the router to prevent crashes
- */
-router.use((err, req, res, next) => {
-  console.error(`[ERROR] ${new Date().toISOString()}:`, err);
-
-  // Mongoose Duplicate Key Error
-  if (err.code === 11000) {
-    return res.status(400).json({ success: false, message: 'Duplicate value entered' });
-  }
-
-  // Mongoose Validation Error
-  if (err.name === 'ValidationError') {
-    const messages = Object.values(err.errors).map(val => val.message);
-    return res.status(400).json({ success: false, message: messages.join(', ') });
-  }
-
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Internal Server Error',
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  });
-});
+// Centralised error handler — must be last
+router.use(ctrl.errorHandler);
 
 export default router;

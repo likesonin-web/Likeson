@@ -68,8 +68,8 @@ function CompetenciesSection({ profile, dispatch, loading }) {
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="space-y-4">
       <div className="glass-card p-4 mb-2">
         <div className="flex items-start gap-2">
-          <AlertCircle size={15} className="mt-0.5 shrink-0" style={{ color: "var(--warning)" }} />
-          <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.7 }}>
+          <AlertCircle size={15} className="mt-0.5 shrink-0 text-warning" />
+          <p className="text-xs text-base-content opacity-70">
             These flags appear on your public profile and are used for booking matching. Only toggle
             what you are genuinely trained for.
           </p>
@@ -96,8 +96,8 @@ function CompetenciesSection({ profile, dispatch, loading }) {
                 {c.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate" style={{ color: "var(--base-content)" }}>{c.label}</p>
-                <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.55 }}>{c.note}</p>
+                <p className="text-sm font-semibold truncate text-base-content">{c.label}</p>
+                <p className="text-xs mt-0.5 text-base-content opacity-55">{c.note}</p>
               </div>
               <div
                 className="w-12 h-6 rounded-full relative transition-all duration-300 shrink-0"
@@ -150,12 +150,12 @@ function CertificatesSection({ profile, dispatch, loading }) {
         animate={{ opacity: 1, scale: 1 }}
         className="flex flex-col items-center justify-center py-16 gap-4"
       >
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: "var(--base-200)" }}>
-          <Award size={28} style={{ color: "var(--primary)" }} />
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-base-200">
+          <Award size={28} className="text-primary" />
         </div>
         <div className="text-center">
-          <p className="font-semibold text-sm" style={{ color: "var(--base-content)" }}>No certificates yet</p>
-          <p className="text-xs mt-1" style={{ color: "var(--base-content)", opacity: 0.55 }}>
+          <p className="font-semibold text-sm text-base-content">No certificates yet</p>
+          <p className="text-xs mt-1 text-base-content opacity-55">
             Add your first training certificate to boost your profile score
           </p>
         </div>
@@ -169,13 +169,13 @@ function CertificatesSection({ profile, dispatch, loading }) {
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
       <div className="flex items-center justify-between mb-1">
-        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+        <p className="text-xs font-semibold uppercase tracking-wider text-base-content opacity-50">
           {certs.length} certificate{certs.length !== 1 ? "s" : ""}
         </p>
         <Link
           href="/care-assistant/training/certificates/add"
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl"
-          style={{ background: "color-mix(in srgb, var(--primary), transparent 88%)", color: "var(--primary)" }}
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-[color-mix(in srgb, var(--primary), transparent 88%)] text-primary"
+         
         >
           <Plus size={13} /> Add New
         </Link>
@@ -190,14 +190,14 @@ function CertificatesSection({ profile, dispatch, loading }) {
           className="card p-4 flex gap-3"
         >
           <div
-            className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
-            style={{ background: "color-mix(in srgb, var(--accent), transparent 85%)", color: "var(--accent)" }}
+            className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-[color-mix(in srgb, var(--accent), transparent 85%)] text-accent"
+           
           >
             <Award size={18} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-semibold truncate" style={{ color: "var(--base-content)" }}>{c.name}</p>
+              <p className="text-sm font-semibold truncate text-base-content">{c.name}</p>
               <div className="flex items-center gap-1.5 shrink-0">
                 {c.isVerified
                   ? <span className="badge badge-success !py-0.5 !px-2 !text-[10px]">Verified</span>
@@ -207,24 +207,24 @@ function CertificatesSection({ profile, dispatch, loading }) {
 
             {c.issuedBy && (
               <div className="flex items-center gap-1 mt-1">
-                <Building2 size={11} style={{ color: "var(--base-content)", opacity: 0.45 }} />
-                <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.55 }}>{c.issuedBy}</p>
+                <Building2 size={11} className="text-base-content opacity-45" />
+                <p className="text-xs text-base-content opacity-55">{c.issuedBy}</p>
               </div>
             )}
 
             <div className="flex items-center gap-3 mt-2 flex-wrap">
               {c.issuedAt && (
                 <div className="flex items-center gap-1">
-                  <CalendarDays size={11} style={{ color: "var(--base-content)", opacity: 0.4 }} />
-                  <span className="text-xs" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+                  <CalendarDays size={11} className="text-base-content opacity-40" />
+                  <span className="text-xs text-base-content opacity-50">
                     Issued: {formatDate(c.issuedAt)}
                   </span>
                 </div>
               )}
               {c.expiresAt && (
                 <div className="flex items-center gap-1">
-                  <Clock size={11} style={{ color: "var(--warning)" }} />
-                  <span className="text-xs" style={{ color: "var(--warning)" }}>
+                  <Clock size={11} className="text-warning" />
+                  <span className="text-xs text-warning">
                     Expires: {formatDate(c.expiresAt)}
                   </span>
                 </div>
@@ -237,8 +237,8 @@ function CertificatesSection({ profile, dispatch, loading }) {
                   href={c.documentUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1 text-xs font-semibold"
-                  style={{ color: "var(--primary)" }}
+                  className="flex items-center gap-1 text-xs font-semibold text-primary"
+                 
                 >
                   <ExternalLink size={12} /> View Doc
                 </a>
@@ -246,8 +246,8 @@ function CertificatesSection({ profile, dispatch, loading }) {
               <button
                 onClick={() => handleDelete(c._id)}
                 disabled={loading.training}
-                className="flex items-center gap-1 text-xs font-semibold ml-auto"
-                style={{ color: "var(--error)" }}
+                className="flex items-center gap-1 text-xs font-semibold ml-auto text-error"
+               
               >
                 {loading.training ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                 Remove
@@ -301,8 +301,8 @@ function AddCertificateSection({ dispatch, loading }) {
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
       <div className="glass-card p-4 mb-4">
         <div className="flex items-start gap-2">
-          <AlertCircle size={15} className="mt-0.5 shrink-0" style={{ color: "var(--info)" }} />
-          <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.7 }}>
+          <AlertCircle size={15} className="mt-0.5 shrink-0 text-info" />
+          <p className="text-xs text-base-content opacity-70">
             Certificate details will be reviewed and verified by the admin team. Ensure names match
             official documents.
           </p>
@@ -312,11 +312,11 @@ function AddCertificateSection({ dispatch, loading }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         {fields.map((f) => (
           <div key={f.key} className="space-y-1">
-            <label className="text-xs font-semibold flex items-center gap-1" style={{ color: "var(--base-content)" }}>
+            <label className="text-xs font-semibold flex items-center gap-1 text-base-content">
               {f.label}
-              {f.required && <span style={{ color: "var(--error)" }}>*</span>}
+              {f.required && <span className="text-error">*</span>}
             </label>
-            <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.5 }}>{f.note}</p>
+            <p className="text-[11px] text-base-content opacity-50">{f.note}</p>
             <input
               type={f.type}
               value={form[f.key]}
@@ -325,7 +325,7 @@ function AddCertificateSection({ dispatch, loading }) {
               className={`input-field w-full ${errors[f.key] ? "!border-[var(--error)]" : ""}`}
             />
             {errors[f.key] && (
-              <p className="text-[11px] flex items-center gap-1" style={{ color: "var(--error)" }}>
+              <p className="text-[11px] flex items-center gap-1 text-error">
                 <X size={11} /> {errors[f.key]}
               </p>
             )}
@@ -377,27 +377,23 @@ export default function TrainingPage() {
   }[section];
 
   return (
-    <div data-theme="care-assistant" className="min-h-screen" style={{ background: "var(--base-100)" }}>
+    <div data-theme="care-assistant" className="min-h-screen bg-base-100">
 
       {/* ── header ── */}
       <div
-        className="sticky top-0 z-20 px-4 pt-5 pb-3"
-        style={{
-          background:     "color-mix(in srgb, var(--base-100) 92%, transparent)",
-          backdropFilter: "blur(12px)",
-          borderBottom:   "1px solid var(--base-300)",
-        }}
+        className="sticky top-0 z-20 px-4 pt-5 pb-3 bg-[color-mix(in srgb, var(--base-100) 92%, transparent)] backdrop-blur-[12px] border-b border-base-300"
+       
       >
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
                      <BackButton className='my-3' />
           
-          <p className="text-[11px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: "var(--primary)" }}>
+          <p className="text-[11px] font-semibold uppercase tracking-widest mb-0.5 text-primary">
             Training & Certifications
           </p>
-          <h1 className="!text-xl !font-black !leading-tight" style={{ color: "var(--base-content)" }}>
+          <h1 className="!text-xl !font-black !leading-tight text-base-content">
             {sectionTitle}
           </h1>
-          <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.55 }}>
+          <p className="text-xs mt-0.5 text-base-content opacity-55">
             {sectionSubtitle}
           </p>
         </motion.div>
@@ -405,16 +401,16 @@ export default function TrainingPage() {
         {/* profile completion bar */}
         {profile && (
           <div className="flex items-center gap-2 mt-3">
-            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--base-300)" }}>
+            <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-base-300">
               <motion.div
-                className="h-full rounded-full"
-                style={{ background: "var(--primary)" }}
+                className="h-full rounded-full bg-primary"
+               
                 initial={{ width: 0 }}
                 animate={{ width: `${profile.profileCompletionPercent ?? 0}%` }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
               />
             </div>
-            <span className="text-[11px] font-bold shrink-0" style={{ color: "var(--primary)" }}>
+            <span className="text-[11px] font-bold shrink-0 text-primary">
               {profile.profileCompletionPercent ?? 0}% complete
             </span>
           </div>
@@ -447,11 +443,11 @@ export default function TrainingPage() {
       {/* ── active note ── */}
       <div className="px-4 mt-3">
         <div
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
-          style={{ background: "color-mix(in srgb, var(--info), transparent 90%)" }}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[color-mix(in srgb, var(--info), transparent 90%)]"
+         
         >
-          <AlertCircle size={13} style={{ color: "var(--info)" }} />
-          <p className="text-[11px]" style={{ color: "var(--info)" }}>
+          <AlertCircle size={13} className="text-info" />
+          <p className="text-[11px] text-info">
             {links.find((l) =>
               (section === "competencies" && l.segments.length === 0) ||
               (section === "certificates" && l.segments.join("/") === "certificates") ||

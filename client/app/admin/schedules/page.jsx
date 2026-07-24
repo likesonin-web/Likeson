@@ -115,8 +115,8 @@ function BookingDot({ count, type = 'default' }) {
     <span
       className={`inline-flex items-center justify-center rounded-full text-[9px] font-black leading-none
         ${many ? 'bg-error text-error-content' : 'bg-primary text-primary-content'}
-      `}
-      style={{ minWidth: 16, height: 16, padding: '0 4px' }}
+       min-w-[16px] h-[16px] py-[0px] px-[4px]`}
+
     >
       {count > 9 ? '9+' : count}
     </span>
@@ -607,13 +607,10 @@ export default function SchedulesPage() {
                         {/* heat strip at bottom */}
                         {count > 0 && !isSel && (
                           <div
-                            className="absolute bottom-0 left-1 right-1 h-0.5 rounded-full"
-                            style={{
-                              background: count >= 8 ? 'var(--error)'
+                            className="absolute bottom-0 left-1 right-1 h-0.5 rounded-full opacity-70"
+                            style={{ background: count >= 8 ? 'var(--error)'
                                 : count >= 4 ? 'var(--warning)'
-                                : 'var(--primary)',
-                              opacity: 0.7,
-                            }}
+                                : 'var(--primary)' }}
                           />
                         )}
                       </>

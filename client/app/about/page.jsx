@@ -76,15 +76,8 @@ function HeroParticles() {
       {Array.from({ length: 18 }).map((_, i) => (
         <motion.div
           key={i}
-          className="absolute rounded-full"
-          style={{
-            width:  Math.random() * 6 + 3,
-            height: Math.random() * 6 + 3,
-            left:   `${Math.random() * 100}%`,
-            top:    `${Math.random() * 100}%`,
-            background: `oklch(${60 + Math.random() * 20}% 0.18 ${180 + i * 18})`,
-            opacity: 0.35,
-          }}
+          className="absolute rounded-full opacity-35"
+          style={{ width: Math.random() * 6 + 3, height: Math.random() * 6 + 3, left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, background: `oklch(${60 + Math.random() * 20}% 0.18 ${180 + i * 18})` }}
           animate={{ y: [0, -24, 0], opacity: [0.35, 0.7, 0.35] }}
           transition={{ duration: 4 + Math.random() * 4, repeat: Infinity, delay: i * 0.3 }}
         />
@@ -112,7 +105,7 @@ function PillarCard({ icon: Icon, label, color, desc, index }) {
           <Icon size={22} style={{ color }} />
         </div>
         <h3 className="font-montserrat font-extrabold text-base text-base-content mb-1">{label}</h3>
-        <p className="text-xs leading-relaxed" style={{ color: 'color-mix(in oklch, var(--base-content) 65%, transparent)' }}>{desc}</p>
+        <p className="text-xs leading-relaxed text-[color-mix(in oklch, var(--base-content) 65%, transparent)]">{desc}</p>
         <div
           className="absolute bottom-0 left-0 h-[2px] w-0 group-hover:w-full transition-all duration-500 rounded-b-[inherit]"
           style={{ background: color }}
@@ -126,9 +119,9 @@ function StatBubble({ value, label, icon: Icon, index }) {
   return (
     <motion.div variants={fadeUp} custom={index} className="text-center">
       <div className="stat-card flex flex-col items-center gap-2 p-6">
-        <div className="w-10 h-10 rounded-full flex items-center justify-center mb-1"
-          style={{ background: 'color-mix(in srgb, var(--primary), transparent 85%)' }}>
-          <Icon size={18} style={{ color: 'var(--primary)' }} />
+        <div className="w-10 h-10 rounded-full flex items-center justify-center mb-1 bg-[color-mix(in srgb, var(--primary), transparent 85%)]"
+         >
+          <Icon size={18} className="text-primary" />
         </div>
         <span className="stat-card-value">{value}</span>
         <span className="stat-card-label">{label}</span>
@@ -141,12 +134,12 @@ function ValueCard({ icon: Icon, title, body, index }) {
   return (
     <motion.div variants={fadeUp} custom={index}>
       <div className="card p-6 h-full">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4"
-          style={{ background: 'color-mix(in srgb, var(--primary), transparent 88%)', border: '1px solid color-mix(in srgb, var(--primary), transparent 65%)' }}>
-          <Icon size={18} style={{ color: 'var(--primary)' }} />
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4 bg-[color-mix(in srgb, var(--primary), transparent 88%)] border border-[color-mix(in srgb, var(--primary), transparent 65%)]"
+         >
+          <Icon size={18} className="text-primary" />
         </div>
         <h4 className="font-montserrat font-black text-base text-base-content mb-2">{title}</h4>
-        <p className="text-sm leading-relaxed" style={{ color: 'color-mix(in oklch, var(--base-content) 68%, transparent)' }}>{body}</p>
+        <p className="text-sm leading-relaxed text-[color-mix(in oklch, var(--base-content) 68%, transparent)]">{body}</p>
       </div>
     </motion.div>
   );
@@ -157,17 +150,13 @@ function TeamCard({ name, role, initials, hue, index }) {
     <motion.div variants={fadeUp} custom={index}>
       <div className="card p-6 text-center group">
         <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-3 font-montserrat font-black text-lg transition-transform duration-300 group-hover:scale-110"
-          style={{
-            background: `oklch(55% 0.18 ${hue})`,
-            color: '#fff',
-            boxShadow: `0 6px 20px oklch(55% 0.18 ${hue} / 35%)`,
-          }}
+          className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-3 font-montserrat font-black text-lg transition-transform duration-300 group-hover:scale-110 text-[#fff]"
+          style={{ background: `oklch(55% 0.18 ${hue})`, boxShadow: `0 6px 20px oklch(55% 0.18 ${hue} / 35%)` }}
         >
           {initials}
         </div>
         <p className="font-montserrat font-extrabold text-sm text-base-content">{name}</p>
-        <p className="text-xs mt-0.5" style={{ color: 'color-mix(in oklch, var(--base-content) 60%, transparent)' }}>{role}</p>
+        <p className="text-xs mt-0.5 text-[color-mix(in oklch, var(--base-content) 60%, transparent)]">{role}</p>
       </div>
     </motion.div>
   );
@@ -186,8 +175,8 @@ export default function AboutPage() {
       {/* ── HERO ──────────────────────────────────────────────────────── */}
       <section
         ref={heroRef}
-        className="relative min-h-[88vh] flex items-center justify-center overflow-hidden"
-        style={{ background: 'linear-gradient(160deg, var(--primary) 0%, color-mix(in srgb, var(--secondary) 80%, var(--primary)) 100%)' }}
+        className="relative min-h-[88vh] flex items-center justify-center overflow-hidden bg-[linear-gradient(160deg, var(--primary) 0%, color-mix(in srgb, var(--secondary) 80%, var(--primary)) 100%)]"
+       
       >
         <HeroParticles />
 
@@ -203,8 +192,8 @@ export default function AboutPage() {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-6 text-xs font-bold uppercase tracking-widest"
-            style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff' }}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-6 text-xs font-bold uppercase tracking-widest bg-white/15 border border-[rgba(255,255,255,0.3)] text-[#fff]"
+           
           >
             <Heart size={12} fill="currentColor" /> Vijayawada&apos;s Healthcare Platform
           </motion.div>
@@ -213,12 +202,12 @@ export default function AboutPage() {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-            className="font-montserrat font-black text-white leading-[1.05] mb-6"
-            style={{ fontSize: 'clamp(2.5rem, 7vw, 5rem)' }}
+            className="font-montserrat font-black text-white leading-[1.05] mb-6 text-[clamp(2.5rem, 7vw, 5rem)]"
+           
           >
             Healthcare,
             <br />
-            <span style={{ color: 'var(--accent)' }}>Reimagined</span>
+            <span className="text-accent">Reimagined</span>
             <br />
             for Everyone.
           </motion.h1>
@@ -227,8 +216,8 @@ export default function AboutPage() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.25 }}
-            className="text-base md:text-lg max-w-xl mx-auto mb-10 leading-relaxed"
-            style={{ color: 'rgba(255,255,255,0.82)' }}
+            className="text-base md:text-lg max-w-xl mx-auto mb-10 leading-relaxed text-[rgba(255,255,255,0.82)]"
+           
           >
             Likeson.in connects patients with verified doctors, labs, pharmacies,
             care assistants, and medical transport — all in one trusted platform
@@ -242,12 +231,12 @@ export default function AboutPage() {
             className="flex flex-wrap items-center justify-center gap-4"
           >
             <Link href="/services">
-              <span className="btn-primary-cta" style={{ background: '#fff', color: 'var(--primary)' }}>
+              <span className="btn-primary-cta bg-[#fff] text-primary">
                 Explore Services <ArrowRight size={14} className="inline ml-1" />
               </span>
             </Link>
             <Link href="/contact">
-              <span className="btn-secondary" style={{ borderColor: 'rgba(255,255,255,0.6)', color: '#fff' }}>
+              <span className="btn-secondary text-[#fff]" style={{ borderColor: 'rgba(255,255,255,0.6)' }}>
                 Partner with Us
               </span>
             </Link>
@@ -268,20 +257,20 @@ export default function AboutPage() {
           <InViewSection>
             <motion.div variants={fadeUp} custom={0}>
               <span className="badge badge-primary mb-4">Our Mission</span>
-              <h2 className="font-montserrat font-black text-base-content leading-tight mb-5"
-                style={{ fontSize: 'clamp(1.8rem, 4vw, 3rem)' }}>
+              <h2 className="font-montserrat font-black text-base-content leading-tight mb-5 text-[clamp(1.8rem, 4vw, 3rem)]"
+               >
                 Bringing the Best Care<br />
                 <span className="text-gradient-primary">Closer to Home</span>
               </h2>
-              <p className="text-base leading-relaxed mb-5"
-                style={{ color: 'color-mix(in oklch, var(--base-content) 70%, transparent)' }}>
+              <p className="text-base leading-relaxed mb-5 text-[color-mix(in oklch, var(--base-content) 70%, transparent)]"
+               >
                 Founded in Vijayawada, Likeson.in was built on a simple belief: quality
                 healthcare shouldn&apos;t require a waiting room or a long commute. Our platform
                 aggregates every layer of care — consultation, transport, diagnostics, pharmacy,
                 and in-home assistance — into a single, seamless experience.
               </p>
-              <p className="text-base leading-relaxed"
-                style={{ color: 'color-mix(in oklch, var(--base-content) 70%, transparent)' }}>
+              <p className="text-base leading-relaxed text-[color-mix(in oklch, var(--base-content) 70%, transparent)]"
+               >
                 Every partner on our platform is verified, every price is transparent,
                 and every interaction is logged for accountability. That&apos;s not just a
                 promise — it&apos;s enforced by our technology.
@@ -307,25 +296,25 @@ export default function AboutPage() {
                 >
                   <CheckCircle2 size={18} style={{ color: `oklch(55% 0.18 ${hue})` }} />
                   <p className="font-montserrat font-black text-sm text-base-content">{label}</p>
-                  <p className="text-xs" style={{ color: 'color-mix(in oklch, var(--base-content) 60%, transparent)' }}>{sub}</p>
+                  <p className="text-xs text-[color-mix(in oklch, var(--base-content) 60%, transparent)]">{sub}</p>
                 </motion.div>
               ))}
             </motion.div>
             {/* bg blob */}
-            <div className="absolute -top-10 -right-10 w-64 h-64 rounded-full blur-3xl opacity-10 pointer-events-none"
-              style={{ background: 'var(--primary)' }} />
+            <div className="absolute -top-10 -right-10 w-64 h-64 rounded-full blur-3xl opacity-10 pointer-events-none bg-primary"
+              />
           </InViewSection>
         </div>
       </section>
 
       {/* ── PILLARS ────────────────────────────────────────────────────── */}
-      <section className="py-20" style={{ background: 'var(--base-200)' }}>
+      <section className="py-20 bg-base-200">
         <div className="container-custom">
           <InViewSection className="text-center mb-12">
             <motion.div variants={fadeUp} custom={0}>
               <span className="badge badge-primary mb-3">Platform Services</span>
-              <h2 className="font-montserrat font-black text-base-content mb-3"
-                style={{ fontSize: 'clamp(1.6rem, 3.5vw, 2.6rem)' }}>
+              <h2 className="font-montserrat font-black text-base-content mb-3 text-[clamp(1.6rem, 3.5vw, 2.6rem)]"
+               >
                 Six Pillars of Care
               </h2>
               <p className="section-subheading max-w-md mx-auto">
@@ -344,8 +333,8 @@ export default function AboutPage() {
         <InViewSection className="text-center mb-12">
           <motion.div variants={fadeUp} custom={0}>
             <span className="badge badge-primary mb-3">Core Values</span>
-            <h2 className="font-montserrat font-black text-base-content"
-              style={{ fontSize: 'clamp(1.6rem, 3.5vw, 2.6rem)' }}>
+            <h2 className="font-montserrat font-black text-base-content text-[clamp(1.6rem, 3.5vw, 2.6rem)]"
+             >
               What Drives Everything We Do
             </h2>
           </motion.div>
@@ -356,13 +345,13 @@ export default function AboutPage() {
       </section>
 
       {/* ── TEAM ───────────────────────────────────────────────────────── */}
-      <section className="py-20" style={{ background: 'var(--base-200)' }}>
+      <section className="py-20 bg-base-200">
         <div className="container-custom">
           <InViewSection className="text-center mb-12">
             <motion.div variants={fadeUp} custom={0}>
               <span className="badge badge-primary mb-3">Leadership</span>
-              <h2 className="font-montserrat font-black text-base-content"
-                style={{ fontSize: 'clamp(1.6rem, 3.5vw, 2.6rem)' }}>
+              <h2 className="font-montserrat font-black text-base-content text-[clamp(1.6rem, 3.5vw, 2.6rem)]"
+               >
                 The Team Behind Likeson
               </h2>
             </motion.div>
@@ -379,27 +368,27 @@ export default function AboutPage() {
           <motion.div
             variants={fadeUp}
             custom={0}
-            className="relative rounded-3xl overflow-hidden p-10 md:p-16 text-center"
-            style={{ background: 'linear-gradient(135deg, var(--primary), var(--secondary))' }}
+            className="relative rounded-3xl overflow-hidden p-10 md:p-16 text-center bg-[linear-gradient(135deg, var(--primary), var(--secondary))]"
+           
           >
             <HeroParticles />
             <div className="relative z-10">
-              <h2 className="font-montserrat font-black text-white mb-4"
-                style={{ fontSize: 'clamp(1.8rem, 4vw, 3rem)' }}>
+              <h2 className="font-montserrat font-black text-white mb-4 text-[clamp(1.8rem, 4vw, 3rem)]"
+               >
                 Ready to Experience Better Healthcare?
               </h2>
-              <p className="mb-8 max-w-md mx-auto text-base"
-                style={{ color: 'rgba(255,255,255,0.82)' }}>
+              <p className="mb-8 max-w-md mx-auto text-base text-[rgba(255,255,255,0.82)]"
+               >
                 Join thousands of patients and partners building a healthier Vijayawada together.
               </p>
               <div className="flex flex-wrap gap-4 justify-center">
                 <Link href="/register">
-                  <span className="btn-primary-cta" style={{ background: '#fff', color: 'var(--primary)' }}>
+                  <span className="btn-primary-cta bg-[#fff] text-primary">
                     Get Started Free
                   </span>
                 </Link>
                 <Link href="/legal/terms">
-                  <span className="btn-secondary" style={{ borderColor: 'rgba(255,255,255,0.5)', color: '#fff' }}>
+                  <span className="btn-secondary text-[#fff]" style={{ borderColor: 'rgba(255,255,255,0.5)' }}>
                     Read Our Terms
                   </span>
                 </Link>

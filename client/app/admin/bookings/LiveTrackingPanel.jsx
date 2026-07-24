@@ -155,7 +155,7 @@ async function fetchTrackingData(rideId) {
 function Spinner() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-      style={{ animation: 'ltp-spin 1s linear infinite', flexShrink: 0 }}>
+      className="shrink-0" style={{ animation: 'ltp-spin 1s linear infinite' }}>
       <style>{`@keyframes ltp-spin{to{transform:rotate(360deg)}}`}</style>
       <circle cx="12" cy="12" r="10" stroke="currentColor"
         strokeWidth="2.5" strokeDasharray="31.4" strokeDashoffset="10" strokeLinecap="round" />
@@ -249,6 +249,7 @@ function MapCanvas({ booking, tracking, mapRoutePolyline, liveLocation, activeLa
   const [error,   setError]         = useState(false);
   const [svOpen,  setSvOpen]        = useState(false);
   const [measureDist, setMeasureDist] = useState(null);
+  const [mapView, setMapView]       = useState(null); // { center, zoom } — synced from map events, never read from ref during render
 
   const pickupCoords  = booking?.patientLocation?.coordinates;
   const dropoffCoords = booking?.destinationLocation?.coordinates;
@@ -282,6 +283,10 @@ const polylineStr = tracking?.expectedRoutePolyline ?? mapRoutePolyline ?? null;
           ],
         });
         mapObj.current = map;
+        setMapView({ center: map.getCenter(), zoom: map.getZoom() });
+        map.addListener('idle', () => {
+          setMapView({ center: map.getCenter(), zoom: map.getZoom() });
+        });
 
         if (polylineStr) {
           const path = decodePolyline(polylineStr);
@@ -537,11 +542,11 @@ const polylineStr = tracking?.expectedRoutePolyline ?? mapRoutePolyline ?? null;
 
       {/* Map + compare split */}
       <div className="flex w-full h-full">
-        <div ref={mapRef} style={{ width: showCompare ? '50%' : '100%', height: '100%' }} />
+        <div ref={mapRef} className="h-full" style={{ width: showCompare ? '50%' : '100%' }} />
         {showCompare && (
           <CompareHalf
-            center={mapObj.current?.getCenter()}
-            zoom={mapObj.current?.getZoom()}
+            center={mapView?.center}
+            zoom={mapView?.zoom}
           />
         )}
       </div>
@@ -549,8 +554,8 @@ const polylineStr = tracking?.expectedRoutePolyline ?? mapRoutePolyline ?? null;
       {/* Street view overlay */}
       {svOpen && (
         <div ref={svContainerRef}
-          className="absolute inset-0 z-10"
-          style={{ height: '100%' }}
+          className="absolute inset-0 z-10 h-full"
+         
         />
       )}
     </div>
@@ -583,8 +588,8 @@ function CompareHalf({ center, zoom }) {
   }, [center, zoom]);
 
   return (
-    <div style={{ width: '50%', height: '100%', position: 'relative' }}>
-      <div ref={ref} style={{ width: '100%', height: '100%' }} />
+    <div className="w-[50%] h-full relative">
+      <div ref={ref} className="w-full h-full" />
       <div className="absolute top-1 left-1 bg-black/60 text-white text-[9px]
         font-bold px-1.5 py-0.5 rounded">Satellite</div>
     </div>
@@ -699,8 +704,8 @@ const dropoffCoords = booking?.destinationLocation?.coordinates ?? mapRoute?.dro
             exit={{ opacity: 0, y: 12, scale: 0.97 }}
             transition={{ duration: 0.15 }}
             className="w-full bg-base-100/97 backdrop-blur border border-base-300
-              rounded-2xl shadow-2xl overflow-hidden"
-            style={{ maxHeight: '60vh' }}
+       rounded-2xl shadow-2xl overflow-hidden max-h-[60vh]"
+           
           >
             {/* Ride summary strip */}
             {ride && (
@@ -780,7 +785,7 @@ const dropoffCoords = booking?.destinationLocation?.coordinates ?? mapRoute?.dro
             </div>
 
             {/* Tab content */}
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(60vh - 140px)' }}>
+            <div className="overflow-y-auto max-h-[calc(60vh - 140px)]">
 
               {/* ── MAP tab ── */}
               {tab === 'map' && (
@@ -832,8 +837,8 @@ const dropoffCoords = booking?.destinationLocation?.coordinates ?? mapRoute?.dro
                     ].map(({ color, line, label }) => (
                       <div key={label} className="flex items-center gap-1">
                         {line
-                          ? <div style={{ width: 18, height: 3, background: color, borderRadius: 2 }} />
-                          : <div style={{ width: 9, height: 9, borderRadius: '50%', background: color, border: '2px solid white', boxSizing: 'border-box' }} />
+                          ? <div className="w-[18px] h-[3px] rounded-[2px]" style={{ background: color }} />
+                          : <div className="w-[9px] h-[9px] rounded-[50%] border-[2px] border-[white] box-border" style={{ background: color }} />
                         }
                         <span className="text-[10px] text-base-content/50">{label}</span>
                       </div>
@@ -972,7 +977,7 @@ const dropoffCoords = booking?.destinationLocation?.coordinates ?? mapRoute?.dro
                             <div key={m._id ?? i} className="flex gap-2.5">
                               <div className="flex flex-col items-center flex-shrink-0 pt-1">
                                 <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                                {!isLast && <div className="w-px flex-1 bg-base-300 my-1" style={{ minHeight: 12 }} />}
+                                {!isLast && <div className="w-px flex-1 bg-base-300 my-1 min-h-[12px]" />}
                               </div>
                               <div className={`flex-1 min-w-0 ${!isLast ? 'pb-3' : ''}`}>
                                 <div className="flex items-baseline justify-between gap-2">
@@ -1295,11 +1300,11 @@ function NormalPanel({
 
             {/* Map canvas */}
             {trackLoading && !tracking ? (
-              <div className="flex items-center justify-center bg-base-200 rounded-xl gap-2 text-base-content/40 text-xs" style={{ height: 260 }}>
+              <div className="flex items-center justify-center bg-base-200 rounded-xl gap-2 text-base-content/40 text-xs h-[260px]">
                 <Spinner /> Loading canonical route…
               </div>
             ) : (
-              <div className="rounded-xl overflow-hidden border border-base-300" style={{ height: 260 }}>
+              <div className="rounded-xl overflow-hidden border border-base-300 h-[260px]">
                 <MapCanvas
                   booking={booking}
                   tracking={tracking}
@@ -1320,8 +1325,8 @@ function NormalPanel({
               ].map(({ color, line, label }) => (
                 <div key={label} className="flex items-center gap-1">
                   {line
-                    ? <div style={{ width: 18, height: 3, background: color, borderRadius: 2 }} />
-                    : <div style={{ width: 9, height: 9, borderRadius: '50%', background: color, border: '2px solid white', boxSizing: 'border-box' }} />
+                    ? <div className="w-[18px] h-[3px] rounded-[2px]" style={{ background: color }} />
+                    : <div className="w-[9px] h-[9px] rounded-[50%] border-[2px] border-[white] box-border" style={{ background: color }} />
                   }
                   <span className="text-[10px] text-base-content/50">{label}</span>
                 </div>
@@ -1484,7 +1489,7 @@ function NormalPanel({
                       <div key={m._id ?? i} className="flex gap-2.5">
                         <div className="flex flex-col items-center flex-shrink-0 pt-1">
                           <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                          {!isLast && <div className="w-px flex-1 bg-base-300 my-1" style={{ minHeight: 12 }} />}
+                          {!isLast && <div className="w-px flex-1 bg-base-300 my-1 min-h-[12px]" />}
                         </div>
                         <div className={`flex-1 min-w-0 ${!isLast ? 'pb-3' : ''}`}>
                           <div className="flex items-baseline justify-between gap-2">
@@ -1698,7 +1703,7 @@ const mapRoutePolyline = mapRoute?.polyline ?? null;
     return (
       <>
         {/* Placeholder in normal flow */}
-        <div className="rounded-xl border border-base-300 bg-base-100 overflow-hidden" style={{ minHeight: 120 }}>
+        <div className="rounded-xl border border-base-300 bg-base-100 overflow-hidden min-h-[120px]">
           <div className="flex flex-col items-center justify-center h-full py-8 gap-2 text-base-content/30 text-xs">
             <Lock size={20} strokeWidth={1} />
             <span>Tracking locked to fullscreen</span>

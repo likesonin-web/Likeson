@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, memo, useRef, useState } from "react";
+import React, { useCallback, memo, useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -9,16 +9,33 @@ import {
   ArrowUpRight, ChevronRight, Sparkles,
 } from "lucide-react";
 
+// --- CONSTANTS & CONFIGURATIONS ---
 const BOOK = (type) => `/book-appointment?type=${type}`;
 const HOW_IT_WORKS = "/how-it-works";
 
+// Extracted magic numbers for animations to ensure global consistency
+const ANIMATION = {
+  transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] },
+  viewport: { once: true, margin: "-60px" }
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 40 },
+  visible: (index) => ({
+    opacity: 1,
+    y: 0,
+    transition: { ...ANIMATION.transition, delay: index * 0.08 }
+  })
+};
+
+// Abstracted colors to CSS-friendly strings (easier to map to Tailwind or global CSS variables later)
 const SERVICES_DATA = [
   {
     id: "full_care_ride", title: "Full Care Ride",
     tagline: "Door-to-door with a dedicated care assistant",
     description: "13-step care journey — verified assistant, GPS-tracked vehicle, medicines collected en route, safe return confirmed.",
     icon: Ambulance, href: BOOK("full_care_ride"), storyHref: `${HOW_IT_WORKS}#full-care-ride`,
-    palette: { glow: "rgba(249,115,22,0.32)", border: "rgba(249,115,22,0.5)", text: "#f97316", light: "rgba(249,115,22,0.10)" },
+    theme: { rgb: "249, 115, 22", hex: "#f97316" }, // Orange
     badge: "Most Popular",
     features: ["13-Step Care Journey", "Live GPS Tracking", "En-Route Pharmacy", "Safe Return Confirmed"],
   },
@@ -27,7 +44,7 @@ const SERVICES_DATA = [
     tagline: "In-person visit at hospital or clinic",
     description: "Book board-certified specialists for in-person visits, home visits, or scheduled clinic appointments.",
     icon: Stethoscope, href: BOOK("doctor_consultation"), storyHref: `${HOW_IT_WORKS}#doctor-consultation`,
-    palette: { glow: "rgba(14,165,233,0.32)", border: "rgba(14,165,233,0.5)", text: "#0ea5e9", light: "rgba(14,165,233,0.10)" },
+    theme: { rgb: "14, 165, 233", hex: "#0ea5e9" }, // Sky
     features: ["Choose Hospital & Doctor", "In-Person & Home Visits", "Digital Prescriptions", "Follow-Up Tracking"],
   },
   {
@@ -35,7 +52,7 @@ const SERVICES_DATA = [
     tagline: "Video call with your doctor from anywhere",
     description: "Video or audio appointments — ideal for NRIs managing parents remotely, follow-ups, and chronic care.",
     icon: Zap, href: BOOK("doctor_online"), storyHref: `${HOW_IT_WORKS}#doctor-online`,
-    palette: { glow: "rgba(139,92,246,0.32)", border: "rgba(139,92,246,0.5)", text: "#8b5cf6", light: "rgba(139,92,246,0.10)" },
+    theme: { rgb: "139, 92, 246", hex: "#8b5cf6" }, // Violet
     badge: "NRI Friendly",
     features: ["24/7 Video & Audio", "Upload Patient History", "Instant Confirmation", "NRI-Friendly Scheduling"],
   },
@@ -44,7 +61,7 @@ const SERVICES_DATA = [
     tagline: "Clinic or home session by a certified therapist",
     description: "Post-surgical recovery, mobility support, chronic pain — certified physio sessions at clinic or your home.",
     icon: Activity, href: BOOK("physiotherapist"), storyHref: `${HOW_IT_WORKS}#physiotherapist`,
-    palette: { glow: "rgba(239,68,68,0.32)", border: "rgba(239,68,68,0.5)", text: "#ef4444", light: "rgba(239,68,68,0.10)" },
+    theme: { rgb: "239, 68, 68", hex: "#ef4444" }, // Red
     features: ["Certified Physiotherapists", "Clinic or Home Visit", "Post-Surgery Recovery", "Auto Follow-Up Reminders"],
   },
   {
@@ -52,7 +69,7 @@ const SERVICES_DATA = [
     tagline: "Background-verified professional at your side",
     description: "Verified care assistants who escort patients, manage queues, handle billing — so no one faces a hospital alone.",
     icon: HeartHandshake, href: BOOK("care_assistant"), storyHref: `${HOW_IT_WORKS}#care-assistant`,
-    palette: { glow: "rgba(16,185,129,0.32)", border: "rgba(16,185,129,0.5)", text: "#10b981", light: "rgba(16,185,129,0.10)" },
+    theme: { rgb: "16, 185, 129", hex: "#10b981" }, // Emerald
     features: ["Queue Management", "Billing Assistance", "Elderly Companionship", "Medication Reminders"],
   },
   {
@@ -60,7 +77,7 @@ const SERVICES_DATA = [
     tagline: "Lab technician at your doorstep",
     description: "NABL-accredited lab tests with home sample collection. Digital reports delivered to your dashboard in 6-48 hrs.",
     icon: Microscope, href: BOOK("diagnostic_home"), storyHref: `${HOW_IT_WORKS}#diagnostics`,
-    palette: { glow: "rgba(6,182,212,0.32)", border: "rgba(6,182,212,0.5)", text: "#06b6d4", light: "rgba(6,182,212,0.10)" },
+    theme: { rgb: "6, 182, 212", hex: "#06b6d4" }, // Cyan
     badge: "Home Visit",
     features: ["NABL Accredited Labs", "Home Sample Collection", "Reports in 6-48 hrs", "Full Body Packages"],
   },
@@ -69,40 +86,53 @@ const SERVICES_DATA = [
     tagline: "Verified medicines, delivered fast",
     description: "Express delivery with cold-chain maintenance — including auto-refill plans for chronic patients.",
     icon: Pill, href: BOOK("pharmacy"), storyHref: `${HOW_IT_WORKS}#pharmacy`,
-    palette: { glow: "rgba(245,158,11,0.32)", border: "rgba(245,158,11,0.5)", text: "#f59e0b", light: "rgba(245,158,11,0.10)" },
+    theme: { rgb: "245, 158, 11", hex: "#f59e0b" }, // Amber
     features: ["2-Hour Express Delivery", "Cold-Chain Maintained", "Auto-Refill Chronic", "Prescription Digitization"],
   },
 ];
 
-// Added variants for clean SSR & SEO rendering
-const cardVariants = {
-  hidden: { opacity: 0, y: 40 },
-  visible: (index) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.55, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }
-  })
-};
+// --- COMPONENTS ---
 
 const SpotlightCard = memo(({ service, index }) => {
   const Icon = service.icon;
   const cardRef = useRef(null);
+  const requestRef = useRef(null);
   const [hovered, setHovered] = useState(false);
 
+  // 1. Performance: Throttled mouse move via requestAnimationFrame
   const handleMouseMove = useCallback((e) => {
     const el = cardRef.current;
     if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    el.style.setProperty("--spot-x", `${x}px`);
-    el.style.setProperty("--spot-y", `${y}px`);
+
+    if (requestRef.current) cancelAnimationFrame(requestRef.current);
+
+    requestRef.current = requestAnimationFrame(() => {
+      const rect = el.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      el.style.setProperty("--spot-x", `${x}px`);
+      el.style.setProperty("--spot-y", `${y}px`);
+    });
+  }, []);
+
+  // Cleanup animation frame on unmount
+  useEffect(() => {
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
   }, []);
 
   const handleMouseEnter = useCallback(() => setHovered(true), []);
   const handleMouseLeave = useCallback(() => setHovered(false), []);
 
-  const { palette } = service;
+  const { theme } = service;
+  // Dynamic palette generation to avoid hardcoded boilerplate
+  const palette = {
+    glow: `rgba(${theme.rgb}, 0.32)`,
+    border: `rgba(${theme.rgb}, 0.5)`,
+    light: `rgba(${theme.rgb}, 0.10)`,
+    text: theme.hex
+  };
 
   return (
     <motion.li
@@ -110,18 +140,16 @@ const SpotlightCard = memo(({ service, index }) => {
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      // FIX 3: SEO Fallback - initial={false} ensures bots see the HTML instantly
       initial={false}
       custom={index}
       variants={cardVariants}
       whileInView="visible"
-      viewport={{ once: true, margin: "-60px" }}
+      viewport={ANIMATION.viewport}
       animate={{ scale: hovered ? 1.015 : 1 }}
       style={{ listStyle: "none", "--spot-x": "50%", "--spot-y": "50%" }}
-      className="relative rounded-2xl will-change-transform"
+      className="relative rounded-2xl will-change-transform group"
       aria-labelledby={`svc-title-${service.id}`}
     >
-      {/* Glow border */}
       <motion.div
         className="absolute inset-0 rounded-2xl pointer-events-none"
         animate={{
@@ -132,10 +160,7 @@ const SpotlightCard = memo(({ service, index }) => {
         transition={{ duration: 0.3 }}
       />
 
-      {/* Main Card Content */}
       <div className="relative h-full rounded-2xl overflow-hidden flex flex-col bg-base-100">
-        
-        {/* Spotlight overlay */}
         <div
           className="absolute inset-0 rounded-2xl pointer-events-none transition-opacity duration-300 hidden sm:block"
           style={{
@@ -146,7 +171,6 @@ const SpotlightCard = memo(({ service, index }) => {
         />
 
         <div className="relative z-10 flex flex-col flex-1 p-7">
-          {/* Header */}
           <div className="flex items-start justify-between mb-7">
             <motion.div
               animate={{ scale: hovered ? 1.1 : 1, rotate: hovered ? 5 : 0 }}
@@ -163,16 +187,16 @@ const SpotlightCard = memo(({ service, index }) => {
             <div className="flex items-center gap-2 flex-shrink-0">
               {service.badge && (
                 <span
-                  // FIX 1: Increased from text-[10px] to text-xs for better legibility
                   className="font-poppins text-xs font-black uppercase tracking-widest px-2.5 py-1 rounded-full"
                   style={{ backgroundColor: palette.light, color: palette.text, border: `1px solid ${palette.border}` }}
                 >
                   {service.badge}
                 </span>
               )}
+              {/* 3. UX: Higher z-index to ensure this button isn't blocked by the main card's invisible link */}
               <Link
                 href={service.storyHref}
-                className="w-9 h-9 rounded-full border border-base-300 text-base-content/50 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="relative z-20 w-9 h-9 rounded-full border border-base-300 text-base-content/50 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 aria-label={`See how ${service.title} works`}
               >
                 <ChevronRight size={16} />
@@ -180,35 +204,22 @@ const SpotlightCard = memo(({ service, index }) => {
             </div>
           </div>
 
-          {/* Text Content */}
           <div className="mb-6">
-            <p 
-              // FIX 1: Increased from text-[10px] to text-xs
-              className="font-poppins text-xs font-black uppercase tracking-[0.16em] mb-1.5"
-              style={{ color: palette.text }}
-            >
+            <p className="font-poppins text-xs font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: palette.text }}>
               {service.tagline}
             </p>
-            <h2
-              id={`svc-title-${service.id}`}
-              className="font-montserrat text-[1.3rem] text-base-content font-black leading-tight tracking-tight mb-3"
-            >
+            <h2 id={`svc-title-${service.id}`} className="font-montserrat text-[1.3rem] text-base-content font-black leading-tight tracking-tight mb-3">
               {service.title}
             </h2>
-            <p 
-              // FIX 2: Increased contrast from text-base-content/50 to /70
-              className="font-poppins text-xs md:text-sm leading-relaxed text-base-content/70"
-            >
+            <p className="font-poppins text-xs md:text-sm leading-relaxed text-base-content/70">
               {service.description}
             </p>
           </div>
 
-          {/* Feature Pills */}
           <div className="flex flex-wrap gap-2 mb-7 mt-auto">
             {service.features.map((f) => (
               <span
                 key={f}
-                // FIX 1: Increased from text-[11px] to text-xs
                 className="font-poppins inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all duration-300"
                 style={{
                   backgroundColor: hovered ? palette.light : "var(--base-200)",
@@ -224,17 +235,15 @@ const SpotlightCard = memo(({ service, index }) => {
             ))}
           </div>
 
-          {/* CTA Button */}
-          <Link href={service.href} aria-label={`Book ${service.title}`}>
+          {/* 4. UX: `after:absolute after:inset-0` stretches the click area across the entire card */}
+          <Link href={service.href} aria-label={`Book ${service.title}`} className="relative z-10 after:absolute after:inset-0 after:z-10">
             <motion.div
-              className="font-poppins relative w-full flex items-center justify-between px-5 py-3.5 rounded-xl overflow-hidden font-black text-sm cursor-pointer"
+              className="font-poppins relative w-full flex items-center justify-between px-5 py-3.5 rounded-xl overflow-hidden font-black text-sm"
               animate={{ 
                 backgroundColor: hovered ? palette.text : "var(--base-200)", 
                 color: hovered ? "#ffffff" : palette.text 
               }}
               transition={{ duration: 0.28 }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
             >
               <span>Book Now</span>
               <motion.span animate={{ x: hovered ? 3 : 0 }} transition={{ duration: 0.22 }}>
@@ -263,8 +272,8 @@ const SectionHeader = memo(() => (
     className="max-w-3xl mb-20"
     initial={false}
     whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true }}
-    transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+    viewport={ANIMATION.viewport}
+    transition={ANIMATION.transition}
   >
     <div className="flex items-center gap-3 mb-6">
       <div className="font-poppins flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-[0.15em] bg-[#0ea5e9]/10 border border-[#0ea5e9]/25 text-[#0ea5e9]">
@@ -302,8 +311,8 @@ const BottomCTA = memo(() => (
     className="mt-20 relative rounded-3xl overflow-hidden"
     initial={false}
     whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true }}
-    transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+    viewport={ANIMATION.viewport}
+    transition={ANIMATION.transition}
     style={{ backgroundImage: "var(--bg-gradient-primary)" }}
   >
     <div className="relative flex flex-col sm:flex-row items-center justify-between gap-6 px-8 py-10">

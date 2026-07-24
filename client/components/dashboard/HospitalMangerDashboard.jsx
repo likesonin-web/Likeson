@@ -43,7 +43,7 @@ import {
   CheckCircle2,
   Smartphone,
   Search as SearchIcon,
-Building2,
+  Building2,
   Siren,
   IndianRupee,
 } from "lucide-react";
@@ -57,8 +57,9 @@ import {
   HOSPITAL_MANAGER_TOP_RIGHT_LINKS,
   HOSPITAL_MANAGER_PROFILE_LINKS,
 } from "../../constants/hospitalmangerlinks";
-import WelcomeHospitalPage from "@/app/hospital-manager/WelcomeHospitalPage"; // Added Welcome Page Import
+import WelcomeHospitalPage from "@/app/hospital-manager/WelcomeHospitalPage"; 
 import { fetchPartnerWallet } from "@/store/slices/partnerWalletSlice";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // COMMAND SEARCH INDEX
 // Flat map of all navigable links for the command palette
@@ -254,7 +255,7 @@ const HospitalManagerDashboard = ({ children }) => {
   const router    = useRouter();
   const pathname  = usePathname();
 
-const { user }       = useSelector((state) => state.user);
+  const { user }       = useSelector((state) => state.user);
   const unreadCount    = useSelector(selectUnreadCount);
   const { wallet }     = useSelector((state) => state.partnerWallet);
 
@@ -263,14 +264,20 @@ const { user }       = useSelector((state) => state.user);
   const [searchQuery,   setSearchQuery]   = useState("");
   const [isSearchOpen,  setIsSearchOpen]  = useState(false);
 
-  // ── FIX: Explicit check for the root/welcome paths ───────────────────────
+  // ── Route checks ───────────────────────────────────────────────────────────
   const isWelcomeRoute = useMemo(
     () => ["/", "/hospital-manager", "/hospital-manager/"].includes(pathname),
     [pathname]
   );
 
+  // NEW: Check if the current route is the support page
+  const isSupportRoute = useMemo(
+    () => pathname === "/hospital-manager/support",
+    [pathname]
+  );
+
   // Collapse sidebar on mobile; fetch notifications on mount
-useEffect(() => {
+  useEffect(() => {
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
       setIsSidebarOpen(false);
     }
@@ -464,190 +471,194 @@ useEffect(() => {
           isSidebarOpen ? "lg:ml-64" : "lg:ml-[72px]"
         )}
       >
-        {/* ── Global header ────────────────────────────────────────────── */}
-        <header className="sticky top-0 z-40 flex h-[68px] w-full items-center justify-between border-b border-base-300 bg-base-100/80 backdrop-blur-xl shrink-0">
+        {/* ── Global header conditionally hidden on support page ───────── */}
+        {!isSupportRoute && (
+          <header className="sticky top-0 z-40 flex h-[68px] w-full items-center justify-between border-b border-base-300 bg-base-100/80 backdrop-blur-xl shrink-0">
 
-          {/* Left */}
-          <div className="flex items-center gap-4">
-            {!isSidebarOpen && (
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-2 hover:bg-base-200 rounded-lg transition-colors"
-                aria-label="Open sidebar"
-              >
-                <Menu size={19} />
-              </button>
-            )}
-
-            {/* Quick links (desktop only) */}
-            <div className="hidden xl:flex items-center gap-1">
-              {HOSPITAL_MANAGER_TOP_RIGHT_LINKS.map((item, i) => (
-                <div key={i} className="group relative">
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider text-base-content/40 hover:text-primary hover:bg-primary/6 transition-all">
-                    {item.icon}
-                    {item.name}
-                    {item.links && <ChevronDown size={11} className="opacity-50" />}
-                  </button>
-                  {item.links && (
-                    <div className="absolute left-0 top-full pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                      <div className="w-52 bg-base-200 border border-base-300 p-1.5 rounded-2xl shadow-xl">
-                        {item.links.map((sub, si) => (
-                          <Link
-                            key={si}
-                            href={sub.href}
-                            className="flex items-center gap-2.5 px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-base-content/50 hover:bg-primary/8 hover:text-primary rounded-xl transition-all"
-                          >
-                            {sub.icon}
-                            {sub.name}
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right */}
-          <div className="flex items-center gap-2 sm:gap-3">
-
-            {/* Command palette trigger */}
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="hidden sm:flex items-center gap-2 px-3.5 py-2 bg-base-200/60 border border-base-300 rounded-xl text-base-content/35 hover:border-primary/40 hover:text-primary/60 transition-all group"
-            >
-              <Search size={14} />
-              <span className="text-[9px] font-black uppercase tracking-widest hidden md:inline">
-                Quick Search
-              </span>
-              <span className="hidden md:inline text-[9px] opacity-30 ml-1">⌘K</span>
-            </button>
-
-            {/* Mobile search icon */}
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="sm:hidden p-2.5 rounded-xl border border-base-300 text-base-content/50 hover:text-primary hover:border-primary/40 transition-all"
-              aria-label="Open search"
-            >
-              <Search size={17} />
-            </button>
-
-{/* Partner Wallet */}
-            <Link href="/partner/wallet">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.94 }}
-                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest transition-all bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
-              >
-                <IndianRupee size={15} strokeWidth={2.5} />
-                <span>
-                  {wallet
-                    ? `₹${wallet.availableBalance?.toLocaleString("en-IN") ?? 0}`
-                    : "Wallet"}
-                </span>
-              </motion.button>
-            </Link>
-
-            {/* Theme toggle */}
-            <ThemeToggle />
-
-            {/* Notifications */}
-            <Link href="/hospital-manager/notifications">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.94 }}
-                className="relative p-2.5 rounded-xl border border-base-300 text-base-content/50 hover:bg-primary/6 hover:text-primary hover:border-primary/40 transition-all"
-                aria-label="Notifications"
-              >
-                <motion.span
-                  variants={bellRingVariant}
-                  animate={unreadCount > 0 ? "ring" : "idle"}
-                  className="flex"
+            {/* Left */}
+            <div className="flex items-center gap-4">
+              {!isSidebarOpen && (
+                <button
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="p-2 hover:bg-base-200 rounded-lg transition-colors"
+                  aria-label="Open sidebar"
                 >
-                  <Bell size={17} />
-                </motion.span>
-                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-base-100 animate-pulse" />
-                )}
-              </motion.button>
-            </Link>
+                  <Menu size={19} />
+                </button>
+              )}
 
-            {/* Profile dropdown */}
-            <div className="group relative">
-              <motion.div
-                whileHover={{ scale: 1.04 }}
-                className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/25 cursor-pointer overflow-hidden flex items-center justify-center"
-              >
-                {user?.avatar ? (
-                  <img
-                    src={user.avatar}
-                    alt={user?.name || "Manager"}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-[11px] font-black text-primary uppercase">
-                    {user?.name?.charAt(0) || "H"}
-                  </span>
-                )}
-              </motion.div>
-
-              {/* Dropdown */}
-              <div className="absolute right-0 top-full pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <div className="w-60 bg-base-200 border border-base-300 rounded-2xl shadow-2xl p-2 backdrop-blur-xl">
-                  {/* User info */}
-                  <div className="px-4 py-3 border-b border-base-300 mb-1.5 bg-primary/5 rounded-xl">
-                    <p className="text-[11px] font-black uppercase tracking-tight truncate text-base-content">
-                      {user?.name || "Hospital Manager"}
-                    </p>
-                    <p className="text-[9px] text-primary font-black uppercase mt-0.5 tracking-[0.18em]">
-                      Facility Administrator
-                    </p>
-                    {user?.email && (
-                      <p className="text-[9px] text-base-content/35 mt-0.5 truncate font-semibold">
-                        {user.email}
-                      </p>
+              {/* Quick links (desktop only) */}
+              <div className="hidden xl:flex items-center gap-1">
+                {HOSPITAL_MANAGER_TOP_RIGHT_LINKS.map((item, i) => (
+                  <div key={i} className="group relative">
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider text-base-content/40 hover:text-primary hover:bg-primary/6 transition-all">
+                      {item.icon}
+                      {item.name}
+                      {item.links && <ChevronDown size={11} className="opacity-50" />}
+                    </button>
+                    {item.links && (
+                      <div className="absolute left-0 top-full pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <div className="w-52 bg-base-200 border border-base-300 p-1.5 rounded-2xl shadow-xl">
+                          {item.links.map((sub, si) => (
+                            <Link
+                              key={si}
+                              href={sub.href}
+                              className="flex items-center gap-2.5 px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-base-content/50 hover:bg-primary/8 hover:text-primary rounded-xl transition-all"
+                            >
+                              {sub.icon}
+                              {sub.name}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
+                ))}
+              </div>
+            </div>
 
-                  {HOSPITAL_MANAGER_PROFILE_LINKS.map((pl, pi) => (
-                    <Link
-                      key={pi}
-                      href={pl.href}
-                      className="flex items-center gap-2.5 px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-base-content/55 hover:bg-base-100 hover:text-primary rounded-xl transition-all"
-                    >
-                      {pl.icon}
-                      {pl.name}
-                    </Link>
-                  ))}
+            {/* Right */}
+            <div className="flex items-center gap-2 sm:gap-3">
 
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[10px] font-black uppercase tracking-wider text-error/80 border-t border-base-300 mt-1.5 rounded-xl hover:bg-error/8 hover:text-error transition-all"
+              {/* Command palette trigger */}
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                className="hidden sm:flex items-center gap-2 px-3.5 py-2 bg-base-200/60 border border-base-300 rounded-xl text-base-content/35 hover:border-primary/40 hover:text-primary/60 transition-all group"
+              >
+                <Search size={14} />
+                <span className="text-[9px] font-black uppercase tracking-widest hidden md:inline">
+                  Quick Search
+                </span>
+                <span className="hidden md:inline text-[9px] opacity-30 ml-1">⌘K</span>
+              </button>
+
+              {/* Mobile search icon */}
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                className="sm:hidden p-2.5 rounded-xl border border-base-300 text-base-content/50 hover:text-primary hover:border-primary/40 transition-all"
+                aria-label="Open search"
+              >
+                <Search size={17} />
+              </button>
+
+              {/* Partner Wallet */}
+              <Link href="/partner/wallet">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.94 }}
+                  className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest transition-all bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
+                >
+                  <IndianRupee size={15} strokeWidth={2.5} />
+                  <span>
+                    {wallet
+                      ? `₹${wallet.availableBalance?.toLocaleString("en-IN") ?? 0}`
+                      : "Wallet"}
+                  </span>
+                </motion.button>
+              </Link>
+
+              {/* Theme toggle */}
+              <ThemeToggle />
+
+              {/* Notifications */}
+              <Link href="/hospital-manager/notifications">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.94 }}
+                  className="relative p-2.5 rounded-xl border border-base-300 text-base-content/50 hover:bg-primary/6 hover:text-primary hover:border-primary/40 transition-all"
+                  aria-label="Notifications"
+                >
+                  <motion.span
+                    variants={bellRingVariant}
+                    animate={unreadCount > 0 ? "ring" : "idle"}
+                    className="flex"
                   >
-                    <LogOut size={14} />
-                    Sign Out
-                  </button>
+                    <Bell size={17} />
+                  </motion.span>
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-base-100 animate-pulse" />
+                  )}
+                </motion.button>
+              </Link>
+
+              {/* Profile dropdown */}
+              <div className="group relative">
+                <motion.div
+                  whileHover={{ scale: 1.04 }}
+                  className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/25 cursor-pointer overflow-hidden flex items-center justify-center"
+                >
+                  {user?.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt={user?.name || "Manager"}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-[11px] font-black text-primary uppercase">
+                      {user?.name?.charAt(0) || "H"}
+                    </span>
+                  )}
+                </motion.div>
+
+                {/* Dropdown */}
+                <div className="absolute right-0 top-full pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="w-60 bg-base-200 border border-base-300 rounded-2xl shadow-2xl p-2 backdrop-blur-xl">
+                    {/* User info */}
+                    <div className="px-4 py-3 border-b border-base-300 mb-1.5 bg-primary/5 rounded-xl">
+                      <p className="text-[11px] font-black uppercase tracking-tight truncate text-base-content">
+                        {user?.name || "Hospital Manager"}
+                      </p>
+                      <p className="text-[9px] text-primary font-black uppercase mt-0.5 tracking-[0.18em]">
+                        Facility Administrator
+                      </p>
+                      {user?.email && (
+                        <p className="text-[9px] text-base-content/35 mt-0.5 truncate font-semibold">
+                          {user.email}
+                        </p>
+                      )}
+                    </div>
+
+                    {HOSPITAL_MANAGER_PROFILE_LINKS.map((pl, pi) => (
+                      <Link
+                        key={pi}
+                        href={pl.href}
+                        className="flex items-center gap-2.5 px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-base-content/55 hover:bg-base-100 hover:text-primary rounded-xl transition-all"
+                      >
+                        {pl.icon}
+                        {pl.name}
+                      </Link>
+                    ))}
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[10px] font-black uppercase tracking-wider text-error/80 border-t border-base-300 mt-1.5 rounded-xl hover:bg-error/8 hover:text-error transition-all"
+                    >
+                      <LogOut size={14} />
+                      Sign Out
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         {/* ── Page body ────────────────────────────────────────────────── */}
         <section className="flex-1 w-full max-w-[1680px] mx-auto p-4 ">
 
-          {/* Breadcrumbs */}
-          <div className="mb-5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-base-content/25">
-            <Link
-              href="/hospital-manager/dashboard"
-              className="hover:text-primary transition-colors"
-            >
-              Hospital Portal
-            </Link>
-            <ChevronRight size={11} />
-            <span className="text-primary capitalize">{pageLabel}</span>
-          </div>
+          {/* Breadcrumbs - Conditionally rendering based on header visibility as well just in case, but left default here */}
+          {!isSupportRoute && (
+            <div className="mb-5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-base-content/25">
+              <Link
+                href="/hospital-manager/dashboard"
+                className="hover:text-primary transition-colors"
+              >
+                Hospital Portal
+              </Link>
+              <ChevronRight size={11} />
+              <span className="text-primary capitalize">{pageLabel}</span>
+            </div>
+          )}
 
           {/* Content wrapper */}
           <motion.div

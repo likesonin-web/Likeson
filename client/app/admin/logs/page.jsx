@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import Image from "next/image";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -131,12 +132,8 @@ function fmtDate(ts) {
 function ChartTip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{
-      background: "var(--base-100,#fff)",
-      border: "1px solid var(--base-300,#e5e7eb)",
-      borderRadius: 10, padding: "10px 14px", fontSize: 12,
-    }}>
-      <p style={{ fontWeight: 700, marginBottom: 4 }}>{label}</p>
+    <div className="bg-base-100 border border-base-300 rounded-[10px] py-[10px] px-[14px] text-[12px]">
+      <p className="font-bold mb-[4px]">{label}</p>
       {payload.map((p, i) => (
         <p key={i} style={{ color: p.color }}>
           {p.name}: <strong>{p.value}</strong>
@@ -156,12 +153,7 @@ function LevelBadge({ level, size = "sm" }) {
   const pad = size === "lg" ? "6px 14px" : "3px 8px";
   const fs  = size === "lg" ? 12 : 10;
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      padding: pad, borderRadius: 6, fontSize: fs,
-      fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase",
-      background: cfg.bg, color: cfg.color,
-    }}>
+    <span className="inline-flex items-center gap-[4px] rounded-[6px] font-extrabold tracking-[0.07em] uppercase" style={{ padding: pad, fontSize: fs, background: cfg.bg, color: cfg.color }}>
       <LIcon size={size === "lg" ? 12 : 10} />
       {cfg.label}
     </span>
@@ -176,14 +168,7 @@ function CatBadge({ category }) {
   const cfg = CATEGORIES[category] || CATEGORIES.system;
   const CIcon = cfg.icon;
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      padding: "3px 8px", borderRadius: 6, fontSize: 10,
-      fontWeight: 700, letterSpacing: "0.05em",
-      background: `color-mix(in srgb, ${cfg.color}, transparent 88%)`,
-      color: cfg.color,
-      border: `1px solid color-mix(in srgb, ${cfg.color}, transparent 68%)`,
-    }}>
+    <span className="inline-flex items-center gap-[4px] py-[3px] px-[8px] rounded-[6px] text-[10px] font-bold tracking-[0.05em]" style={{ background: `color-mix(in srgb, ${cfg.color}, transparent 88%)`, color: cfg.color, border: `1px solid color-mix(in srgb, ${cfg.color}, transparent 68%)` }}>
       <CIcon size={9} />{cfg.label}
     </span>
   );
@@ -201,15 +186,8 @@ function LogRow({ log, index, onClick, selected, onSelect, selectionMode }) {
       exit={{ opacity: 0 }}
       transition={{ delay: Math.min(index * 0.018, 0.36) }}
       onClick={() => !selectionMode && onClick(log)}
-      className="group"
-      style={{
-        display: "flex", alignItems: "flex-start", gap: 12,
-        padding: "13px 20px",
-        cursor: selectionMode ? "default" : "pointer",
-        borderBottom: "1px solid var(--base-300,#e5e7eb)",
-        background: selected ? "color-mix(in srgb, var(--primary,#6366f1), transparent 92%)" : "transparent",
-        transition: "background 0.15s",
-      }}
+      className="group flex items-start gap-[12px] py-[13px] px-[20px] border-b border-base-300"
+      style={{ cursor: selectionMode ? "default" : "pointer", background: selected ? "color-mix(in srgb, var(--primary,#6366f1), transparent 92%)" : "transparent", transition: "background 0.15s" }}
       onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "var(--base-200,#f3f4f6)"; }}
       onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
     >
@@ -217,63 +195,52 @@ function LogRow({ log, index, onClick, selected, onSelect, selectionMode }) {
       {selectionMode && (
         <input type="checkbox" checked={selected}
           onChange={() => onSelect(log._id || log.id)}
-          style={{ marginTop: 4, cursor: "pointer", accentColor: "var(--primary,#6366f1)" }}
+          className="mt-[4px] cursor-pointer" style={{ accentColor: "var(--primary,#6366f1)" }}
           onClick={e => e.stopPropagation()}
         />
       )}
 
       {/* Level icon dot */}
-      <div style={{
-        width: 28, height: 28, borderRadius: 8, flexShrink: 0, marginTop: 2,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: LOG_LEVELS[log.level]?.bg || "rgba(107,114,128,0.12)",
-      }}>
+      <div className="w-[28px] h-[28px] rounded-[8px] shrink-0 mt-[2px] flex items-center justify-center" style={{ background: LOG_LEVELS[log.level]?.bg || "rgba(107,114,128,0.12)" }}>
         {(() => { const I = LOG_LEVELS[log.level]?.icon || Info; return <I size={13} style={{ color: LOG_LEVELS[log.level]?.color }} />; })()}
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-[6px] flex-wrap">
           <LevelBadge level={log.level} />
           <CatBadge category={log.category} />
-          <span style={{ fontSize: 10, fontFamily: "monospace", opacity: 0.3 }}>
+          <span className="text-[10px] font-mono opacity-30">
             {log.logCode || log.id}
           </span>
         </div>
 
-        <p style={{
-          fontSize: 13, fontWeight: 600, marginTop: 3,
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          color: "var(--base-content,#1f2937)",
-        }}>
+        <p className="text-[13px] font-semibold mt-[3px] overflow-hidden text-ellipsis whitespace-nowrap text-base-content">
           {log.message}
         </p>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 3, flexWrap: "wrap" }}>
+        <div className="flex items-center gap-[12px] mt-[3px] flex-wrap">
           {(log.actor?.name || log.actor) && (
-            <span style={{ fontSize: 11, opacity: 0.45, display: "flex", alignItems: "center", gap: 4 }}>
+            <span className="text-[11px] opacity-45 flex items-center gap-[4px]">
               <User size={10} />
               {typeof log.actor === "string" ? log.actor : log.actor?.name}
               {log.actor?.role && ` · ${log.actor.role}`}
             </span>
           )}
           {(log.actor?.ip || log.ip) && (
-            <span style={{ fontSize: 11, opacity: 0.3, fontFamily: "monospace" }}>
+            <span className="text-[11px] opacity-30 font-mono">
               {log.actor?.ip || log.ip}
             </span>
           )}
           {(log.request?.durationMs || log.duration) && (
-            <span style={{ fontSize: 11, opacity: 0.3 }}>
+            <span className="text-[11px] opacity-30">
               {log.request?.durationMs ? `${log.request.durationMs}ms` : log.duration}
             </span>
           )}
           {log.request?.statusCode && (
-            <span style={{
-              fontSize: 10, fontFamily: "monospace", fontWeight: 700,
-              color: log.request.statusCode >= 500 ? "var(--error,#ef4444)"
+            <span className="text-[10px] font-mono font-bold" style={{ color: log.request.statusCode >= 500 ? "var(--error,#ef4444)"
                    : log.request.statusCode >= 400 ? "var(--warning,#f59e0b)"
-                   : "var(--success,#22c55e)",
-            }}>
+                   : "var(--success,#22c55e)" }}>
               {log.request.method} {log.request.statusCode}
             </span>
           )}
@@ -281,11 +248,11 @@ function LogRow({ log, index, onClick, selected, onSelect, selectionMode }) {
       </div>
 
       {/* Timestamp */}
-      <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <p style={{ fontSize: 11, opacity: 0.4, fontFamily: "monospace" }}>
+      <div className="text-right shrink-0">
+        <p className="text-[11px] opacity-40 font-mono">
           {fmtShort(log.createdAt || log.timestamp)}
         </p>
-        <p style={{ fontSize: 10, opacity: 0.25 }}>
+        <p className="text-[10px] opacity-25">
           {fmtDate(log.createdAt || log.timestamp)}
         </p>
       </div>
@@ -343,56 +310,36 @@ function LogDetailDrawer({ log, onClose, onDelete, onUpdate, deleteLoading, upda
   ].filter(r => r.value && r.value !== "—" || typeof r.value !== "string");
 
   return (
-    <motion.div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", justifyContent: "flex-end" }}
+    <motion.div className="fixed inset-0 z-[50] flex justify-end"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}
+      <div className="absolute inset-0 bg-black/45 backdrop-blur-[4px]"
         onClick={onClose} />
 
       <motion.div
         initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
         transition={{ type: "spring", damping: 26, stiffness: 260 }}
-        style={{
-          position: "relative", zIndex: 10, width: "100%", maxWidth: 440,
-          height: "100%", display: "flex", flexDirection: "column",
-          background: "var(--base-100,#fff)",
-          borderLeft: "1px solid var(--base-300,#e5e7eb)",
-        }}
+        className="relative z-[10] w-full max-w-[440px] h-full flex flex-col bg-base-100 border-l border-base-300"
       >
         {/* Header */}
-        <div style={{
-          padding: "18px 20px", borderBottom: "1px solid var(--base-300,#e5e7eb)",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Terminal size={16} style={{ color: "var(--primary,#6366f1)" }} />
-            <p style={{ fontWeight: 800, fontSize: 15 }}>Log Detail</p>
+        <div className="py-[18px] px-[20px] border-b border-base-300 flex items-center justify-between">
+          <div className="flex items-center gap-[10px]">
+            <Terminal size={16} className="text-primary" />
+            <p className="font-extrabold text-[15px]">Log Detail</p>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="flex gap-[8px]">
             {isSuperadmin && !editMode && (
               <button onClick={() => setEditMode(true)} title="Edit mutable fields"
-                style={{
-                  width: 32, height: 32, borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", background: "transparent",
-                }}>
+                className="w-[32px] h-[32px] rounded-[8px] border border-base-300 flex items-center justify-center cursor-pointer bg-[transparent]">
                 <Edit2 size={13} />
               </button>
             )}
             {isSuperadmin && (
               <button onClick={() => setConfirmDelete(true)} title="Delete log"
-                style={{
-                  width: 32, height: 32, borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", background: "transparent", color: "var(--error,#ef4444)",
-                }}>
+                className="w-[32px] h-[32px] rounded-[8px] border border-base-300 flex items-center justify-center cursor-pointer bg-[transparent] text-error">
                 <Trash2 size={13} />
               </button>
             )}
-            <button onClick={onClose} style={{
-              width: 32, height: 32, borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", background: "transparent", fontSize: 13,
-            }}>✕</button>
+            <button onClick={onClose} className="w-[32px] h-[32px] rounded-[8px] border border-base-300 flex items-center justify-center cursor-pointer bg-[transparent] text-[13px]">✕</button>
           </div>
         </div>
 
@@ -400,28 +347,18 @@ function LogDetailDrawer({ log, onClose, onDelete, onUpdate, deleteLoading, upda
         <AnimatePresence>
           {confirmDelete && (
             <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
-              style={{
-                overflow: "hidden", background: "rgba(239,68,68,0.08)",
-                borderBottom: "1px solid rgba(239,68,68,0.3)", padding: "0 20px",
-              }}>
-              <div style={{ padding: "12px 0" }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--error,#ef4444)", marginBottom: 8 }}>
+              className="overflow-hidden bg-[rgba(239,68,68,0.08)] border-b border-[rgba(239,68,68,0.3)] py-[0px] px-[20px]">
+              <div className="py-[12px] px-[0px]">
+                <p className="text-[13px] font-semibold text-error mb-[8px]">
                   Delete this log entry permanently?
                 </p>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="flex gap-[8px]">
                   <button onClick={() => { onDelete(log._id || log.logCode); setConfirmDelete(false); }}
                     disabled={deleteLoading}
-                    style={{
-                      padding: "6px 16px", borderRadius: 7, fontSize: 12, fontWeight: 700,
-                      background: "var(--error,#ef4444)", color: "white", border: "none",
-                      cursor: "pointer", opacity: deleteLoading ? 0.6 : 1,
-                    }}>
+                    className="py-[6px] px-[16px] rounded-[7px] text-[12px] font-bold bg-error text-[white] border-none cursor-pointer" style={{ opacity: deleteLoading ? 0.6 : 1 }}>
                     {deleteLoading ? "Deleting…" : "Yes, delete"}
                   </button>
-                  <button onClick={() => setConfirmDelete(false)} style={{
-                    padding: "6px 16px", borderRadius: 7, fontSize: 12, fontWeight: 700,
-                    background: "var(--base-200,#f3f4f6)", border: "none", cursor: "pointer",
-                  }}>Cancel</button>
+                  <button onClick={() => setConfirmDelete(false)} className="py-[6px] px-[16px] rounded-[7px] text-[12px] font-bold bg-base-200 border-none cursor-pointer">Cancel</button>
                 </div>
               </div>
             </motion.div>
@@ -429,80 +366,51 @@ function LogDetailDrawer({ log, onClose, onDelete, onUpdate, deleteLoading, upda
         </AnimatePresence>
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+        <div className="flex-1 overflow-y-auto p-[20px]">
           {/* Message */}
-          <div style={{
-            padding: "14px 16px", borderRadius: 12, marginBottom: 16,
-            background: "var(--base-200,#f3f4f6)",
-            border: "1px solid var(--base-300,#e5e7eb)",
-          }}>
-            <p style={{ fontSize: 13, fontWeight: 600 }}>{log.message}</p>
+          <div className="py-[14px] px-[16px] rounded-[12px] mb-[16px] bg-base-200 border border-base-300">
+            <p className="text-[13px] font-semibold">{log.message}</p>
           </div>
 
           {/* Details (editable) */}
           {editMode ? (
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.07em" }}>
+            <div className="mb-[16px]">
+              <label className="text-[11px] font-bold opacity-50 uppercase tracking-[0.07em]">
                 Details
               </label>
               <textarea value={editDetails} onChange={e => setEditDetails(e.target.value)}
                 rows={4} placeholder="Verbose description or stack trace…"
-                style={{
-                  width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 9,
-                  border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12,
-                  fontFamily: "monospace", resize: "vertical",
-                  background: "var(--base-100,#fff)", boxSizing: "border-box",
-                }} />
-              <label style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginTop: 12 }}>
+                className="w-full mt-[6px] py-[10px] px-[12px] rounded-[9px] border border-base-300 text-[12px] font-mono resize-y bg-base-100 box-border" />
+              <label className="text-[11px] font-bold opacity-50 uppercase tracking-[0.07em] block mt-[12px]">
                 Metadata (JSON)
               </label>
               <textarea value={editMeta} onChange={e => setEditMeta(e.target.value)}
                 rows={5} placeholder='{"key": "value"}'
-                style={{
-                  width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 9,
-                  border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12,
-                  fontFamily: "monospace", resize: "vertical",
-                  background: "var(--base-100,#fff)", boxSizing: "border-box",
-                }} />
-              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                className="w-full mt-[6px] py-[10px] px-[12px] rounded-[9px] border border-base-300 text-[12px] font-mono resize-y bg-base-100 box-border" />
+              <div className="flex gap-[8px] mt-[10px]">
                 <button onClick={handleUpdate} disabled={updateLoading}
-                  style={{
-                    padding: "7px 18px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                    background: "var(--primary,#6366f1)", color: "white", border: "none",
-                    cursor: "pointer", opacity: updateLoading ? 0.6 : 1,
-                  }}>
+                  className="py-[7px] px-[18px] rounded-[8px] text-[12px] font-bold bg-primary text-[white] border-none cursor-pointer" style={{ opacity: updateLoading ? 0.6 : 1 }}>
                   {updateLoading ? "Saving…" : "Save Changes"}
                 </button>
-                <button onClick={() => setEditMode(false)} style={{
-                  padding: "7px 18px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                  background: "var(--base-200,#f3f4f6)", border: "none", cursor: "pointer",
-                }}>Cancel</button>
+                <button onClick={() => setEditMode(false)} className="py-[7px] px-[18px] rounded-[8px] text-[12px] font-bold bg-base-200 border-none cursor-pointer">Cancel</button>
               </div>
             </div>
           ) : log.details ? (
-            <div style={{ marginBottom: 16 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>Details</p>
-              <pre style={{
-                fontSize: 11, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word",
-                padding: "12px 14px", borderRadius: 9, background: "var(--base-200,#f3f4f6)",
-                border: "1px solid var(--base-300,#e5e7eb)", lineHeight: 1.6,
-              }}>{log.details}</pre>
+            <div className="mb-[16px]">
+              <p className="text-[11px] font-bold opacity-40 uppercase tracking-[0.07em] mb-[6px]">Details</p>
+              <pre className="text-[11px] font-mono whitespace-pre-wrap break-words py-[12px] px-[14px] rounded-[9px] bg-base-200 border border-base-300 leading-[1.6]">{log.details}</pre>
             </div>
           ) : null}
 
           {/* Related entity */}
           {log.relatedEntity?.model && (
-            <div style={{ marginBottom: 16 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>Related Entity</p>
-              <div style={{
-                display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
-                borderRadius: 9, background: "var(--base-200,#f3f4f6)",
-                border: "1px solid var(--base-300,#e5e7eb)",
-              }}>
-                <Database size={14} style={{ opacity: 0.5 }} />
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{log.relatedEntity.model}</span>
-                {log.relatedEntity.label && <span style={{ fontSize: 12, opacity: 0.6 }}>· {log.relatedEntity.label}</span>}
-                <span style={{ fontSize: 11, fontFamily: "monospace", opacity: 0.35, marginLeft: "auto" }}>
+            <div className="mb-[16px]">
+              <p className="text-[11px] font-bold opacity-40 uppercase tracking-[0.07em] mb-[6px]">Related Entity</p>
+              <div className="flex items-center gap-[8px] py-[10px] px-[14px] rounded-[9px] bg-base-200 border border-base-300">
+                <Database size={14} className="opacity-50" />
+                <span className="text-[12px] font-semibold">{log.relatedEntity.model}</span>
+                {log.relatedEntity.label && <span className="text-[12px] opacity-60">· {log.relatedEntity.label}</span>}
+                <span className="text-[11px] font-mono opacity-35 ml-[auto]">
                   {String(log.relatedEntity.entityId).slice(-8)}
                 </span>
               </div>
@@ -511,32 +419,23 @@ function LogDetailDrawer({ log, onClose, onDelete, onUpdate, deleteLoading, upda
 
           {/* Metadata */}
           {!editMode && log.metadata && (
-            <div style={{ marginBottom: 16 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>Metadata</p>
-              <pre style={{
-                fontSize: 11, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word",
-                padding: "12px 14px", borderRadius: 9, background: "var(--base-200,#f3f4f6)",
-                border: "1px solid var(--base-300,#e5e7eb)", lineHeight: 1.6,
-              }}>{JSON.stringify(log.metadata, null, 2)}</pre>
+            <div className="mb-[16px]">
+              <p className="text-[11px] font-bold opacity-40 uppercase tracking-[0.07em] mb-[6px]">Metadata</p>
+              <pre className="text-[11px] font-mono whitespace-pre-wrap break-words py-[12px] px-[14px] rounded-[9px] bg-base-200 border border-base-300 leading-[1.6]">{JSON.stringify(log.metadata, null, 2)}</pre>
             </div>
           )}
 
           {/* Key-value rows */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="flex flex-col gap-[10px]">
             {rows.map(row => (
-              <div key={row.label} style={{ display: "flex", alignItems: "flex-start", gap: 10, justifyContent: "space-between" }}>
-                <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.38, textTransform: "uppercase", letterSpacing: "0.07em", flexShrink: 0, width: 90 }}>
+              <div key={row.label} className="flex items-start gap-[10px] justify-between">
+                <span className="text-[11px] font-bold opacity-38 uppercase tracking-[0.07em] shrink-0 w-[90px]">
                   {row.label}
                 </span>
                 {typeof row.value === "string" || typeof row.value === "number" ? (
-                  <span style={{
-                    fontSize: 12, textAlign: "right", flex: 1,
-                    fontFamily: row.mono ? "monospace" : "inherit",
-                    fontWeight: row.mono ? 400 : 600,
-                    wordBreak: "break-all",
-                  }}>{row.value}</span>
+                  <span className="text-[12px] text-right flex-1" style={{ fontFamily: row.mono ? "monospace" : "inherit", fontWeight: row.mono ? 400 : 600, wordBreak: "break-all" }}>{row.value}</span>
                 ) : (
-                  <div style={{ textAlign: "right" }}>{row.value}</div>
+                  <div className="text-right">{row.value}</div>
                 )}
               </div>
             ))}
@@ -588,28 +487,24 @@ function CreateLogModal({ onClose, onSubmit, loading, error }) {
   };
 
   return (
-    <motion.div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center" }}
+    <motion.div className="fixed inset-0 z-[60] flex items-center justify-center"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}
+      <div className="absolute inset-0 bg-black/45 backdrop-blur-[4px]"
         onClick={onClose} />
       <motion.div
         initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.92, opacity: 0 }}
-        style={{
-          position: "relative", zIndex: 10, width: "100%", maxWidth: 520, maxHeight: "90vh",
-          overflowY: "auto", background: "var(--base-100,#fff)",
-          borderRadius: 16, padding: 28, boxShadow: "0 24px 60px rgba(0,0,0,0.18)",
-        }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Plus size={16} style={{ color: "var(--primary,#6366f1)" }} />
-            <p style={{ fontWeight: 800, fontSize: 16 }}>Create System Log</p>
+        className="relative z-[10] w-full max-w-[520px] max-h-[90vh] overflow-y-auto bg-base-100 rounded-[16px] p-[28px] shadow-[0_24px_60px_rgba(0,0,0,0.18)]">
+        <div className="flex items-center justify-between mb-[20px]">
+          <div className="flex items-center gap-[10px]">
+            <Plus size={16} className="text-primary" />
+            <p className="font-extrabold text-[16px]">Create System Log</p>
           </div>
-          <button onClick={onClose} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18, opacity: 0.5 }}>✕</button>
+          <button onClick={onClose} className="border-none bg-transparent cursor-pointer text-[18px] opacity-50">✕</button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-[14px]">
+          <div className="grid grid-cols-[1fr_1fr] gap-[12px]">
             <div>
               <label style={labelStyle}>Level *</label>
               <select value={form.level} onChange={e => set("level", e.target.value)} style={fieldStyle}>
@@ -625,19 +520,19 @@ function CreateLogModal({ onClose, onSubmit, loading, error }) {
           </div>
 
           <div>
-            <label style={labelStyle}>Message * <span style={{ opacity: 0.4 }}>(max 500 chars)</span></label>
+            <label style={labelStyle}>Message * <span className="opacity-40">(max 500 chars)</span></label>
             <input value={form.message} onChange={e => set("message", e.target.value)}
               maxLength={500} placeholder="Short human-readable summary…" required style={fieldStyle} />
           </div>
 
           <div>
-            <label style={labelStyle}>Details <span style={{ opacity: 0.4 }}>(optional — verbose / stack trace)</span></label>
+            <label style={labelStyle}>Details <span className="opacity-40">(optional — verbose / stack trace)</span></label>
             <textarea value={form.details} onChange={e => set("details", e.target.value)}
               rows={3} placeholder="Full description, stack trace…"
-              style={{ ...fieldStyle, resize: "vertical", fontFamily: "monospace", fontSize: 12 }} />
+              className="resize-y font-mono text-[12px]" style={{ ...fieldStyle }} />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="grid grid-cols-[1fr_1fr] gap-[12px]">
             <div>
               <label style={labelStyle}>Related Model</label>
               <select value={form.relatedEntity.model}
@@ -654,26 +549,22 @@ function CreateLogModal({ onClose, onSubmit, loading, error }) {
               <label style={labelStyle}>Entity ID</label>
               <input value={form.relatedEntity.entityId}
                 onChange={e => setForm(p => ({ ...p, relatedEntity: { ...p.relatedEntity, entityId: e.target.value } }))}
-                placeholder="MongoDB ObjectId" style={{ ...fieldStyle, fontFamily: "monospace", fontSize: 12 }} />
+                placeholder="MongoDB ObjectId" className="font-mono text-[12px]" style={{ ...fieldStyle }} />
             </div>
           </div>
 
           <div>
-            <label style={labelStyle}>Metadata <span style={{ opacity: 0.4 }}>(optional — valid JSON)</span></label>
+            <label style={labelStyle}>Metadata <span className="opacity-40">(optional — valid JSON)</span></label>
             <textarea value={form.metadata} onChange={e => set("metadata", e.target.value)}
               rows={3} placeholder='{"key": "value"}'
-              style={{ ...fieldStyle, resize: "vertical", fontFamily: "monospace", fontSize: 12 }} />
+              className="resize-y font-mono text-[12px]" style={{ ...fieldStyle }} />
           </div>
 
           {error && (
-            <p style={{ fontSize: 12, color: "var(--error,#ef4444)", fontWeight: 600 }}>{error}</p>
+            <p className="text-[12px] text-error font-semibold">{error}</p>
           )}
 
-          <button type="submit" disabled={loading || !form.message.trim()} style={{
-            padding: "11px 0", borderRadius: 10, fontSize: 13, fontWeight: 800,
-            background: "var(--primary,#6366f1)", color: "white", border: "none",
-            cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1,
-          }}>
+          <button type="submit" disabled={loading || !form.message.trim()} className="py-[11px] px-[0px] rounded-[10px] text-[13px] font-extrabold bg-primary text-[white] border-none" style={{ cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1 }}>
             {loading ? "Creating…" : "Create Log Entry"}
           </button>
         </form>
@@ -700,39 +591,35 @@ function BulkDeleteModal({ selectedIds, onClose, onSubmit, loading }) {
   };
 
   return (
-    <motion.div style={{ position: "fixed", inset: 0, zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center" }}
+    <motion.div className="fixed inset-0 z-[70] flex items-center justify-center"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[4px]"
         onClick={onClose} />
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-        style={{
-          position: "relative", zIndex: 10, width: "100%", maxWidth: 440,
-          background: "var(--base-100,#fff)", borderRadius: 16, padding: 28,
-          boxShadow: "0 24px 60px rgba(0,0,0,0.2)",
-        }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <Trash2 size={18} style={{ color: "var(--error,#ef4444)" }} />
-          <p style={{ fontWeight: 800, fontSize: 16, color: "var(--error,#ef4444)" }}>Bulk Delete Logs</p>
+        className="relative z-[10] w-full max-w-[440px] bg-base-100 rounded-[16px] p-[28px] shadow-[0_24px_60px_rgba(0,0,0,0.2)]">
+        <div className="flex items-center gap-[10px] mb-[8px]">
+          <Trash2 size={18} className="text-error" />
+          <p className="font-extrabold text-[16px] text-error">Bulk Delete Logs</p>
         </div>
-        <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 20 }}>
+        <p className="text-[13px] opacity-60 mb-[20px]">
           Requires at least one filter. At least one of <strong>level</strong>, <strong>category</strong>, or <strong>before date</strong> must be set. This action is permanent.
         </p>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-[12px]">
+          <div className="grid grid-cols-[1fr_1fr] gap-[10px]">
             <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>Level</label>
+              <label className="block text-[11px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[5px]">Level</label>
               <select value={form.level} onChange={e => setForm(p => ({ ...p, level: e.target.value }))}
-                style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12, boxSizing: "border-box" }}>
+                className="w-full py-[8px] px-[10px] rounded-[8px] border border-base-300 text-[12px] box-border">
                 <option value="">Any</option>
                 {VALID_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>Category</label>
+              <label className="block text-[11px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[5px]">Category</label>
               <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-                style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12, boxSizing: "border-box" }}>
+                className="w-full py-[8px] px-[10px] rounded-[8px] border border-base-300 text-[12px] box-border">
                 <option value="">Any</option>
                 {VALID_CATS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -740,31 +627,24 @@ function BulkDeleteModal({ selectedIds, onClose, onSubmit, loading }) {
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>Delete logs before</label>
+            <label className="block text-[11px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[5px]">Delete logs before</label>
             <input type="datetime-local" value={form.before} onChange={e => setForm(p => ({ ...p, before: e.target.value }))}
-              style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12, boxSizing: "border-box" }} />
+              className="w-full py-[8px] px-[10px] rounded-[8px] border border-base-300 text-[12px] box-border" />
           </div>
 
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          <label className="flex items-center gap-[8px] text-[13px] font-semibold cursor-pointer">
             <input type="checkbox" checked={form.confirm} onChange={e => setForm(p => ({ ...p, confirm: e.target.checked }))}
               style={{ accentColor: "var(--error,#ef4444)" }} />
             I confirm this bulk deletion is permanent
           </label>
 
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="flex gap-[10px]">
             <button type="submit"
               disabled={loading || !form.confirm || (!form.level && !form.category && !form.before)}
-              style={{
-                flex: 1, padding: "10px 0", borderRadius: 9, fontWeight: 800, fontSize: 13,
-                background: "var(--error,#ef4444)", color: "white", border: "none",
-                cursor: "pointer", opacity: (loading || !form.confirm || (!form.level && !form.category && !form.before)) ? 0.4 : 1,
-              }}>
+              className="flex-1 py-[10px] px-[0px] rounded-[9px] font-extrabold text-[13px] bg-error text-[white] border-none cursor-pointer" style={{ opacity: (loading || !form.confirm || (!form.level && !form.category && !form.before)) ? 0.4 : 1 }}>
               {loading ? "Deleting…" : "Delete Logs"}
             </button>
-            <button type="button" onClick={onClose} style={{
-              flex: 1, padding: "10px 0", borderRadius: 9, fontWeight: 700, fontSize: 13,
-              background: "var(--base-200,#f3f4f6)", border: "none", cursor: "pointer",
-            }}>Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 py-[10px] px-[0px] rounded-[9px] font-bold text-[13px] bg-base-200 border-none cursor-pointer">Cancel</button>
           </div>
         </form>
       </motion.div>
@@ -778,9 +658,9 @@ function BulkDeleteModal({ selectedIds, onClose, onSubmit, loading }) {
 
 function AnalyticsPanel({ data, loading }) {
   if (loading) return (
-    <div style={{ padding: 40, textAlign: "center", opacity: 0.4 }}>
+    <div className="p-[40px] text-center opacity-40">
       <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
-      <p style={{ fontSize: 13 }}>Loading analytics…</p>
+      <p className="text-[13px]">Loading analytics…</p>
     </div>
   );
   if (!data) return null;
@@ -795,21 +675,18 @@ function AnalyticsPanel({ data, loading }) {
   }));
 
   const StatCard = ({ label, value, color, icon: Icon }) => (
-    <div style={{
-      padding: "16px 18px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)",
-      background: "var(--base-100,#fff)", display: "flex", alignItems: "center", gap: 12,
-    }}>
-      {Icon && <Icon size={18} style={{ color: color || "var(--primary,#6366f1)", flexShrink: 0 }} />}
+    <div className="py-[16px] px-[18px] rounded-[12px] border border-base-300 bg-base-100 flex items-center gap-[12px]">
+      {Icon && <Icon size={18} className="shrink-0" style={{ color: color || "var(--primary,#6366f1)" }} />}
       <div>
-        <p style={{ fontSize: 20, fontWeight: 900, color: color || "var(--base-content,#1f2937)" }}>{value ?? "—"}</p>
-        <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</p>
+        <p className="text-[20px] font-black" style={{ color: color || "var(--base-content,#1f2937)" }}>{value ?? "—"}</p>
+        <p className="text-[11px] font-bold opacity-45 uppercase tracking-[0.07em]">{label}</p>
       </div>
     </div>
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+    <div className="flex flex-col gap-[20px]">
+      <div className="grid grid-cols-[repeat(auto-fill,_minmax(150px,_1fr))] gap-[12px]">
         <StatCard label="Total Logs"  value={summary.total}        color="var(--primary,#6366f1)" icon={Database} />
         <StatCard label="Errors"      value={summary.errorCount}   color="var(--error,#ef4444)"   icon={XCircle}  />
         <StatCard label="Warnings"    value={summary.warningCount} color="var(--warning,#f59e0b)" icon={AlertTriangle} />
@@ -817,9 +694,9 @@ function AnalyticsPanel({ data, loading }) {
         <StatCard label="Info"        value={summary.infoCount}    color="var(--info,#3b82f6)"    icon={Info}     />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <div style={{ padding: "16px 18px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-          <p style={{ fontSize: 12, fontWeight: 700, opacity: 0.55, marginBottom: 12 }}>Hourly Activity (last 24h)</p>
+      <div className="grid grid-cols-[1fr_1fr] gap-[16px]">
+        <div className="py-[16px] px-[18px] rounded-[12px] border border-base-300 bg-base-100">
+          <p className="text-[12px] font-bold opacity-55 mb-[12px]">Hourly Activity (last 24h)</p>
           <ResponsiveContainer width="100%" height={150}>
             <AreaChart data={hourlyTrend}>
               <defs>
@@ -838,8 +715,8 @@ function AnalyticsPanel({ data, loading }) {
           </ResponsiveContainer>
         </div>
 
-        <div style={{ padding: "16px 18px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-          <p style={{ fontSize: 12, fontWeight: 700, opacity: 0.55, marginBottom: 12 }}>Events by Category</p>
+        <div className="py-[16px] px-[18px] rounded-[12px] border border-base-300 bg-base-100">
+          <p className="text-[12px] font-bold opacity-55 mb-[12px]">Events by Category</p>
           <ResponsiveContainer width="100%" height={150}>
             <BarChart data={catChartData} barSize={16}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--base-300,#e5e7eb)" vertical={false} />
@@ -854,8 +731,8 @@ function AnalyticsPanel({ data, loading }) {
         </div>
       </div>
 
-      <div style={{ padding: "16px 18px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-        <p style={{ fontSize: 12, fontWeight: 700, opacity: 0.55, marginBottom: 12 }}>Daily Activity (last 30d)</p>
+      <div className="py-[16px] px-[18px] rounded-[12px] border border-base-300 bg-base-100">
+        <p className="text-[12px] font-bold opacity-55 mb-[12px]">Daily Activity (last 30d)</p>
         <ResponsiveContainer width="100%" height={130}>
           <AreaChart data={dailyTrend}>
             <defs>
@@ -874,50 +751,46 @@ function AnalyticsPanel({ data, loading }) {
         </ResponsiveContainer>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
-        <div style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-          <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Top IPs</p>
-          {topIps.length === 0 ? <p style={{ fontSize: 12, opacity: 0.3 }}>No data</p> :
+      <div className="grid grid-cols-[1fr_1fr_1fr] gap-[14px]">
+        <div className="py-[14px] px-[16px] rounded-[12px] border border-base-300 bg-base-100">
+          <p className="text-[11px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[10px]">Top IPs</p>
+          {topIps.length === 0 ? <p className="text-[12px] opacity-30">No data</p> :
             topIps.map((r, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span style={{ fontSize: 11, fontFamily: "monospace", opacity: 0.7 }}>{r.ip}</span>
-                <span style={{ fontSize: 11, fontWeight: 700 }}>{r.count}</span>
+              <div key={i} className="flex justify-between items-center mb-[6px]">
+                <span className="text-[11px] font-mono opacity-70">{r.ip}</span>
+                <span className="text-[11px] font-bold">{r.count}</span>
               </div>
             ))}
         </div>
-        <div style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-          <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Top API Paths</p>
-          {topPaths.length === 0 ? <p style={{ fontSize: 12, opacity: 0.3 }}>No data</p> :
+        <div className="py-[14px] px-[16px] rounded-[12px] border border-base-300 bg-base-100">
+          <p className="text-[11px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[10px]">Top API Paths</p>
+          {topPaths.length === 0 ? <p className="text-[12px] opacity-30">No data</p> :
             topPaths.map((r, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span style={{ fontSize: 10, fontFamily: "monospace", opacity: 0.65, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, marginRight: 8 }}>{r.path}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{r.count}</span>
+              <div key={i} className="flex justify-between items-center mb-[6px]">
+                <span className="text-[10px] font-mono opacity-65 overflow-hidden text-ellipsis whitespace-nowrap flex-1 mr-[8px]">{r.path}</span>
+                <span className="text-[11px] font-bold shrink-0">{r.count}</span>
               </div>
             ))}
         </div>
-        <div style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-          <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Top Errors</p>
-          {topErrors.length === 0 ? <p style={{ fontSize: 12, opacity: 0.3 }}>No data</p> :
+        <div className="py-[14px] px-[16px] rounded-[12px] border border-base-300 bg-base-100">
+          <p className="text-[11px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[10px]">Top Errors</p>
+          {topErrors.length === 0 ? <p className="text-[12px] opacity-30">No data</p> :
             topErrors.map((r, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
-                <span style={{ fontSize: 11, opacity: 0.65, flex: 1, lineHeight: 1.4 }}>{r.message}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--error,#ef4444)", flexShrink: 0 }}>{r.count}</span>
+              <div key={i} className="flex justify-between items-start gap-[8px] mb-[6px]">
+                <span className="text-[11px] opacity-65 flex-1 leading-[1.4]">{r.message}</span>
+                <span className="text-[11px] font-bold text-error shrink-0">{r.count}</span>
               </div>
             ))}
         </div>
       </div>
 
       {Object.keys(statusCodeBreakdown).length > 0 && (
-        <div style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-          <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Status Code Breakdown</p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="py-[14px] px-[16px] rounded-[12px] border border-base-300 bg-base-100">
+          <p className="text-[11px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[10px]">Status Code Breakdown</p>
+          <div className="flex gap-[8px] flex-wrap">
             {Object.entries(statusCodeBreakdown).map(([code, count]) => (
-              <div key={code} style={{
-                padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                background: Number(code) >= 500 ? "rgba(239,68,68,0.1)" : Number(code) >= 400 ? "rgba(245,158,11,0.1)" : "rgba(34,197,94,0.1)",
-                color: Number(code) >= 500 ? "var(--error,#ef4444)" : Number(code) >= 400 ? "var(--warning,#f59e0b)" : "var(--success,#22c55e)",
-              }}>
-                {code} <span style={{ fontWeight: 400 }}>×{count}</span>
+              <div key={code} className="py-[6px] px-[12px] rounded-[8px] text-[12px] font-bold" style={{ background: Number(code) >= 500 ? "rgba(239,68,68,0.1)" : Number(code) >= 400 ? "rgba(245,158,11,0.1)" : "rgba(34,197,94,0.1)", color: Number(code) >= 500 ? "var(--error,#ef4444)" : Number(code) >= 400 ? "var(--warning,#f59e0b)" : "var(--success,#22c55e)" }}>
+                {code} <span className="font-normal">×{count}</span>
               </div>
             ))}
           </div>
@@ -925,15 +798,12 @@ function AnalyticsPanel({ data, loading }) {
       )}
 
       {Object.keys(byActorRole).length > 0 && (
-        <div style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-          <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>By Actor Role</p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="py-[14px] px-[16px] rounded-[12px] border border-base-300 bg-base-100">
+          <p className="text-[11px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[10px]">By Actor Role</p>
+          <div className="flex gap-[8px] flex-wrap">
             {Object.entries(byActorRole).map(([role, count]) => (
-              <div key={role} style={{
-                padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                background: "var(--base-200,#f3f4f6)",
-              }}>
-                {role} <span style={{ fontWeight: 700 }}>·{count}</span>
+              <div key={role} className="py-[6px] px-[12px] rounded-[8px] text-[12px] font-semibold bg-base-200">
+                {role} <span className="font-bold">·{count}</span>
               </div>
             ))}
           </div>
@@ -1100,32 +970,24 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
   return (
     <div>
       {/* ── User Search + Filter panel ──────────────────────────────────────── */}
-      <div style={{
-        padding: "20px 22px", borderRadius: 14, marginBottom: 18,
-        border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)",
-      }}>
-        <p style={{ fontSize: 12, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>
+      <div className="py-[20px] px-[22px] rounded-[14px] mb-[18px] border border-base-300 bg-base-100">
+        <p className="text-[12px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[12px]">
           Search & select a user to view their logs
         </p>
 
-        <form onSubmit={handleFetchLogs} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <form onSubmit={handleFetchLogs} className="flex gap-[10px] flex-wrap items-end">
 
           {/* ── User search input + dropdown ─────────────────────────────────── */}
-          <div style={{ flex: "1 1 300px", minWidth: 0, position: "relative" }}>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>
+          <div className="min-w-0 relative" style={{ flex: "1 1 300px" }}>
+            <label className="block text-[11px] font-bold opacity-40 uppercase tracking-[0.07em] mb-[5px]">
               Search by name, email or phone
             </label>
             <div
               ref={searchRef}
-              style={{
-                display: "flex", alignItems: "center", gap: 8,
-                border: `1px solid ${selectedUser ? "var(--primary,#6366f1)" : "var(--base-300,#e5e7eb)"}`,
-                borderRadius: 9, padding: "8px 12px",
-                background: selectedUser ? "color-mix(in srgb, var(--primary,#6366f1), transparent 94%)" : "transparent",
-              }}>
+              className="flex items-center gap-[8px] rounded-[9px] py-[8px] px-[12px]" style={{ border: `1px solid ${selectedUser ? "var(--primary,#6366f1)" : "var(--base-300,#e5e7eb)"}`, background: selectedUser ? "color-mix(in srgb, var(--primary,#6366f1), transparent 94%)" : "transparent" }}>
               {usersLoading
-                ? <RefreshCw size={13} style={{ opacity: 0.4, flexShrink: 0 }} className="animate-spin" />
-                : <Search size={13} style={{ opacity: 0.4, flexShrink: 0 }} />
+                ? <RefreshCw size={13} className="opacity-40 shrink-0 animate-spin" />
+                : <Search size={13} className="opacity-40 shrink-0" />
               }
               <input
                 value={searchQuery}
@@ -1133,16 +995,11 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
                 onFocus={handleFocus}
                 placeholder="Type name, email or phone…"
                 autoComplete="off"
-                style={{
-                  border: "none", outline: "none", fontSize: 13,
-                  background: "transparent", flex: 1,
-                  color: selectedUser ? "var(--primary,#6366f1)" : "inherit",
-                  fontWeight: selectedUser ? 600 : 400,
-                }}
+                className="border-none outline-none text-[13px] bg-[transparent] flex-1" style={{ color: selectedUser ? "var(--primary,#6366f1)" : "inherit", fontWeight: selectedUser ? 600 : 400 }}
               />
               {(searchQuery || selectedUser) && (
                 <button type="button" onClick={handleClear}
-                  style={{ border: "none", background: "none", cursor: "pointer", opacity: 0.4 }}>
+                  className="border-none bg-transparent cursor-pointer opacity-40">
                   <XCircle size={13} />
                 </button>
               )}
@@ -1157,22 +1014,15 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.12 }}
-                  style={{
-                    position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
-                    background: "var(--base-100,#fff)",
-                    border: "1px solid var(--base-300,#e5e7eb)",
-                    borderRadius: 12, zIndex: 100, overflow: "hidden",
-                    boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
-                    maxHeight: 320, overflowY: "auto",
-                  }}>
+                  className="absolute top-[calc(100% + 6px)] left-[0px] right-[0px] bg-base-100 border border-base-300 rounded-[12px] z-[100] overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.12)] max-h-[320px] overflow-y-auto">
                   {usersLoading && (
-                    <div style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 10, opacity: 0.5 }}>
+                    <div className="py-[16px] px-[18px] flex items-center gap-[10px] opacity-50">
                       <RefreshCw size={13} className="animate-spin" />
-                      <span style={{ fontSize: 13 }}>Searching users…</span>
+                      <span className="text-[13px]">Searching users…</span>
                     </div>
                   )}
                   {!usersLoading && allUsers.length === 0 && (
-                    <div style={{ padding: "16px 18px", opacity: 0.4, fontSize: 13 }}>
+                    <div className="py-[16px] px-[18px] opacity-40 text-[13px]">
                       No users found
                     </div>
                   )}
@@ -1180,58 +1030,41 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
                     <div
                       key={u._id}
                       onClick={() => handleSelectUser(u)}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 12,
-                        padding: "11px 16px", cursor: "pointer",
-                        borderBottom: "1px solid var(--base-200,#f3f4f6)",
-                        transition: "background 0.1s",
-                        background: selectedUser?._id === u._id ? "color-mix(in srgb, var(--primary,#6366f1), transparent 92%)" : "transparent",
-                      }}
+                      className="flex items-center gap-[12px] py-[11px] px-[16px] cursor-pointer border-b border-base-200" style={{ transition: "background 0.1s", background: selectedUser?._id === u._id ? "color-mix(in srgb, var(--primary,#6366f1), transparent 92%)" : "transparent" }}
                       onMouseEnter={e => { if (selectedUser?._id !== u._id) e.currentTarget.style.background = "var(--base-200,#f3f4f6)"; }}
                       onMouseLeave={e => { if (selectedUser?._id !== u._id) e.currentTarget.style.background = "transparent"; }}
                     >
                       {/* Avatar / initials */}
-                      <div style={{
-                        width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        background: `color-mix(in srgb, ${roleBadgeColor(u.role)}, transparent 82%)`,
-                        fontSize: 12, fontWeight: 800,
-                        color: roleBadgeColor(u.role),
-                      }}>
+                      <div className="w-[34px] h-[34px] rounded-[10px] shrink-0 flex items-center justify-center text-[12px] font-extrabold" style={{ background: `color-mix(in srgb, ${roleBadgeColor(u.role)}, transparent 82%)`, color: roleBadgeColor(u.role) }}>
                         {u.avatar
-                          ? <img src={u.avatar} alt="" style={{ width: 34, height: 34, borderRadius: 10, objectFit: "cover" }} />
+                          ? <Image src={u.avatar} alt="" width={34} height={34} className="rounded-[10px] object-cover" />
                           : (u.name?.[0] || "?").toUpperCase()
                         }
                       </div>
 
                       {/* Info */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <p style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-[6px]">
+                          <p className="text-[13px] font-bold overflow-hidden text-ellipsis whitespace-nowrap">
                             {u.name}
                           </p>
-                          <span style={{
-                            fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em",
-                            padding: "2px 6px", borderRadius: 5,
-                            background: `color-mix(in srgb, ${roleBadgeColor(u.role)}, transparent 85%)`,
-                            color: roleBadgeColor(u.role), flexShrink: 0,
-                          }}>
+                          <span className="text-[9px] font-extrabold uppercase tracking-[0.06em] py-[2px] px-[6px] rounded-[5px] shrink-0" style={{ background: `color-mix(in srgb, ${roleBadgeColor(u.role)}, transparent 85%)`, color: roleBadgeColor(u.role) }}>
                             {u.role}
                           </span>
                           {u.isBlocked && (
-                            <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: "rgba(239,68,68,0.1)", color: "var(--error,#ef4444)", flexShrink: 0 }}>
+                            <span className="text-[9px] font-bold py-[2px] px-[6px] rounded-[5px] bg-[rgba(239,68,68,0.1)] text-error shrink-0">
                               BLOCKED
                             </span>
                           )}
                         </div>
-                        <p style={{ fontSize: 11, opacity: 0.45, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 1 }}>
+                        <p className="text-[11px] opacity-45 overflow-hidden text-ellipsis whitespace-nowrap mt-[1px]">
                           {u.email}
                           {u.phone && ` · ${u.phone}`}
                         </p>
                       </div>
 
                       {/* ObjectId tail */}
-                      <span style={{ fontSize: 10, fontFamily: "monospace", opacity: 0.3, flexShrink: 0 }}>
+                      <span className="text-[10px] font-mono opacity-30 shrink-0">
                         …{u._id?.slice(-6)}
                       </span>
                     </div>
@@ -1239,7 +1072,7 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
 
                   {/* Load more hint */}
                   {!usersLoading && usersPag.total > allUsers.length && (
-                    <div style={{ padding: "10px 16px", fontSize: 11, opacity: 0.4, textAlign: "center" }}>
+                    <div className="py-[10px] px-[16px] text-[11px] opacity-40 text-center">
                       {usersPag.total - allUsers.length} more — refine your search
                     </div>
                   )}
@@ -1250,9 +1083,9 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
 
           {/* ── Role filter for user search ─────────────────────────────────── */}
           <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>Role</label>
+            <label className="block text-[11px] font-bold opacity-40 uppercase tracking-[0.07em] mb-[5px]">Role</label>
             <select value={roleFilter} onChange={handleRoleFilter}
-              style={{ padding: "8px 10px", borderRadius: 9, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12 }}>
+              className="py-[8px] px-[10px] rounded-[9px] border border-base-300 text-[12px]">
               <option value="">All Roles</option>
               {["superadmin","admin","doctor","transportpartner","driver","lab partner","customer","pharmacy","care assistant","finance"].map(r =>
                 <option key={r} value={r}>{r}</option>
@@ -1262,41 +1095,35 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
 
           {/* ── Log filters (only useful once a user is selected) ───────────── */}
           <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>Log Level</label>
+            <label className="block text-[11px] font-bold opacity-40 uppercase tracking-[0.07em] mb-[5px]">Log Level</label>
             <select value={localFilters.level} onChange={e => setFlt("level", e.target.value)}
-              style={{ padding: "8px 10px", borderRadius: 9, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12 }}>
+              className="py-[8px] px-[10px] rounded-[9px] border border-base-300 text-[12px]">
               <option value="">All</option>
               {VALID_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>Category</label>
+            <label className="block text-[11px] font-bold opacity-40 uppercase tracking-[0.07em] mb-[5px]">Category</label>
             <select value={localFilters.category} onChange={e => setFlt("category", e.target.value)}
-              style={{ padding: "8px 10px", borderRadius: 9, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12 }}>
+              className="py-[8px] px-[10px] rounded-[9px] border border-base-300 text-[12px]">
               <option value="">All</option>
               {VALID_CATS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>From</label>
+            <label className="block text-[11px] font-bold opacity-40 uppercase tracking-[0.07em] mb-[5px]">From</label>
             <input type="date" value={localFilters.from} onChange={e => setFlt("from", e.target.value)}
-              style={{ padding: "8px 10px", borderRadius: 9, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12 }} />
+              className="py-[8px] px-[10px] rounded-[9px] border border-base-300 text-[12px]" />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>To</label>
+            <label className="block text-[11px] font-bold opacity-40 uppercase tracking-[0.07em] mb-[5px]">To</label>
             <input type="date" value={localFilters.to} onChange={e => setFlt("to", e.target.value)}
-              style={{ padding: "8px 10px", borderRadius: 9, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12 }} />
+              className="py-[8px] px-[10px] rounded-[9px] border border-base-300 text-[12px]" />
           </div>
 
           {/* Apply filters button (only active once user is selected) */}
           <button type="submit" disabled={!selectedUser || logsLoading}
-            style={{
-              display: "flex", alignItems: "center", gap: 7, padding: "9px 18px",
-              borderRadius: 10, fontSize: 13, fontWeight: 700, border: "none",
-              background: "var(--primary,#6366f1)", color: "white",
-              cursor: (!selectedUser || logsLoading) ? "not-allowed" : "pointer",
-              opacity: (!selectedUser || logsLoading) ? 0.5 : 1,
-            }}>
+            className="flex items-center gap-[7px] py-[9px] px-[18px] rounded-[10px] text-[13px] font-bold border-none bg-primary text-[white]" style={{ cursor: (!selectedUser || logsLoading) ? "not-allowed" : "pointer", opacity: (!selectedUser || logsLoading) ? 0.5 : 1 }}>
             {logsLoading
               ? <><RefreshCw size={13} className="animate-spin" />Loading…</>
               : <><Search size={13} />Apply Filters</>}
@@ -1304,11 +1131,7 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
 
           {submitted && (
             <button type="button" onClick={handleClear}
-              style={{
-                padding: "9px 14px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                background: "rgba(239,68,68,0.08)", color: "var(--error,#ef4444)",
-                border: "1px solid rgba(239,68,68,0.2)", cursor: "pointer",
-              }}>
+              className="py-[9px] px-[14px] rounded-[10px] text-[13px] font-bold bg-[rgba(239,68,68,0.08)] text-error border border-[rgba(239,68,68,0.2)] cursor-pointer">
               Clear
             </button>
           )}
@@ -1317,11 +1140,7 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
 
       {/* ── Error ──────────────────────────────────────────────────────────── */}
       {logsError && (
-        <div style={{
-          padding: "12px 16px", borderRadius: 10, marginBottom: 14,
-          background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)",
-          color: "var(--error,#ef4444)", fontSize: 13, fontWeight: 600,
-        }}>
+        <div className="py-[12px] px-[16px] rounded-[10px] mb-[14px] bg-[rgba(239,68,68,0.06)] border border-[rgba(239,68,68,0.2)] text-error text-[13px] font-semibold">
           {logsError}
         </div>
       )}
@@ -1329,55 +1148,40 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
       {/* ── Selected user info card ─────────────────────────────────────────── */}
       {(userLogsUser || selectedUser) && submitted && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-          style={{
-            display: "flex", alignItems: "center", gap: 14, padding: "14px 18px",
-            borderRadius: 12, marginBottom: 16,
-            border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)",
-          }}>
+          className="flex items-center gap-[14px] py-[14px] px-[18px] rounded-[12px] mb-[16px] border border-base-300 bg-base-100">
           {/* Avatar */}
-          <div style={{
-            width: 44, height: 44, borderRadius: 12, flexShrink: 0, overflow: "hidden",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: `color-mix(in srgb, ${roleBadgeColor((userLogsUser || selectedUser)?.role)}, transparent 82%)`,
-            fontSize: 15, fontWeight: 800,
-            color: roleBadgeColor((userLogsUser || selectedUser)?.role),
-          }}>
+          <div className="w-[44px] h-[44px] rounded-[12px] shrink-0 overflow-hidden flex items-center justify-center text-[15px] font-extrabold" style={{ background: `color-mix(in srgb, ${roleBadgeColor((userLogsUser || selectedUser)?.role)}, transparent 82%)`, color: roleBadgeColor((userLogsUser || selectedUser)?.role) }}>
             {(userLogsUser || selectedUser)?.avatar
-              ? <img src={(userLogsUser || selectedUser).avatar} alt="" style={{ width: 44, height: 44, objectFit: "cover" }} />
+              ? <Image src={(userLogsUser || selectedUser).avatar} alt="" width={44} height={44} className="object-cover" />
               : ((userLogsUser || selectedUser)?.name?.[0] || "?").toUpperCase()
             }
           </div>
 
           {/* Info */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <p style={{ fontSize: 14, fontWeight: 700 }}>{(userLogsUser || selectedUser)?.name || "—"}</p>
-              <span style={{
-                fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em",
-                padding: "3px 8px", borderRadius: 6,
-                background: `color-mix(in srgb, ${roleBadgeColor((userLogsUser || selectedUser)?.role)}, transparent 85%)`,
-                color: roleBadgeColor((userLogsUser || selectedUser)?.role),
-              }}>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-[8px] flex-wrap">
+              <p className="text-[14px] font-bold">{(userLogsUser || selectedUser)?.name || "—"}</p>
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.06em] py-[3px] px-[8px] rounded-[6px]" style={{ background: `color-mix(in srgb, ${roleBadgeColor((userLogsUser || selectedUser)?.role)}, transparent 85%)`, color: roleBadgeColor((userLogsUser || selectedUser)?.role) }}>
                 {(userLogsUser || selectedUser)?.role}
               </span>
               {(userLogsUser || selectedUser)?.isBlocked && (
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: "rgba(239,68,68,0.1)", color: "var(--error,#ef4444)" }}>
+                <span className="text-[10px] font-bold py-[3px] px-[8px] rounded-[6px] bg-[rgba(239,68,68,0.1)] text-error">
                   BLOCKED
                 </span>
               )}
             </div>
-            <p style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>
+            <p className="text-[12px] opacity-50 mt-[2px]">
               {(userLogsUser || selectedUser)?.email}
               {(userLogsUser || selectedUser)?.phone && ` · ${(userLogsUser || selectedUser).phone}`}
             </p>
           </div>
 
           {/* Stats */}
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: "var(--primary,#6366f1)" }}>
+          <div className="text-right shrink-0">
+            <p className="text-[13px] font-bold text-primary">
               {userLogsPag.total?.toLocaleString() ?? 0} logs
             </p>
-            <p style={{ fontSize: 10, opacity: 0.35, fontFamily: "monospace" }}>
+            <p className="text-[10px] opacity-35 font-mono">
               {(userLogsUser || selectedUser)?._id?.slice(-8)}
             </p>
           </div>
@@ -1386,31 +1190,28 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
 
       {/* ── Logs table ─────────────────────────────────────────────────────── */}
       {submitted && (
-        <div style={{ borderRadius: 14, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)", overflow: "hidden" }}>
+        <div className="rounded-[14px] border border-base-300 bg-base-100 overflow-hidden">
           {/* Header */}
-          <div style={{
-            padding: "12px 20px", borderBottom: "1px solid var(--base-300,#e5e7eb)",
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Users size={14} style={{ color: "var(--primary,#6366f1)" }} />
-              <p style={{ fontSize: 13, fontWeight: 700 }}>
+          <div className="py-[12px] px-[20px] border-b border-base-300 flex items-center justify-between">
+            <div className="flex items-center gap-[8px]">
+              <Users size={14} className="text-primary" />
+              <p className="text-[13px] font-bold">
                 {logsLoading ? "Loading…" : userLogs.length === 0 ? "No logs found" : `${userLogsPag.total?.toLocaleString() ?? userLogs.length} log entries`}
               </p>
-              {logsLoading && <RefreshCw size={12} className="animate-spin" style={{ opacity: 0.4 }} />}
+              {logsLoading && <RefreshCw size={12} className="animate-spin opacity-40" />}
             </div>
-            <p style={{ fontSize: 12, opacity: 0.4 }}>
+            <p className="text-[12px] opacity-40">
               Page {userLogsPag.page} of {userLogsPag.totalPages || 1}
             </p>
           </div>
 
           {/* Log rows */}
-          <div style={{ overflowY: "auto", maxHeight: "56vh" }}>
+          <div className="overflow-y-auto max-h-[56vh]">
             <AnimatePresence>
               {!logsLoading && userLogs.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "60px 20px", opacity: 0.3 }}>
-                  <FileText size={32} style={{ margin: "0 auto 12px" }} />
-                  <p style={{ fontSize: 13, fontWeight: 600 }}>No logs found for this user</p>
+                <div className="text-center py-[60px] px-[20px] opacity-30">
+                  <FileText size={32} className="mt-[0px] mx-[auto] mb-[12px]" />
+                  <p className="text-[13px] font-semibold">No logs found for this user</p>
                 </div>
               ) : userLogs.map((log, i) => (
                 <LogRow
@@ -1428,25 +1229,22 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
 
           {/* Pagination */}
           {userLogsPag.totalPages > 1 && (
-            <div style={{
-              padding: "14px 20px", borderTop: "1px solid var(--base-300,#e5e7eb)",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
-              <p style={{ fontSize: 12, opacity: 0.4 }}>
+            <div className="py-[14px] px-[20px] border-t border-base-300 flex items-center justify-between">
+              <p className="text-[12px] opacity-40">
                 {userLogsPag.total > 0
                   ? `Showing ${((userLogsPag.page - 1) * userLogsPag.limit) + 1}–${Math.min(userLogsPag.page * userLogsPag.limit, userLogsPag.total)} of ${userLogsPag.total?.toLocaleString()}`
                   : "No results"}
               </p>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="flex items-center gap-[8px]">
                 <button disabled={userLogsPag.page <= 1} onClick={() => handlePage(userLogsPag.page - 1)}
-                  style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", display: "flex", alignItems: "center", justifyContent: "center", cursor: userLogsPag.page <= 1 ? "not-allowed" : "pointer", opacity: userLogsPag.page <= 1 ? 0.3 : 1, background: "transparent" }}>
+                  className="w-[32px] h-[32px] rounded-[8px] border border-base-300 flex items-center justify-center bg-[transparent]" style={{ cursor: userLogsPag.page <= 1 ? "not-allowed" : "pointer", opacity: userLogsPag.page <= 1 ? 0.3 : 1 }}>
                   <ChevronLeft size={16} />
                 </button>
-                <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.55, padding: "0 8px" }}>
+                <span className="text-[13px] font-semibold opacity-55 py-[0px] px-[8px]">
                   {userLogsPag.page} / {userLogsPag.totalPages}
                 </span>
                 <button disabled={userLogsPag.page >= userLogsPag.totalPages} onClick={() => handlePage(userLogsPag.page + 1)}
-                  style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", display: "flex", alignItems: "center", justifyContent: "center", cursor: userLogsPag.page >= userLogsPag.totalPages ? "not-allowed" : "pointer", opacity: userLogsPag.page >= userLogsPag.totalPages ? 0.3 : 1, background: "transparent" }}>
+                  className="w-[32px] h-[32px] rounded-[8px] border border-base-300 flex items-center justify-center bg-[transparent]" style={{ cursor: userLogsPag.page >= userLogsPag.totalPages ? "not-allowed" : "pointer", opacity: userLogsPag.page >= userLogsPag.totalPages ? 0.3 : 1 }}>
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -1457,13 +1255,10 @@ function UserLogsTab({ dispatch, isSuperadmin }) {
 
       {/* ── Empty state when no user selected yet ──────────────────────────── */}
       {!submitted && !logsLoading && (
-        <div style={{
-          textAlign: "center", padding: "60px 20px", opacity: 0.3,
-          border: "2px dashed var(--base-300,#e5e7eb)", borderRadius: 14,
-        }}>
-          <Users size={36} style={{ margin: "0 auto 12px" }} />
-          <p style={{ fontSize: 14, fontWeight: 700 }}>Search and select a user above</p>
-          <p style={{ fontSize: 12, marginTop: 4 }}>Their system logs will appear here</p>
+        <div className="text-center py-[60px] px-[20px] opacity-30 border-[2px] border-dashed border-base-300 rounded-[14px]">
+          <Users size={36} className="mt-[0px] mx-[auto] mb-[12px]" />
+          <p className="text-[14px] font-bold">Search and select a user above</p>
+          <p className="text-[12px] mt-[4px]">Their system logs will appear here</p>
         </div>
       )}
 
@@ -1623,82 +1418,57 @@ export default function SystemLogManagement() {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", padding: "24px", background: "var(--base-100,#f9fafb)" }}>
+    <div className="min-h-[100vh] p-[24px] bg-base-100">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <motion.div initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }}
-        style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 28 }}>
+        className="flex flex-wrap items-center justify-between gap-[14px] mb-[28px]">
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-            <Link href="/admin" style={{ fontSize: 12, opacity: 0.45, textDecoration: "none" }}>Admin</Link>
-            <ChevronRight size={12} style={{ opacity: 0.3 }} />
-            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary,#6366f1)" }}>System Logs</span>
+          <div className="flex items-center gap-[6px] mb-[4px]">
+            <Link href="/admin" className="text-[12px] opacity-45 no-underline">Admin</Link>
+            <ChevronRight size={12} className="opacity-30" />
+            <span className="text-[12px] font-bold text-primary">System Logs</span>
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0, letterSpacing: "-0.02em" }}>System Logs</h1>
-          <p style={{ fontSize: 13, opacity: 0.45, margin: "4px 0 0", fontWeight: 500 }}>
+          <h1 className="text-[24px] font-black m-[0px] tracking-[-0.02em]">System Logs</h1>
+          <p className="text-[13px] opacity-45 mt-[4px] mx-[0px] mb-[0px] font-medium">
             {pagination.total?.toLocaleString() ?? "—"} total entries · Real-time audit trail
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div className="flex gap-[10px] flex-wrap">
           <button onClick={() => setShowCreate(true)}
-            style={{
-              display: "flex", alignItems: "center", gap: 7, padding: "9px 16px",
-              borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer",
-              background: "var(--primary,#6366f1)", color: "white", border: "none",
-            }}>
+            className="flex items-center gap-[7px] py-[9px] px-[16px] rounded-[10px] text-[13px] font-bold cursor-pointer bg-primary text-[white] border-none">
             <Plus size={14} />Create Log
           </button>
 
           {isSuperadmin && (
             <button onClick={() => setShowBulk(true)}
-              style={{
-                display: "flex", alignItems: "center", gap: 7, padding: "9px 16px",
-                borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer",
-                background: "rgba(239,68,68,0.1)", color: "var(--error,#ef4444)",
-                border: "1px solid rgba(239,68,68,0.25)",
-              }}>
+              className="flex items-center gap-[7px] py-[9px] px-[16px] rounded-[10px] text-[13px] font-bold cursor-pointer bg-[rgba(239,68,68,0.1)] text-error border border-[rgba(239,68,68,0.25)]">
               <Trash2 size={14} />Bulk Delete
             </button>
           )}
 
           <button onClick={handleExport} disabled={exportLoading}
-            style={{
-              display: "flex", alignItems: "center", gap: 7, padding: "9px 16px",
-              borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: exportLoading ? "not-allowed" : "pointer",
-              background: "var(--base-200,#f3f4f6)", border: "1px solid var(--base-300,#e5e7eb)",
-              opacity: exportLoading ? 0.6 : 1,
-            }}>
+            className="flex items-center gap-[7px] py-[9px] px-[16px] rounded-[10px] text-[13px] font-bold bg-base-200 border border-base-300" style={{ cursor: exportLoading ? "not-allowed" : "pointer", opacity: exportLoading ? 0.6 : 1 }}>
             {exportLoading ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
             {exportLoading ? "Exporting…" : "Export CSV"}
           </button>
 
           <button onClick={handleRefresh}
-            style={{
-              width: 38, height: 38, borderRadius: 10, border: "1px solid var(--base-300,#e5e7eb)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", background: "var(--base-100,#fff)",
-            }}>
-            <RefreshCw size={15} style={{ opacity: 0.5 }} className={listLoading ? "animate-spin" : ""} />
+            className="w-[38px] h-[38px] rounded-[10px] border border-base-300 flex items-center justify-center cursor-pointer bg-base-100">
+            <RefreshCw size={15} className={`opacity-50 ${listLoading ? "animate-spin" : ""}`} />
           </button>
         </div>
       </motion.div>
 
       {/* ── Tabs ──────────────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 24, background: "var(--base-200,#f3f4f6)", borderRadius: 12, padding: 4, width: "fit-content" }}>
+      <div className="flex gap-[4px] mb-[24px] bg-base-200 rounded-[12px] p-[4px] w-[fit-content]">
         {TABS.map(tab => {
           const TIcon = tab.icon;
           const active = activeTab === tab.key;
           return (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              style={{
-                display: "flex", alignItems: "center", gap: 7, padding: "8px 18px",
-                borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "none",
-                background: active ? "var(--base-100,#fff)" : "transparent",
-                color: active ? "var(--primary,#6366f1)" : "var(--base-content,#1f2937)",
-                boxShadow: active ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-                transition: "all 0.15s",
-              }}>
+              className="flex items-center gap-[7px] py-[8px] px-[18px] rounded-[9px] text-[13px] font-bold cursor-pointer border-none" style={{ background: active ? "var(--base-100,#fff)" : "transparent", color: active ? "var(--primary,#6366f1)" : "var(--base-content,#1f2937)", boxShadow: active ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: "all 0.15s" }}>
               <TIcon size={14} />{tab.label}
             </button>
           );
@@ -1714,7 +1484,7 @@ export default function SystemLogManagement() {
           <motion.div key="logs" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
 
             {/* Level pills */}
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
+            <div className="flex gap-[10px] flex-wrap mb-[18px]">
               {Object.entries(LOG_LEVELS).map(([lvl, cfg]) => {
                 const LIcon = cfg.icon;
                 const active = localFilters.level === lvl;
@@ -1723,14 +1493,7 @@ export default function SystemLogManagement() {
                     const next = active ? "" : lvl;
                     setFlt("level", next);
                     applyFilters({ level: next });
-                  }} style={{
-                    display: "flex", alignItems: "center", gap: 7, padding: "7px 14px",
-                    borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                    border: active ? `1.5px solid ${cfg.color}` : "1px solid var(--base-300,#e5e7eb)",
-                    background: active ? `color-mix(in srgb, ${cfg.color}, transparent 88%)` : "var(--base-100,#fff)",
-                    color: active ? cfg.color : "var(--base-content,#1f2937)",
-                    transition: "all 0.12s",
-                  }}>
+                  }} className="flex items-center gap-[7px] py-[7px] px-[14px] rounded-[9px] text-[12px] font-bold cursor-pointer" style={{ border: active ? `1.5px solid ${cfg.color}` : "1px solid var(--base-300,#e5e7eb)", background: active ? `color-mix(in srgb, ${cfg.color}, transparent 88%)` : "var(--base-100,#fff)", color: active ? cfg.color : "var(--base-content,#1f2937)", transition: "all 0.12s" }}>
                     <LIcon size={13} style={{ color: cfg.color }} />
                     {cfg.label}
                   </button>
@@ -1739,22 +1502,17 @@ export default function SystemLogManagement() {
             </div>
 
             {/* Filter bar */}
-            <div style={{
-              padding: "16px 20px", borderRadius: 14, marginBottom: 16,
-              border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)",
-              display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "1 1 220px", minWidth: 0,
-                border: "1px solid var(--base-300,#e5e7eb)", borderRadius: 9, padding: "7px 12px" }}>
-                <Search size={13} style={{ opacity: 0.4, flexShrink: 0 }} />
+            <div className="py-[16px] px-[20px] rounded-[14px] mb-[16px] border border-base-300 bg-base-100 flex flex-wrap gap-[10px] items-center">
+              <div className="flex items-center gap-[8px] min-w-0 border border-base-300 rounded-[9px] py-[7px] px-[12px]" style={{ flex: "1 1 220px" }}>
+                <Search size={13} className="opacity-40 shrink-0" />
                 <input value={localFilters.search}
                   onChange={e => setFlt("search", e.target.value)}
                   onKeyDown={e => e.key === "Enter" && applyFilters()}
                   placeholder="Search message, logCode, details…"
-                  style={{ border: "none", outline: "none", fontSize: 13, background: "transparent", flex: 1 }} />
+                  className="border-none outline-none text-[13px] bg-[transparent] flex-1" />
                 {localFilters.search && (
                   <button onClick={() => { setFlt("search", ""); applyFilters({ search: "" }); }}
-                    style={{ border: "none", background: "none", cursor: "pointer", opacity: 0.4 }}>
+                    className="border-none bg-transparent cursor-pointer opacity-40">
                     <XCircle size={13} />
                   </button>
                 )}
@@ -1762,43 +1520,32 @@ export default function SystemLogManagement() {
 
               <select value={localFilters.category}
                 onChange={e => { setFlt("category", e.target.value); applyFilters({ category: e.target.value }); }}
-                style={{ padding: "7px 10px", borderRadius: 9, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12, cursor: "pointer" }}>
+                className="py-[7px] px-[10px] rounded-[9px] border border-base-300 text-[12px] cursor-pointer">
                 <option value="">All Categories</option>
                 {VALID_CATS.map(c => <option key={c} value={c}>{CATEGORIES[c]?.label || c}</option>)}
               </select>
 
               <select value={localFilters.sortOrder}
                 onChange={e => { setFlt("sortOrder", e.target.value); applyFilters({ sortOrder: e.target.value }); }}
-                style={{ padding: "7px 10px", borderRadius: 9, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12, cursor: "pointer" }}>
+                className="py-[7px] px-[10px] rounded-[9px] border border-base-300 text-[12px] cursor-pointer">
                 <option value="desc">Newest first</option>
                 <option value="asc">Oldest first</option>
               </select>
 
               <button onClick={() => setAdvFilters(p => !p)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "7px 12px",
-                  borderRadius: 9, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12,
-                  fontWeight: 600, cursor: "pointer", background: advFilters ? "var(--base-200,#f3f4f6)" : "var(--base-100,#fff)",
-                }}>
+                className="flex items-center gap-[6px] py-[7px] px-[12px] rounded-[9px] border border-base-300 text-[12px] font-semibold cursor-pointer" style={{ background: advFilters ? "var(--base-200,#f3f4f6)" : "var(--base-100,#fff)" }}>
                 <SlidersHorizontal size={13} />{advFilters ? "Hide filters" : "More filters"}
               </button>
 
               {isSuperadmin && (
                 <button onClick={() => { setSelectionMode(p => !p); clearSel(); }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 6, padding: "7px 12px",
-                    borderRadius: 9, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12,
-                    fontWeight: 600, cursor: "pointer",
-                    background: selectionMode ? "rgba(239,68,68,0.08)" : "var(--base-100,#fff)",
-                    color: selectionMode ? "var(--error,#ef4444)" : "var(--base-content,#1f2937)",
-                  }}>
+                  className="flex items-center gap-[6px] py-[7px] px-[12px] rounded-[9px] border border-base-300 text-[12px] font-semibold cursor-pointer" style={{ background: selectionMode ? "rgba(239,68,68,0.08)" : "var(--base-100,#fff)", color: selectionMode ? "var(--error,#ef4444)" : "var(--base-content,#1f2937)" }}>
                   <CheckSquare size={13} />{selectionMode ? "Cancel" : "Select"}
                 </button>
               )}
 
               <button onClick={() => applyFilters()}
-                style={{ padding: "7px 16px", borderRadius: 9, fontSize: 12, fontWeight: 700,
-                  background: "var(--primary,#6366f1)", color: "white", border: "none", cursor: "pointer" }}>
+                className="py-[7px] px-[16px] rounded-[9px] text-[12px] font-bold bg-primary text-[white] border-none cursor-pointer">
                 Apply
               </button>
               {(localFilters.search || localFilters.level || localFilters.category || localFilters.actorRole || localFilters.ip || localFilters.method || localFilters.from || localFilters.to) && (
@@ -1806,10 +1553,8 @@ export default function SystemLogManagement() {
                   const reset = { search: "", level: "", category: "", actorRole: "", ip: "", method: "", statusCode: "", environment: "", from: "", to: "", page: 1 };
                   setLocalFilters(p => ({ ...p, ...reset }));
                   applyFilters(reset);
-                }} style={{ padding: "7px 12px", borderRadius: 9, fontSize: 12, fontWeight: 700,
-                  background: "rgba(239,68,68,0.08)", color: "var(--error,#ef4444)",
-                  border: "1px solid rgba(239,68,68,0.2)", cursor: "pointer" }}>
-                  <XCircle size={12} style={{ display: "inline", marginRight: 4 }} />Clear
+                }} className="py-[7px] px-[12px] rounded-[9px] text-[12px] font-bold bg-[rgba(239,68,68,0.08)] text-error border border-[rgba(239,68,68,0.2)] cursor-pointer">
+                  <XCircle size={12} className="inline mr-[4px]" />Clear
                 </button>
               )}
             </div>
@@ -1818,12 +1563,8 @@ export default function SystemLogManagement() {
             <AnimatePresence>
               {advFilters && (
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                  style={{ overflow: "hidden", marginBottom: 14 }}>
-                  <div style={{
-                    display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 10,
-                    padding: "16px 20px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)",
-                    background: "var(--base-100,#fff)",
-                  }}>
+                  className="overflow-hidden mb-[14px]">
+                  <div className="grid grid-cols-[repeat(auto-fill,_minmax(170px,_1fr))] gap-[10px] py-[16px] px-[20px] rounded-[12px] border border-base-300 bg-base-100">
                     {[
                       { label: "Actor Role", key: "actorRole", type: "select", opts: VALID_ACTOR_ROLES },
                       { label: "HTTP Method", key: "method",   type: "select", opts: VALID_METHODS     },
@@ -1835,20 +1576,20 @@ export default function SystemLogManagement() {
                       { label: "Limit",       key: "limit",    type: "select",  opts: ["20","30","50","100"] },
                     ].map(f => (
                       <div key={f.key}>
-                        <label style={{ display: "block", fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>
+                        <label className="block text-[10px] font-bold opacity-40 uppercase tracking-[0.07em] mb-[5px]">
                           {f.label}
                         </label>
                         {f.type === "select" ? (
                           <select value={localFilters[f.key]}
                             onChange={e => setFlt(f.key, e.target.value)}
-                            style={{ width: "100%", padding: "7px 9px", borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12 }}>
+                            className="w-full py-[7px] px-[9px] rounded-[8px] border border-base-300 text-[12px]">
                             <option value="">Any</option>
                             {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
                           </select>
                         ) : (
                           <input type={f.type} value={localFilters[f.key]} placeholder={f.placeholder}
                             onChange={e => setFlt(f.key, e.target.value)}
-                            style={{ width: "100%", padding: "7px 9px", borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12, boxSizing: "border-box" }} />
+                            className="w-full py-[7px] px-[9px] rounded-[8px] border border-base-300 text-[12px] box-border" />
                         )}
                       </div>
                     ))}
@@ -1861,20 +1602,15 @@ export default function SystemLogManagement() {
             <AnimatePresence>
               {selectionMode && selectedIds.size > 0 && (
                 <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10, padding: "10px 16px",
-                    borderRadius: 10, marginBottom: 12,
-                    background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)",
-                  }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--error,#ef4444)" }}>
+                  className="flex items-center gap-[10px] py-[10px] px-[16px] rounded-[10px] mb-[12px] bg-[rgba(239,68,68,0.06)] border border-[rgba(239,68,68,0.2)]">
+                  <span className="text-[13px] font-bold text-error">
                     {selectedIds.size} selected
                   </span>
-                  <button onClick={selectAll} style={{ fontSize: 12, fontWeight: 600, border: "none", background: "none", cursor: "pointer", opacity: 0.65 }}>Select all</button>
-                  <button onClick={clearSel}  style={{ fontSize: 12, fontWeight: 600, border: "none", background: "none", cursor: "pointer", opacity: 0.65 }}>Clear</button>
-                  <div style={{ flex: 1 }} />
+                  <button onClick={selectAll} className="text-[12px] font-semibold border-none bg-transparent cursor-pointer opacity-65">Select all</button>
+                  <button onClick={clearSel}  className="text-[12px] font-semibold border-none bg-transparent cursor-pointer opacity-65">Clear</button>
+                  <div className="flex-1" />
                   <button onClick={() => setShowBulk(true)}
-                    style={{ padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                      background: "var(--error,#ef4444)", color: "white", border: "none", cursor: "pointer" }}>
+                    className="py-[6px] px-[14px] rounded-[8px] text-[12px] font-bold bg-error text-[white] border-none cursor-pointer">
                     Bulk Delete
                   </button>
                 </motion.div>
@@ -1882,32 +1618,32 @@ export default function SystemLogManagement() {
             </AnimatePresence>
 
             {/* Logs table */}
-            <div style={{ borderRadius: 14, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)", overflow: "hidden" }}>
-              <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--base-300,#e5e7eb)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Terminal size={14} style={{ color: "var(--primary,#6366f1)" }} />
-                  <p style={{ fontSize: 13, fontWeight: 700 }}>
+            <div className="rounded-[14px] border border-base-300 bg-base-100 overflow-hidden">
+              <div className="py-[12px] px-[20px] border-b border-base-300 flex items-center justify-between">
+                <div className="flex items-center gap-[8px]">
+                  <Terminal size={14} className="text-primary" />
+                  <p className="text-[13px] font-bold">
                     {listLoading ? "Loading…" : `${pagination.total?.toLocaleString() ?? 0} logs`}
                   </p>
-                  {listLoading && <RefreshCw size={12} className="animate-spin" style={{ opacity: 0.4 }} />}
+                  {listLoading && <RefreshCw size={12} className="animate-spin opacity-40" />}
                 </div>
-                <p style={{ fontSize: 12, opacity: 0.4 }}>
+                <p className="text-[12px] opacity-40">
                   Page {pagination.page} of {pagination.totalPages}
                 </p>
               </div>
 
               {listError && (
-                <div style={{ padding: "14px 20px", color: "var(--error,#ef4444)", fontSize: 13, fontWeight: 600 }}>
+                <div className="py-[14px] px-[20px] text-error text-[13px] font-semibold">
                   {listError}
                 </div>
               )}
 
-              <div style={{ overflowY: "auto", maxHeight: "62vh" }}>
+              <div className="overflow-y-auto max-h-[62vh]">
                 <AnimatePresence>
                   {!listLoading && logs.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "60px 20px", opacity: 0.3 }}>
-                      <FileText size={32} style={{ margin: "0 auto 12px" }} />
-                      <p style={{ fontSize: 13, fontWeight: 600 }}>No logs match your filters</p>
+                    <div className="text-center py-[60px] px-[20px] opacity-30">
+                      <FileText size={32} className="mt-[0px] mx-[auto] mb-[12px]" />
+                      <p className="text-[13px] font-semibold">No logs match your filters</p>
                     </div>
                   ) : logs.map((log, i) => (
                     <LogRow key={log._id || log.logCode || i}
@@ -1921,25 +1657,22 @@ export default function SystemLogManagement() {
                 </AnimatePresence>
               </div>
 
-              <div style={{
-                padding: "14px 20px", borderTop: "1px solid var(--base-300,#e5e7eb)",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-              }}>
-                <p style={{ fontSize: 12, opacity: 0.4 }}>
+              <div className="py-[14px] px-[20px] border-t border-base-300 flex items-center justify-between">
+                <p className="text-[12px] opacity-40">
                   {pagination.total > 0
                     ? `Showing ${((pagination.page - 1) * pagination.limit) + 1}–${Math.min(pagination.page * pagination.limit, pagination.total)} of ${pagination.total?.toLocaleString()}`
                     : "No results"}
                 </p>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="flex items-center gap-[8px]">
                   <button disabled={pagination.page <= 1} onClick={() => handlePage(pagination.page - 1)}
-                    style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", display: "flex", alignItems: "center", justifyContent: "center", cursor: pagination.page <= 1 ? "not-allowed" : "pointer", opacity: pagination.page <= 1 ? 0.3 : 1, background: "transparent" }}>
+                    className="w-[32px] h-[32px] rounded-[8px] border border-base-300 flex items-center justify-center bg-[transparent]" style={{ cursor: pagination.page <= 1 ? "not-allowed" : "pointer", opacity: pagination.page <= 1 ? 0.3 : 1 }}>
                     <ChevronLeft size={16} />
                   </button>
-                  <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.55, padding: "0 8px" }}>
+                  <span className="text-[13px] font-semibold opacity-55 py-[0px] px-[8px]">
                     {pagination.page} / {pagination.totalPages}
                   </span>
                   <button disabled={pagination.page >= pagination.totalPages} onClick={() => handlePage(pagination.page + 1)}
-                    style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", display: "flex", alignItems: "center", justifyContent: "center", cursor: pagination.page >= pagination.totalPages ? "not-allowed" : "pointer", opacity: pagination.page >= pagination.totalPages ? 0.3 : 1, background: "transparent" }}>
+                    className="w-[32px] h-[32px] rounded-[8px] border border-base-300 flex items-center justify-center bg-[transparent]" style={{ cursor: pagination.page >= pagination.totalPages ? "not-allowed" : "pointer", opacity: pagination.page >= pagination.totalPages ? 0.3 : 1 }}>
                     <ChevronRight size={16} />
                   </button>
                 </div>
@@ -1962,35 +1695,29 @@ export default function SystemLogManagement() {
         {/* ══════════════════════════════════════════════════════════════════ */}
         {activeTab === "analytics" && (
           <motion.div key="analytics" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <div style={{
-              display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap",
-              padding: "12px 16px", borderRadius: 12, marginBottom: 20,
-              border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)",
-            }}>
-              <CalendarDays size={14} style={{ opacity: 0.45 }} />
-              <label style={{ fontSize: 12, fontWeight: 700, opacity: 0.5 }}>From</label>
+            <div className="flex gap-[10px] items-center flex-wrap py-[12px] px-[16px] rounded-[12px] mb-[20px] border border-base-300 bg-base-100">
+              <CalendarDays size={14} className="opacity-45" />
+              <label className="text-[12px] font-bold opacity-50">From</label>
               <input type="date" onChange={e => dispatch(fetchSystemLogsAnalytics({ from: e.target.value }))}
-                style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12 }} />
-              <label style={{ fontSize: 12, fontWeight: 700, opacity: 0.5 }}>To</label>
+                className="py-[6px] px-[10px] rounded-[8px] border border-base-300 text-[12px]" />
+              <label className="text-[12px] font-bold opacity-50">To</label>
               <input type="date" onChange={e => dispatch(fetchSystemLogsAnalytics({ to: e.target.value }))}
-                style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12 }} />
+                className="py-[6px] px-[10px] rounded-[8px] border border-base-300 text-[12px]" />
               <select onChange={e => dispatch(fetchSystemLogsAnalytics({ environment: e.target.value }))}
-                style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12 }}>
+                className="py-[6px] px-[10px] rounded-[8px] border border-base-300 text-[12px]">
                 <option value="">All Environments</option>
                 <option value="development">Development</option>
                 <option value="staging">Staging</option>
                 <option value="production">Production</option>
               </select>
               <button onClick={() => dispatch(fetchSystemLogsAnalytics())}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px",
-                  borderRadius: 8, border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer",
-                  background: "var(--primary,#6366f1)", color: "white" }}>
+                className="flex items-center gap-[6px] py-[6px] px-[14px] rounded-[8px] border-none text-[12px] font-bold cursor-pointer bg-primary text-[white]">
                 <RefreshCw size={12} className={analyticsLoading ? "animate-spin" : ""} />Refresh
               </button>
             </div>
 
             {analyticsError && (
-              <p style={{ color: "var(--error,#ef4444)", fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{analyticsError}</p>
+              <p className="text-error text-[13px] font-semibold mb-[16px]">{analyticsError}</p>
             )}
             <AnalyticsPanel data={analyticsData} loading={analyticsLoading} />
           </motion.div>

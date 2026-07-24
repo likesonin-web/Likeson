@@ -139,15 +139,15 @@ function DayCard({ dayConfig, value, onChange }) {
         <span className="text-base shrink-0">{dayConfig.emoji}</span>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold" style={{ color: "var(--base-content)" }}>
+          <p className="text-sm font-bold text-base-content">
             {dayConfig.label}
           </p>
           {data.isAvailable ? (
-            <p className="text-[11px]" style={{ color: "var(--success)" }}>
+            <p className="text-[11px] text-success">
               {formatTime(data.startTime)} → {formatTime(data.endTime)} · {hours}h
             </p>
           ) : (
-            <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.4 }}>
+            <p className="text-[11px] text-base-content opacity-40">
               Not available
             </p>
           )}
@@ -156,7 +156,7 @@ function DayCard({ dayConfig, value, onChange }) {
         {data.isAvailable && (
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded((e) => !e); }}
-            style={{ color: "var(--base-content)", opacity: 0.4 }}
+            className="text-base-content opacity-40"
           >
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
@@ -174,17 +174,17 @@ function DayCard({ dayConfig, value, onChange }) {
             className="overflow-hidden"
           >
             <div
-              className="px-4 pb-4 space-y-4"
-              style={{ borderTop: "1px solid var(--base-300)", paddingTop: "12px" }}
+              className="px-4 pb-4 space-y-4 border-t border-base-300 pt-[12px]"
+             
             >
               {/* Start time */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold flex items-center gap-1" style={{ color: "var(--base-content)" }}>
-                    <Sun size={11} style={{ color: "var(--warning)" }} />
+                  <label className="text-[11px] font-bold flex items-center gap-1 text-base-content">
+                    <Sun size={11} className="text-warning" />
                     Start Time
                   </label>
-                  <p className="text-[10px]" style={{ color: "var(--base-content)", opacity: 0.4 }}>
+                  <p className="text-[10px] text-base-content opacity-40">
                     When you begin your shift
                   </p>
                   <select
@@ -197,11 +197,11 @@ function DayCard({ dayConfig, value, onChange }) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold flex items-center gap-1" style={{ color: "var(--base-content)" }}>
-                    <Moon size={11} style={{ color: "var(--primary)" }} />
+                  <label className="text-[11px] font-bold flex items-center gap-1 text-base-content">
+                    <Moon size={11} className="text-primary" />
                     End Time
                   </label>
-                  <p className="text-[10px]" style={{ color: "var(--base-content)", opacity: 0.4 }}>
+                  <p className="text-[10px] text-base-content opacity-40">
                     When your shift ends
                   </p>
                   <select
@@ -218,11 +218,11 @@ function DayCard({ dayConfig, value, onChange }) {
 
               {/* Max hours */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold flex items-center gap-1" style={{ color: "var(--base-content)" }}>
-                  <Clock size={11} style={{ color: "var(--info)" }} />
+                <label className="text-[11px] font-bold flex items-center gap-1 text-base-content">
+                  <Clock size={11} className="text-info" />
                   Max Hours Per Day
                 </label>
-                <p className="text-[10px]" style={{ color: "var(--base-content)", opacity: 0.4 }}>
+                <p className="text-[10px] text-base-content opacity-40">
                   Maximum you want to work in a single day — even if bookings are available beyond this.
                 </p>
                 <div className="flex gap-2 flex-wrap">
@@ -244,11 +244,11 @@ function DayCard({ dayConfig, value, onChange }) {
 
               {/* Summary */}
               <div
-                className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                style={{ background: "color-mix(in srgb, var(--success), transparent 90%)" }}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[color-mix(in srgb, var(--success), transparent 90%)]"
+               
               >
-                <CheckCircle2 size={12} style={{ color: "var(--success)" }} />
-                <p className="text-[11px]" style={{ color: "var(--success)" }}>
+                <CheckCircle2 size={12} className="text-success" />
+                <p className="text-[11px] text-success">
                   {formatTime(data.startTime)} to {formatTime(data.endTime)}, up to {data.maxHoursPerDay}h active work
                 </p>
               </div>
@@ -307,24 +307,20 @@ export default function SchedulePage() {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--base-100)" }}>
+    <div className="min-h-screen bg-base-100">
       {/* ── Sticky header ── */}
       <div
-        className="sticky top-0 z-20 px-4 pt-5 pb-3"
-        style={{
-          background: "color-mix(in srgb, var(--base-100) 92%, transparent)",
-          backdropFilter: "blur(14px)",
-          borderBottom: "1px solid var(--base-300)",
-        }}
+        className="sticky top-0 z-20 px-4 pt-5 pb-3 bg-[color-mix(in srgb, var(--base-100) 92%, transparent)] backdrop-blur-[14px] border-b border-base-300"
+       
       >
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-          <p className="text-[11px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "var(--primary)" }}>
+          <p className="text-[11px] font-bold uppercase tracking-widest mb-0.5 text-primary">
             Weekly Planner
           </p>
-          <h1 className="!text-xl !font-black !leading-tight" style={{ color: "var(--base-content)" }}>
+          <h1 className="!text-xl !font-black !leading-tight text-base-content">
             My Schedule
           </h1>
-          <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+          <p className="text-xs mt-0.5 text-base-content opacity-50">
             Set your working days and shift hours for each week
           </p>
         </motion.div>
@@ -370,10 +366,10 @@ export default function SchedulePage() {
         {/* ── Work Type selector ── */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 px-1">
-            <Briefcase size={14} style={{ color: "var(--primary)" }} />
-            <p className="text-xs font-bold" style={{ color: "var(--base-content)" }}>Work Arrangement</p>
+            <Briefcase size={14} className="text-primary" />
+            <p className="text-xs font-bold text-base-content">Work Arrangement</p>
           </div>
-          <p className="text-[11px] px-1" style={{ color: "var(--base-content)", opacity: 0.45 }}>
+          <p className="text-[11px] px-1 text-base-content opacity-45">
             Choose how you generally work. This helps the platform understand your availability pattern and match you with suitable bookings.
           </p>
           <div className="space-y-2">
@@ -394,7 +390,7 @@ export default function SchedulePage() {
                     <p className="text-sm font-bold" style={{ color: isActive ? "var(--primary)" : "var(--base-content)" }}>
                       {wt.label}
                     </p>
-                    <p className="text-[11px] mt-0.5" style={{ color: "var(--base-content)", opacity: 0.55 }}>
+                    <p className="text-[11px] mt-0.5 text-base-content opacity-55">
                       {wt.note}
                     </p>
                   </div>
@@ -408,24 +404,24 @@ export default function SchedulePage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
-              <Calendar size={14} style={{ color: "var(--primary)" }} />
-              <p className="text-xs font-bold" style={{ color: "var(--base-content)" }}>Day-by-Day Schedule</p>
+              <Calendar size={14} className="text-primary" />
+              <p className="text-xs font-bold text-base-content">Day-by-Day Schedule</p>
             </div>
             <button
               onClick={() => setExpandAll((e) => !e)}
-              className="text-[11px] font-semibold"
-              style={{ color: "var(--primary)" }}
+              className="text-[11px] font-semibold text-primary"
+             
             >
               {expandAll ? "Collapse all" : "Expand all"}
             </button>
           </div>
 
           <div
-            className="flex items-start gap-2 px-3 py-2.5 rounded-xl"
-            style={{ background: "color-mix(in srgb, var(--info), transparent 90%)" }}
+            className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-[color-mix(in srgb, var(--info), transparent 90%)]"
+           
           >
-            <Info size={12} className="shrink-0 mt-0.5" style={{ color: "var(--info)" }} />
-            <p className="text-[11px]" style={{ color: "var(--info)" }}>
+            <Info size={12} className="shrink-0 mt-0.5 text-info" />
+            <p className="text-[11px] text-info">
               Toggle each day ON to mark it as a working day. Then set your start time, end time, and maximum hours. Only available days will be matched with bookings.
             </p>
           </div>
@@ -459,11 +455,11 @@ export default function SchedulePage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex items-start gap-2 px-3 py-2.5 rounded-xl"
-            style={{ background: "color-mix(in srgb, var(--warning), transparent 88%)" }}
+            className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-[color-mix(in srgb, var(--warning), transparent 88%)]"
+           
           >
-            <Info size={12} className="shrink-0 mt-0.5" style={{ color: "var(--warning)" }} />
-            <p className="text-[11px]" style={{ color: "var(--warning)" }}>
+            <Info size={12} className="shrink-0 mt-0.5 text-warning" />
+            <p className="text-[11px] text-warning">
               You're available on weekends! Weekend bookings often have higher demand. Ensure you've planned for personal rest time too.
             </p>
           </motion.div>
@@ -484,7 +480,7 @@ export default function SchedulePage() {
 
         {/* ── Help card ── */}
         <div className="glass-card p-4 space-y-2">
-          <p className="text-xs font-bold" style={{ color: "var(--base-content)" }}>📅 Schedule Tips</p>
+          <p className="text-xs font-bold text-base-content">📅 Schedule Tips</p>
           {[
             "Your schedule is used by the system to route bookings to you only on your available days.",
             "Bookings won't be sent to you outside your set start and end times.",
@@ -493,8 +489,8 @@ export default function SchedulePage() {
             "A consistent schedule improves your ranking and patient trust score.",
           ].map((tip, i) => (
             <div key={i} className="flex items-start gap-2">
-              <div className="w-1 h-1 rounded-full mt-1.5 shrink-0" style={{ background: "var(--primary)" }} />
-              <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.6 }}>{tip}</p>
+              <div className="w-1 h-1 rounded-full mt-1.5 shrink-0 bg-primary" />
+              <p className="text-[11px] text-base-content opacity-60">{tip}</p>
             </div>
           ))}
         </div>

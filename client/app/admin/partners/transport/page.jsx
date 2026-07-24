@@ -301,13 +301,13 @@ CurrentValueRow.displayName = 'CurrentValueRow';
 
 const Pagination = memo(({ page, total, limit, onPageChange }) => {
   const pages = Math.max(1, Math.ceil(total / limit));
-  if (pages <= 1) return null;
   const visiblePages = useMemo(() => {
     const range = [];
     const delta = 2;
     for (let i = Math.max(1, page - delta); i <= Math.min(pages, page + delta); i++) range.push(i);
     return range;
   }, [page, pages]);
+  if (pages <= 1) return null;
 
   return (
     <div className="flex items-center justify-between px-4 py-3 border-t border-base-300 flex-wrap gap-2">

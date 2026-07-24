@@ -655,11 +655,6 @@ function UsersTable({ users, loading, onOpenModal }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const Pagination = memo(function Pagination({ currentPage, pages, total, limit, onPage }) {
-  if (pages <= 1) return null;
-
-  const from = (currentPage - 1) * limit + 1;
-  const to   = Math.min(currentPage * limit, total);
-
   const range = useMemo(() => {
     if (pages <= 5) return Array.from({ length: pages }, (_, i) => i + 1);
     let s = Math.max(1, currentPage - 2);
@@ -670,6 +665,11 @@ const Pagination = memo(function Pagination({ currentPage, pages, total, limit, 
     }
     return Array.from({ length: e - s + 1 }, (_, i) => s + i);
   }, [currentPage, pages]);
+
+  if (pages <= 1) return null;
+
+  const from = (currentPage - 1) * limit + 1;
+  const to   = Math.min(currentPage * limit, total);
 
   const PageBtn = ({ n }) => (
     <button

@@ -66,8 +66,8 @@ function NotificationsSection({ settings, dispatch, loading }) {
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
       <div className="glass-card p-4">
         <div className="flex items-start gap-2">
-          <Info size={14} className="mt-0.5 shrink-0" style={{ color: "var(--info)" }} />
-          <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.65 }}>
+          <Info size={14} className="mt-0.5 shrink-0 text-info" />
+          <p className="text-xs text-base-content opacity-65">
             At least one channel must remain active to receive booking assignments. SMS cannot be
             fully disabled for safety alerts.
           </p>
@@ -93,8 +93,8 @@ function NotificationsSection({ settings, dispatch, loading }) {
               {ch.icon}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold" style={{ color: "var(--base-content)" }}>{ch.label}</p>
-              <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: "var(--base-content)", opacity: 0.52 }}>
+              <p className="text-sm font-semibold text-base-content">{ch.label}</p>
+              <p className="text-[11px] mt-0.5 leading-relaxed text-base-content opacity-52">
                 {ch.note}
               </p>
             </div>
@@ -179,8 +179,8 @@ function ServiceAreaSection({ settings, dispatch, loading }) {
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
       <div className="glass-card p-4">
         <div className="flex items-start gap-2">
-          <Navigation size={14} className="mt-0.5 shrink-0" style={{ color: "var(--primary)" }} />
-          <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.65 }}>
+          <Navigation size={14} className="mt-0.5 shrink-0 text-primary" />
+          <p className="text-xs text-base-content opacity-65">
             Bookings are matched to your service areas first. If none match, the platform widens
             the search to your max radius. Add up to 10 preferred areas.
           </p>
@@ -191,14 +191,14 @@ function ServiceAreaSection({ settings, dispatch, loading }) {
       <div className="card p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold" style={{ color: "var(--base-content)" }}>Max Travel Radius</p>
-            <p className="text-[11px] mt-0.5" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+            <p className="text-sm font-semibold text-base-content">Max Travel Radius</p>
+            <p className="text-[11px] mt-0.5 text-base-content opacity-50">
               Maximum distance you will travel from your current location for a booking
             </p>
           </div>
           <div
-            className="px-3 py-1.5 rounded-2xl font-black text-sm shrink-0"
-            style={{ background: "color-mix(in srgb, var(--primary), transparent 87%)", color: "var(--primary)" }}
+            className="px-3 py-1.5 rounded-2xl font-black text-sm shrink-0 bg-[color-mix(in srgb, var(--primary), transparent 87%)] text-primary"
+           
           >
             {radius} km
           </div>
@@ -231,8 +231,8 @@ function ServiceAreaSection({ settings, dispatch, loading }) {
       {/* service areas */}
       <div className="space-y-2">
         <div>
-          <p className="text-sm font-semibold" style={{ color: "var(--base-content)" }}>Preferred Areas</p>
-          <p className="text-[11px] mt-0.5" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+          <p className="text-sm font-semibold text-base-content">Preferred Areas</p>
+          <p className="text-[11px] mt-0.5 text-base-content opacity-50">
             Areas where you prefer to take bookings — up to 10.
           </p>
         </div>
@@ -245,8 +245,8 @@ function ServiceAreaSection({ settings, dispatch, loading }) {
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.8, opacity: 0 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-                style={{ background: "color-mix(in srgb, var(--secondary), transparent 85%)", color: "var(--secondary)" }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[color-mix(in srgb, var(--secondary), transparent 85%)] text-secondary"
+               
               >
                 <Tag size={10} />{a}
                 <button onClick={() => removeArea(a)} className="ml-0.5"><X size={11} /></button>
@@ -258,7 +258,7 @@ function ServiceAreaSection({ settings, dispatch, loading }) {
         {areas.length < 10 && (
           <div className="relative">
             <div className="relative flex items-center">
-              <MapPin size={14} className="absolute left-3" style={{ color: "var(--base-content)", opacity: 0.4 }} />
+              <MapPin size={14} className="absolute left-3 text-base-content opacity-40" />
               <input
                 type="text"
                 value={inputArea}
@@ -269,9 +269,9 @@ function ServiceAreaSection({ settings, dispatch, loading }) {
               />
               {inputArea && (
                 <button
-                  className="absolute right-3"
+                  className="absolute right-3 text-base-content opacity-40"
                   onClick={() => { setInputArea(""); setSuggestions([]); }}
-                  style={{ color: "var(--base-content)", opacity: 0.4 }}
+                 
                 >
                   <X size={14} />
                 </button>
@@ -283,18 +283,18 @@ function ServiceAreaSection({ settings, dispatch, loading }) {
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
-                  className="absolute z-30 left-0 right-0 mt-1 rounded-2xl overflow-hidden shadow-lg"
-                  style={{ background: "var(--base-200)", border: "1px solid var(--base-300)" }}
+                  className="absolute z-30 left-0 right-0 mt-1 rounded-2xl overflow-hidden shadow-lg bg-base-200 border border-base-300"
+                 
                 >
                   {suggestions.map((s) => (
                     <button
                       key={s}
                       type="button"
                       onMouseDown={() => addArea(s)}
-                      className="w-full text-left px-4 py-2.5 text-xs font-medium flex items-center gap-2 transition-colors"
-                      style={{ color: "var(--base-content)" }}
+                      className="w-full text-left px-4 py-2.5 text-xs font-medium flex items-center gap-2 transition-colors text-base-content"
+                     
                     >
-                      <Plus size={12} style={{ color: "var(--primary)" }} />{s}
+                      <Plus size={12} className="text-primary" />{s}
                     </button>
                   ))}
                 </motion.div>
@@ -304,7 +304,7 @@ function ServiceAreaSection({ settings, dispatch, loading }) {
         )}
 
         {areas.length === 10 && (
-          <p className="text-[11px]" style={{ color: "var(--warning)" }}>
+          <p className="text-[11px] text-warning">
             Maximum 10 areas reached. Remove one to add another.
           </p>
         )}
@@ -347,8 +347,8 @@ function DevicesSection({ settings, dispatch, loading, profile }) {
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
       <div className="glass-card p-4">
         <div className="flex items-start gap-2">
-          <Info size={14} className="mt-0.5 shrink-0" style={{ color: "var(--info)" }} />
-          <p className="text-xs" style={{ color: "var(--base-content)", opacity: 0.65 }}>
+          <Info size={14} className="mt-0.5 shrink-0 text-info" />
+          <p className="text-xs text-base-content opacity-65">
             Push notifications are sent to all registered devices. Remove devices you no longer use
             to keep your account secure.
           </p>
@@ -357,12 +357,12 @@ function DevicesSection({ settings, dispatch, loading, profile }) {
 
       {tokens.length === 0 ? (
         <div className="card p-6 flex flex-col items-center gap-3">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "var(--base-200)" }}>
-            <WifiOff size={24} style={{ color: "var(--base-content)", opacity: 0.3 }} />
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-base-200">
+            <WifiOff size={24} className="text-base-content opacity-30" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-semibold" style={{ color: "var(--base-content)" }}>No devices registered</p>
-            <p className="text-xs mt-1" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+            <p className="text-sm font-semibold text-base-content">No devices registered</p>
+            <p className="text-xs mt-1 text-base-content opacity-50">
               Devices are auto-registered when you log in via the mobile app
             </p>
           </div>
@@ -378,25 +378,25 @@ function DevicesSection({ settings, dispatch, loading, profile }) {
               className="card p-4 flex items-center gap-3"
             >
               <div
-                className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
-                style={{ background: "color-mix(in srgb, var(--primary), transparent 85%)", color: "var(--primary)" }}
+                className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-[color-mix(in srgb, var(--primary), transparent 85%)] text-primary"
+               
               >
                 {deviceIcon()}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <Wifi size={11} style={{ color: "var(--success)" }} />
-                  <p className="text-[11px] font-semibold" style={{ color: "var(--success)" }}>Active</p>
+                  <Wifi size={11} className="text-success" />
+                  <p className="text-[11px] font-semibold text-success">Active</p>
                 </div>
-                <p className="text-[11px] mt-0.5 font-mono truncate" style={{ color: "var(--base-content)", opacity: 0.45 }}>
+                <p className="text-[11px] mt-0.5 font-mono truncate text-base-content opacity-45">
                   {token.slice(0, 24)}…
                 </p>
               </div>
               <button
                 onClick={() => handleRemove(token)}
                 disabled={loading.settings}
-                className="shrink-0 w-8 h-8 rounded-2xl flex items-center justify-center transition-colors"
-                style={{ background: "color-mix(in srgb, var(--error), transparent 88%)", color: "var(--error)" }}
+                className="shrink-0 w-8 h-8 rounded-2xl flex items-center justify-center transition-colors bg-[color-mix(in srgb, var(--error), transparent 88%)] text-error"
+               
               >
                 {loading.settings ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
               </button>
@@ -406,13 +406,13 @@ function DevicesSection({ settings, dispatch, loading, profile }) {
       )}
 
       <div
-        className="rounded-2xl p-4 space-y-3"
-        style={{ background: "var(--base-200)", border: "1px dashed var(--base-300)" }}
+        className="rounded-2xl p-4 space-y-3 bg-base-200 border border-dashed border-base-300"
+       
       >
-        <p className="text-xs font-semibold" style={{ color: "var(--base-content)", opacity: 0.6 }}>
+        <p className="text-xs font-semibold text-base-content opacity-60">
           Register device token manually
         </p>
-        <p className="text-[11px]" style={{ color: "var(--base-content)", opacity: 0.4 }}>
+        <p className="text-[11px] text-base-content opacity-40">
           In production, tokens are auto-captured on app login via Firebase.
         </p>
         <input
@@ -423,7 +423,7 @@ function DevicesSection({ settings, dispatch, loading, profile }) {
           className={`input-field w-full text-xs font-mono ${tokenError ? "!border-[var(--error)]" : ""}`}
         />
         {tokenError && (
-          <p className="text-[11px] flex items-center gap-1" style={{ color: "var(--error)" }}>
+          <p className="text-[11px] flex items-center gap-1 text-error">
             <X size={11} /> {tokenError}
           </p>
         )}
@@ -475,16 +475,12 @@ export default function SettingsPage() {
   }[section];
 
   return (
-    <div data-theme="care-assistant" className="min-h-screen" style={{ background: "var(--base-100)" }}>
+    <div data-theme="care-assistant" className="min-h-screen bg-base-100">
 
       {/* ── sticky header ── */}
       <div
-        className="sticky top-0 z-20 px-4 pt-5 pb-3"
-        style={{
-          background:     "color-mix(in srgb, var(--base-100) 92%, transparent)",
-          backdropFilter: "blur(14px)",
-          borderBottom:   "1px solid var(--base-300)",
-        }}
+        className="sticky top-0 z-20 px-4 pt-5 pb-3 bg-[color-mix(in srgb, var(--base-100) 92%, transparent)] backdrop-blur-[14px] border-b border-base-300"
+       
       >
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
                      <BackButton className='my-3' />
@@ -492,10 +488,10 @@ export default function SettingsPage() {
           <p className="text-[11px] font-bold uppercase tracking-widest mb-0.5" style={{ color: accentColor }}>
             Settings & Preferences
           </p>
-          <h1 className="!text-xl !font-black !leading-tight" style={{ color: "var(--base-content)" }}>
+          <h1 className="!text-xl !font-black !leading-tight text-base-content">
             {sectionTitle}
           </h1>
-          <p className="text-xs mt-0.5" style={{ color: "var(--base-content)", opacity: 0.5 }}>
+          <p className="text-xs mt-0.5 text-base-content opacity-50">
             {sectionSubtitle}
           </p>
         </motion.div>

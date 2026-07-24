@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGoogleMaps } from "@/context/GoogleMapsProvider";
-import { Loader2, ChevronRight, ChevronLeft, CheckCircle2, HeartPulse } from "lucide-react";
+import {
+  Loader2,
+  ChevronRight,
+  ChevronLeft,
+  CheckCircle2,
+  HeartPulse,
+} from "lucide-react";
 import toast from "react-hot-toast";
 
 import {
@@ -75,6 +81,8 @@ import {
   selectWalletBalance,
   selectWalletData,
 } from "@/store/slices/walletSlice";
+
+import { selectIsLoggedIn } from "@/store/slices/userSlice";
 
 import { PP, BOOKING_TYPES } from "@/lib/constants";
 import { getSteps, toISOSafe, openRazorpay } from "@/lib/helpers";
@@ -182,6 +190,8 @@ export default function BookingSystem() {
   const walletData = useSelector(selectWalletData);
   const walletBalance = useSelector(selectWalletBalance);
 
+  const isLoggedIn = useSelector(selectIsLoggedIn);
+
   const stepContentRef = useRef(null);
   const [currentStepId, setCurrentStepId] = useState("service");
   const [direction, setDirection] = useState(1);
@@ -197,6 +207,12 @@ export default function BookingSystem() {
   const [isRetryingPayment, setIsRetryingPayment] = useState(false);
 
   const prevDiagFeeRef = useRef(0);
+  // guards so each benefit-family fetch fires once per relevant gate transition
+  const benefitFetchedRef = useRef({
+    consultations: false,
+    careAssistant: false,
+    labs: false,
+  });
 
   useEffect(() => {
     dispatch(fetchWalletDetails());
@@ -216,6 +232,11 @@ export default function BookingSystem() {
   const curIdx = stepIds.indexOf(currentStepId);
   const isLast = currentStepId === stepIds[stepIds.length - 1];
 
+  // ── GATE: benefit/coverage fetches only allowed from "patient" step onward ──
+  // "onward" = patient step has been visited at least once (visitedIds tracks
+  // every step reached; service/provider alone should never trigger these).
+  const hasReachedPatientStep = visitedIds.includes("patient");
+
   const scrollToTop = useCallback(() => {
     if (stepContentRef.current)
       stepContentRef.current.scrollIntoView({
@@ -229,23 +250,58 @@ export default function BookingSystem() {
     dispatch(fetchPlatformPricing());
   }, [dispatch]);
 
+  // ── UPDATED: subscription-benefit + coverage fetches, gated by:
+  //    1) bookingType chosen
+  //    2) patient step reached (not on service/provider)
+  //    3) relevant benefit family for the chosen bookingType
   useEffect(() => {
-    dispatch(fetchSubscriptionBenefitConsultations());
-    dispatch(fetchSubscriptionBenefitCareAssistant());
-    dispatch(fetchSubscriptionBenefitLabs());
-    dispatch(
-      checkConsultationCoverage({
-        consultationType: form.consultationType || "inPerson",
-      }),
-    );
-  }, [dispatch]);
+    if (!form.bookingType || !hasReachedPatientStep) return;
 
+    const bt = BOOKING_TYPES.find((b) => b.value === form.bookingType);
+    const needsCoverage = bt?.needsDoctor || form.bookingType === "follow_up";
+    const needsCareAssistant = form.bookingType === "care_assistant";
+    const needsLabs = !!bt?.isDiag;
+
+    if (needsCoverage && !benefitFetchedRef.current.consultations) {
+      dispatch(fetchSubscriptionBenefitConsultations());
+      dispatch(
+        checkConsultationCoverage({
+          consultationType: form.consultationType || "inPerson",
+        }),
+      );
+      benefitFetchedRef.current.consultations = true;
+    }
+
+    if (needsCareAssistant && !benefitFetchedRef.current.careAssistant) {
+      dispatch(fetchSubscriptionBenefitCareAssistant());
+      benefitFetchedRef.current.careAssistant = true;
+    }
+
+    if (needsLabs && !benefitFetchedRef.current.labs) {
+      dispatch(fetchSubscriptionBenefitLabs());
+      benefitFetchedRef.current.labs = true;
+    }
+  }, [dispatch, form.bookingType, form.consultationType, hasReachedPatientStep]);
+
+  // reset guards whenever bookingType changes so switching type re-fetches
+  // fresh benefits for the new type once patient step is reached again
   useEffect(() => {
-    if (!form.consultationType) return;
+    benefitFetchedRef.current = {
+      consultations: false,
+      careAssistant: false,
+      labs: false,
+    };
+  }, [form.bookingType]);
+
+  // ── UPDATED: consultationType-driven coverage re-check, same gate ──────────
+  useEffect(() => {
+    if (!form.consultationType || !hasReachedPatientStep) return;
+    const bt = BOOKING_TYPES.find((b) => b.value === form.bookingType);
+    if (!(bt?.needsDoctor || form.bookingType === "follow_up")) return;
     dispatch(
       checkConsultationCoverage({ consultationType: form.consultationType }),
     );
-  }, [dispatch, form.consultationType]);
+  }, [dispatch, form.consultationType, form.bookingType, hasReachedPatientStep]);
 
   const onSelectBookingType = useCallback(
     (btValue) => {
@@ -513,6 +569,7 @@ export default function BookingSystem() {
       setForm((p) => ({ ...p, consultationType: "inPerson" }));
   }, [form.bookingType, form.consultationType]);
 
+  // ── deep-link entry gates ANY jump past step0 (idx>=1) ────────────
   useEffect(() => {
     const doctorId = searchParams.get("doctor"),
       hospitalId = searchParams.get("hospital"),
@@ -533,14 +590,22 @@ export default function BookingSystem() {
         ...(type && { bookingType: type }),
       }));
       if (type && doctorId) {
+        if (!isLoggedIn) {
+          router.push(`/login`);
+          return;
+        }
         setCurrentStepId("patient");
         setVisitedIds(["service", "provider", "patient"]);
       } else if (type || doctorId || hospitalId || labId) {
+        if (!isLoggedIn) {
+          router.push(`/login`);
+          return;
+        }
         setCurrentStepId("provider");
         setVisitedIds(["service", "provider"]);
       }
     }
-  }, [searchParams]);
+  }, [searchParams, isLoggedIn, router]);
 
   useEffect(() => {
     const hospitalId = searchParams.get("hospital");
@@ -565,6 +630,8 @@ export default function BookingSystem() {
     [dispatch],
   );
 
+  // Post-booking-success refresh: always allowed (benefits genuinely changed
+  // after a real booking was created), independent of the step gate above.
   useEffect(() => {
     if (createStatus === "succeeded" && createData) {
       if (createData.subscriptionCoverage) {
@@ -1094,6 +1161,7 @@ export default function BookingSystem() {
     });
   }, [pendingPaymentBooking, dispatch, form]);
 
+  // ── gate Continue — idx>=1 (anything past step0) needs login ─────
   const goNext = useCallback(() => {
     if (!validate(currentStepId)) {
       setTimeout(() => {
@@ -1101,6 +1169,10 @@ export default function BookingSystem() {
           document.querySelector("[data-error]") || stepContentRef.current;
         firstError?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 100);
+      return;
+    }
+    if (!isLoggedIn && curIdx >= 1) {
+      router.push(`/login`);
       return;
     }
     if (isLast) {
@@ -1120,6 +1192,8 @@ export default function BookingSystem() {
     validate,
     handleSubmit,
     scrollToTop,
+    isLoggedIn,
+    router,
   ]);
 
   const goPrev = useCallback(() => {
@@ -1130,16 +1204,21 @@ export default function BookingSystem() {
     setTimeout(scrollToTop, 50);
   }, [curIdx, stepIds, scrollToTop]);
 
+  // ── gate direct StepBar jumps — idx>=1 needs login (matches goNext) ─
   const handleStepClick = useCallback(
     (stepId) => {
       if (!visitedIds.includes(stepId) || stepId === currentStepId) return;
       const targetIdx = stepIds.indexOf(stepId);
+      if (!isLoggedIn && targetIdx >= 1) {
+        router.push(`/login`);
+        return;
+      }
       const currentIdx = stepIds.indexOf(currentStepId);
       setDirection(targetIdx < currentIdx ? -1 : 1);
       setCurrentStepId(stepId);
       setTimeout(scrollToTop, 50);
     },
-    [visitedIds, currentStepId, stepIds, scrollToTop],
+    [visitedIds, currentStepId, stepIds, scrollToTop, isLoggedIn, router],
   );
 
   const handleReset = useCallback(() => {
@@ -1153,6 +1232,11 @@ export default function BookingSystem() {
     setPaymentError(null);
     setPendingPaymentBooking(null);
     prevDiagFeeRef.current = 0;
+    benefitFetchedRef.current = {
+      consultations: false,
+      careAssistant: false,
+      labs: false,
+    };
     dispatch(resetHospitals());
     dispatch(resetDoctorsByHospital());
     dispatch(resetHospitalAvailability());
@@ -1300,8 +1384,7 @@ export default function BookingSystem() {
 
         <div
           ref={stepContentRef}
-          className="rounded-2xl border-2 border-base-300 shadow-sm"
-          style={{ background: "var(--base-100)", overflow: "visible" }}
+          className="rounded-2xl border-2 border-base-300 shadow-sm bg-base-100 overflow-visible"
         >
           {success ? (
             <BookingSuccess
@@ -1311,14 +1394,7 @@ export default function BookingSystem() {
             />
           ) : (
             <>
-              <div
-                className="bg-base-200 border-b border-base-300"
-                style={{
-                  overflow: "visible",
-                  position: "relative",
-                  zIndex: 20,
-                }}
-              >
+              <div className="bg-base-200 border-b border-base-300 overflow-visible relative z-[20]">
                 <StepBar
                   steps={steps}
                   currentId={currentStepId}
@@ -1326,7 +1402,7 @@ export default function BookingSystem() {
                   onStepClick={handleStepClick}
                 />
               </div>
-              <div className="relative" style={{ minHeight: 420 }}>
+              <div className="relative min-h-[420px]">
                 <AnimatePresence custom={direction} mode="wait">
                   <motion.div
                     key={currentStepId + "_" + form.bookingType}
@@ -1364,10 +1440,9 @@ export default function BookingSystem() {
                     {steps.map((s) => (
                       <div
                         key={s.id}
-                        className="rounded-full transition-all duration-300"
+                        className="rounded-full transition-all duration-300 h-[4px]"
                         style={{
                           width: s.id === currentStepId ? 10 : 4,
-                          height: 4,
                           background: visitedIds.includes(s.id)
                             ? "var(--primary)"
                             : "var(--base-300)",
@@ -1381,11 +1456,8 @@ export default function BookingSystem() {
                   whileTap={{ scale: 0.97 }}
                   onClick={goNext}
                   disabled={isSubmitting}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-black text-xs text-primary-content disabled:opacity-50 transition-all flex-shrink-0 min-h-[44px] min-w-[96px] justify-center bg-primary hover:opacity-90"
-                  style={{
-                    boxShadow: "0 4px 12px rgba(var(--color-primary),0.25)",
-                    ...PP,
-                  }}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-black text-xs text-primary-content disabled:opacity-50 transition-all flex-shrink-0 min-h-[44px] min-w-[96px] justify-center bg-primary hover:opacity-90 shadow-[0_4px_12px_rgba(var(--color-primary),0.25)]"
+                  style={{ ...PP }}
                 >
                   {isSubmitting ? (
                     <>

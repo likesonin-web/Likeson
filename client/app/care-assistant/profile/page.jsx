@@ -127,8 +127,8 @@ const PillToggle = ({ options, value, onChange }) => (
           ${value === opt
             ? "bg-primary/10 text-primary border border-primary"
             : "bg-base-200 text-base-content/55 border border-base-300 hover:border-primary/40"
-          }`}
-        style={{ borderRadius: "var(--r-selector)" }}  /* 1rem — care-assistant fully-rounded */
+          } rounded-[var(--r-selector)]`}
+  /* 1rem — care-assistant fully-rounded */
       >
         {opt}
       </button>
@@ -159,11 +159,8 @@ const TagInput = ({ tags = [], onChange, placeholder }) => {
         <button
           type="button"
           onClick={add}
-          className="px-3 py-2 text-xs font-bold text-primary-content flex-shrink-0"
-          style={{
-            background:   "var(--primary)",
-            borderRadius: "var(--r-field)",
-          }}
+          className="px-3 py-2 text-xs font-bold text-primary-content flex-shrink-0 bg-primary rounded-[var(--r-field)]"
+         
         >
           Add
         </button>
@@ -210,8 +207,8 @@ const Ring = ({ pct = 0 }) => {
         />
       </svg>
       <span
-        className="absolute text-[10px] font-bold"
-        style={{ color: "var(--primary)" }}
+        className="absolute text-[10px] font-bold text-primary"
+       
       >
         {pct}%
       </span>
@@ -230,12 +227,8 @@ const Avatar = ({ src, name, size = 68 }) => {
 
   return (
     <div
-      className="relative overflow-hidden flex-shrink-0"
-      style={{
-        width:        size,
-        height:       size,
-        borderRadius: "var(--r-box)",  /* 1.5rem — care-assistant */
-      }}
+      className="relative overflow-hidden flex-shrink-0 rounded-[var(--r-box)]"
+      style={{ width: size, height: size, /* 1.5rem — care-assistant */ }}
     >
       {src ? (
         <Image
@@ -248,11 +241,9 @@ const Avatar = ({ src, name, size = 68 }) => {
         />
       ) : (
         <div
-          className="w-full h-full flex items-center justify-center font-bold text-base"
-          style={{
-            background: "var(--bg-gradient-primary)",  /* lavender → rose */
-            color:      "var(--primary-content)",
-          }}
+          className="w-full h-full flex items-center justify-center font-bold text-base bg-bg-gradient-primary"
+          style={{ /* lavender → rose */
+            color: "var(--primary-content)" }}
         >
           {initials}
         </div>
@@ -351,11 +342,8 @@ const SectionOverview = ({ profile, pct }) => {
             {!profile.kyc?.aadhaarNumber && (
               <a
                 href="/care-assistant/kyc/submit"
-                className="flex items-center justify-between text-xs text-warning font-semibold p-2.5 no-underline"
-                style={{
-                  borderRadius:    "var(--r-box)",
-                  backgroundColor: "color-mix(in srgb, var(--warning), transparent 90%)",
-                }}
+                className="flex items-center justify-between text-xs text-warning font-semibold p-2.5 no-underline rounded-[var(--r-box)] bg-[color-mix(in srgb, var(--warning), transparent 90%)]"
+               
               >
                 Submit KYC documents <span aria-hidden>→</span>
               </a>
@@ -363,11 +351,8 @@ const SectionOverview = ({ profile, pct }) => {
             {!profile.bankDetails?.accountNumber && (
               <a
                 href="/care-assistant/bank"
-                className="flex items-center justify-between text-xs text-info font-semibold p-2.5 no-underline"
-                style={{
-                  borderRadius:    "var(--r-box)",
-                  backgroundColor: "color-mix(in srgb, var(--info), transparent 90%)",
-                }}
+                className="flex items-center justify-between text-xs text-info font-semibold p-2.5 no-underline rounded-[var(--r-box)] bg-[color-mix(in srgb, var(--info), transparent 90%)]"
+               
               >
                 Add bank details <span aria-hidden>→</span>
               </a>
@@ -375,11 +360,8 @@ const SectionOverview = ({ profile, pct }) => {
             {!profile.emergencyContact?.name && (
               <a
                 href="/care-assistant/profile/emergency-contact"
-                className="flex items-center justify-between text-xs text-primary font-semibold p-2.5 no-underline"
-                style={{
-                  borderRadius:    "var(--r-box)",
-                  backgroundColor: "color-mix(in srgb, var(--primary), transparent 90%)",
-                }}
+                className="flex items-center justify-between text-xs text-primary font-semibold p-2.5 no-underline rounded-[var(--r-box)] bg-[color-mix(in srgb, var(--primary), transparent 90%)]"
+               
               >
                 Add emergency contact <span aria-hidden>→</span>
               </a>
@@ -679,11 +661,8 @@ const SectionAddress = ({ profile }) => {
             <button
               type="button"
               onClick={addServiceArea}
-              className="px-3 py-2 text-xs font-bold text-primary-content flex-shrink-0"
-              style={{
-                background:   "var(--primary)",
-                borderRadius: "var(--r-field)",
-              }}
+              className="px-3 py-2 text-xs font-bold text-primary-content flex-shrink-0 bg-primary rounded-[var(--r-field)]"
+             
             >
               Add
             </button>
@@ -720,7 +699,7 @@ const SectionAddress = ({ profile }) => {
           />
           <div className="flex justify-between text-[10px] text-base-content/45 mt-0.5">
             <span>1 km</span>
-            <span className="font-bold" style={{ color: "var(--primary)" }}>
+            <span className="font-bold text-primary">
               {area.maxServiceRadiusKm} km
             </span>
             <span>50 km</span>
@@ -813,8 +792,8 @@ const SectionEmergency = ({ profile }) => {
                   form.relation === r
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-base-300 bg-base-200 text-base-content/55 hover:border-primary/40"
-                }`}
-                style={{ borderRadius: "var(--r-selector)" }}  /* 1rem */
+                } rounded-[var(--r-selector)]`}
+  /* 1rem */
               >
                 {r}
               </button>
@@ -825,19 +804,12 @@ const SectionEmergency = ({ profile }) => {
         {/* Saved contact preview */}
         {isComplete && !dirty && (
           <div
-            className="flex items-center gap-3 p-3 border"
-            style={{
-              borderRadius:    "var(--r-box)",
-              backgroundColor: "color-mix(in srgb, var(--success), transparent 90%)",
-              borderColor:     "color-mix(in srgb, var(--success), transparent 80%)",
-            }}
+            className="flex items-center gap-3 p-3 border rounded-[var(--r-box)] bg-[color-mix(in srgb, var(--success), transparent 90%)]"
+            style={{ borderColor: "color-mix(in srgb, var(--success), transparent 80%)" }}
           >
             <div
-              className="w-9 h-9 flex items-center justify-center flex-shrink-0"
-              style={{
-                background:   "var(--bg-gradient-success)",
-                borderRadius: "var(--r-box)",
-              }}
+              className="w-9 h-9 flex items-center justify-center flex-shrink-0 bg-bg-gradient-success rounded-[var(--r-box)]"
+             
             >
               <CheckCircle2 size={15} className="text-success-content" />
             </div>
@@ -922,11 +894,9 @@ const SectionPhoto = ({ profile }) => {
             Current Photo
           </p>
           <div
-            className="relative w-28 h-28 overflow-hidden border-2"
-            style={{
-              borderRadius: "var(--r-box)",      /* 1.5rem — care-assistant */
-              borderColor:  "color-mix(in srgb, var(--primary), transparent 70%)",
-            }}
+            className="relative w-28 h-28 overflow-hidden border-2 rounded-[var(--r-box)]"
+            style={{ /* 1.5rem — care-assistant */
+              borderColor: "color-mix(in srgb, var(--primary), transparent 70%)" }}
           >
             <Image
               src={profile.photoUrl}
@@ -957,11 +927,8 @@ const SectionPhoto = ({ profile }) => {
               Preview
             </p>
             <div
-              className="relative w-28 h-28 overflow-hidden border-2"
-              style={{
-                borderRadius: "var(--r-box)",
-                borderColor:  "color-mix(in srgb, var(--primary), transparent 50%)",
-              }}
+              className="relative w-28 h-28 overflow-hidden border-2 rounded-[var(--r-box)]"
+              style={{ borderColor: "color-mix(in srgb, var(--primary), transparent 50%)" }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={preview.url} alt="New photo preview" className="w-full h-full object-cover" />
@@ -1017,18 +984,12 @@ const SectionPhoto = ({ profile }) => {
           role="button"
           tabIndex={0}
           aria-label="Select profile photo"
-          className="card p-6 flex flex-col items-center gap-4 cursor-pointer active:bg-primary/5 transition-colors"
-          style={{
-            border:      "2px dashed color-mix(in srgb, var(--primary), transparent 55%)",
-            borderRadius:"var(--r-box)",
-          }}
+          className="card p-6 flex flex-col items-center gap-4 cursor-pointer active:bg-primary/5 transition-colors border-[2px] border-dashed border-[color-mix(in srgb, var(--primary), transparent 55%)] rounded-[var(--r-box)]"
+         
         >
           <div
-            className="w-14 h-14 flex items-center justify-center"
-            style={{
-              background:   "var(--bg-gradient-primary)",
-              borderRadius: "var(--r-box)",
-            }}
+            className="w-14 h-14 flex items-center justify-center bg-bg-gradient-primary rounded-[var(--r-box)]"
+           
           >
             <Camera size={22} className="text-primary-content" />
           </div>
@@ -1106,22 +1067,19 @@ export default function MyProfile() {
     /* ── Apply care-assistant theme to the entire page ── */
     <div
       data-theme="care-assistant"
-      className="min-h-screen"
-      style={{ backgroundColor: "var(--base-100)", color: "var(--base-content)" }}
+      className="min-h-screen bg-base-100 text-base-content"
+     
     >
 
       {/* ──────────── Sticky Header ──────────── */}
       <header
-        className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b border-base-300"
-        style={{
-          backgroundColor: "color-mix(in srgb, var(--base-100) 92%, transparent)",
-          backdropFilter:  "blur(14px)",
-        }}
+        className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 border-b border-base-300 bg-[color-mix(in srgb, var(--base-100) 92%, transparent)] backdrop-blur-[14px]"
+       
       >
         <button
           onClick={() => router.back()}
-          className="p-1.5 rounded-lg hover:bg-base-200 transition-colors flex-shrink-0"
-          style={{ borderRadius: "var(--r-selector)" }}
+          className="p-1.5 rounded-lg hover:bg-base-200 transition-colors flex-shrink-0 rounded-[var(--r-selector)]"
+         
           aria-label="Go back"
         >
           <ArrowLeft size={17} className="text-base-content" />
@@ -1131,24 +1089,17 @@ export default function MyProfile() {
           <h1 className="text-[15px] font-bold text-base-content leading-tight">My Profile</h1>
           <div className="flex items-center gap-2 mt-0.5" aria-label={`Profile ${pct}% complete`}>
             <div
-              className="flex-1 h-1 overflow-hidden"
-              style={{
-                borderRadius: "9999px",
-                backgroundColor: "var(--base-300)",
-              }}
+              className="flex-1 h-1 overflow-hidden rounded-[9999px] bg-base-300"
+             
             >
               <div
-                className="h-full transition-all duration-700"
-                style={{
-                  width:        `${pct}%`,
-                  borderRadius: "9999px",
-                  background:   "var(--bg-gradient-primary)",  /* lavender → rose */
-                }}
+                className="h-full transition-all duration-700 rounded-[9999px] bg-bg-gradient-primary"
+                style={{ width: `${pct}%`, /* lavender → rose */ }}
               />
             </div>
             <span
-              className="text-[10px] font-semibold flex-shrink-0"
-              style={{ color: "var(--primary)" }}
+              className="text-[10px] font-semibold flex-shrink-0 text-primary"
+             
             >
               {pct}%
             </span>
@@ -1162,11 +1113,8 @@ export default function MyProfile() {
 
       {/* ──────────── Sticky Tab Nav ──────────── */}
       <nav
-        className="sticky top-[57px] z-20 border-b border-base-300 overflow-x-auto"
-        style={{
-          backgroundColor: "color-mix(in srgb, var(--base-100) 92%, transparent)",
-          scrollbarWidth:  "none",
-        }}
+        className="sticky top-[57px] z-20 border-b border-base-300 overflow-x-auto bg-[color-mix(in srgb, var(--base-100) 92%, transparent)]"
+        style={{ scrollbarWidth: "none" }}
         aria-label="Profile sections"
       >
         <div className="flex px-2 py-1 itesm-center justify-center gap-0.5 w-max min-w-full">
@@ -1183,8 +1131,8 @@ export default function MyProfile() {
                   active
                     ? "text-primary bg-primary/10"
                     : "text-base-content/45 hover:text-base-content hover:bg-base-200 active:scale-95"
-                }`}
-                style={{ borderRadius: "var(--r-selector)" }}  /* 1rem — care-assistant */
+                } rounded-[var(--r-selector)]`}
+  /* 1rem — care-assistant */
               >
                 <Icon size={15} strokeWidth={active ? 2.5 : 1.8} />
                 <span>{item.label}</span>

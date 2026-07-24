@@ -53,6 +53,7 @@ import faqsRoutes               from "./routes/faqROutes.js";
 import couponsRoutes            from "./routes/couponRoutes.js";
 // import chatRoutes               from "./routes/chatRoutes.js";
 import orderPharmacyRoutes      from "./routes/orderRoutes.js";
+import searchRoutes from          './routes/search.routes.js'
 import pharmacyRoutes           from "./routes/pharmacyRoutes.js";
 import walletRoutes             from "./routes/walletRoutes.js";
 import superadminRoutes         from "./routes/super-admin/superadminRoutes.js";
@@ -243,7 +244,7 @@ app.use('/api/bookings',           bookingPayAtServiceRouter);
 app.use('/api/accounting',         accountingRouter);
 app.use('/api/payouts',            payoutRouter);
 app.use('/api/earnings',           earningsRouter);
-
+app.use('/api/search',searchRoutes)
 // Support Routes explicitly mounted
 app.use('/api/support/tickets', ticketRoutes);
 app.use('/api/support/tickets/:ticketId/messages', messageRoutes);

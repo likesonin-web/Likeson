@@ -228,7 +228,7 @@ export default function LocationPage() {
   const isLoading = loading.location || loading.settings;
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--base-100)' }}>
+    <div className="min-h-screen bg-base-100">
       {/* ── Header ── */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -238,14 +238,14 @@ export default function LocationPage() {
                    <BackButton className='my-3' />
         
         <div className="flex items-center gap-3 mb-1">
-          <div className="p-2 rounded-xl" style={{ background: 'color-mix(in srgb, var(--primary), transparent 85%)' }}>
-            <Map size={22} style={{ color: 'var(--primary)' }} />
+          <div className="p-2 rounded-xl bg-[color-mix(in srgb, var(--primary), transparent 85%)]">
+            <Map size={22} className="text-primary" />
           </div>
-          <h1 className="text-2xl font-black font-montserrat tracking-tight" style={{ color: 'var(--base-content)' }}>
+          <h1 className="text-2xl font-black font-montserrat tracking-tight text-base-content">
             Location & Service Area
           </h1>
         </div>
-        <p className="text-sm ml-12" style={{ color: 'color-mix(in oklch, var(--base-content) 55%, transparent)' }}>
+        <p className="text-sm ml-12 text-[color-mix(in oklch, var(--base-content) 55%, transparent)]">
           Set your location and service radius for bookings
         </p>
       </motion.div>
@@ -259,22 +259,22 @@ export default function LocationPage() {
           className="lg:col-span-2 flex flex-col gap-5"
         >
           {/* Search */}
-          <div className="card p-5 relative" style={{ borderRadius: 'var(--r-box)' }}>
-            <label className="block text-xs font-bold uppercase tracking-widest mb-3"
-              style={{ color: 'color-mix(in oklch, var(--base-content) 55%, transparent)' }}>
+          <div className="card p-5 relative rounded-[var(--r-box)]">
+            <label className="block text-xs font-bold uppercase tracking-widest mb-3 text-[color-mix(in oklch, var(--base-content) 55%, transparent)]"
+             >
               Search Location
             </label>
             <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2"
-                style={{ color: 'color-mix(in oklch, var(--base-content) 40%, transparent)' }} />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[color-mix(in oklch, var(--base-content) 40%, transparent)]"
+                />
               <input
                 ref={searchRef}
                 value={searchVal}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 onFocus={() => suggestions.length && setShowSuggest(true)}
                 placeholder="Search area, locality, city…"
-                className="input-field w-full pl-9 pr-4"
-                style={{ fontSize: '0.875rem' }}
+                className="input-field w-full pl-9 pr-4 text-[0.875rem]"
+               
               />
             </div>
 
@@ -284,20 +284,20 @@ export default function LocationPage() {
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
-                  className="absolute left-5 right-5 z-50 mt-1 rounded-xl overflow-hidden shadow-2xl"
-                  style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}
+                  className="absolute left-5 right-5 z-50 mt-1 rounded-xl overflow-hidden shadow-2xl bg-base-200 border border-base-300"
+                 
                 >
                   {suggestions.map((s) => (
                     <button
                       key={s.place_id}
                       onClick={() => selectSuggestion(s)}
-                      className="w-full text-left px-4 py-3 flex items-start gap-3 transition-colors"
-                      style={{ borderBottom: '1px solid var(--base-300)', fontSize: '0.8125rem' }}
+                      className="w-full text-left px-4 py-3 flex items-start gap-3 transition-colors border-b border-base-300 text-[0.8125rem]"
+                     
                       onMouseEnter={(e) => e.currentTarget.style.background = 'color-mix(in srgb, var(--primary), transparent 90%)'}
                       onMouseLeave={(e) => e.currentTarget.style.background = ''}
                     >
-                      <MapPin size={14} className="mt-0.5 shrink-0" style={{ color: 'var(--primary)' }} />
-                      <span style={{ color: 'var(--base-content)' }}>{s.description}</span>
+                      <MapPin size={14} className="mt-0.5 shrink-0 text-primary" />
+                      <span className="text-base-content">{s.description}</span>
                     </button>
                   ))}
                 </motion.div>
@@ -308,12 +308,8 @@ export default function LocationPage() {
             <button
               onClick={getCurrentLocation}
               disabled={gettingLoc}
-              className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-              style={{
-                background: 'color-mix(in srgb, var(--secondary), transparent 85%)',
-                color: 'var(--secondary)',
-                border: '1px solid color-mix(in srgb, var(--secondary), transparent 70%)',
-              }}
+              className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all bg-[color-mix(in srgb, var(--secondary), transparent 85%)] text-secondary border border-[color-mix(in srgb, var(--secondary), transparent 70%)]"
+             
             >
               {gettingLoc
                 ? <Loader2 size={15} className="animate-spin" />
@@ -323,16 +319,16 @@ export default function LocationPage() {
           </div>
 
           {/* Radius Selector */}
-          <div className="card p-5" style={{ borderRadius: 'var(--r-box)' }}>
-            <label className="block text-xs font-bold uppercase tracking-widest mb-3"
-              style={{ color: 'color-mix(in oklch, var(--base-content) 55%, transparent)' }}>
+          <div className="card p-5 rounded-[var(--r-box)]">
+            <label className="block text-xs font-bold uppercase tracking-widest mb-3 text-[color-mix(in oklch, var(--base-content) 55%, transparent)]"
+             >
               Service Radius
             </label>
             <div className="flex items-center gap-3 mb-4">
               <div className="flex-1 relative">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-3xl font-black font-montserrat" style={{ color: 'var(--primary)' }}>{radius}</span>
-                  <span className="text-sm font-semibold" style={{ color: 'color-mix(in oklch, var(--base-content) 55%, transparent)' }}>km</span>
+                  <span className="text-3xl font-black font-montserrat text-primary">{radius}</span>
+                  <span className="text-sm font-semibold text-[color-mix(in oklch, var(--base-content) 55%, transparent)]">km</span>
                 </div>
                 <input
                   type="range" min={1} max={30} value={radius}
@@ -340,8 +336,8 @@ export default function LocationPage() {
                   className="w-full accent-primary cursor-pointer"
                   style={{ accentColor: 'var(--primary)' }}
                 />
-                <div className="flex justify-between text-xs mt-1"
-                  style={{ color: 'color-mix(in oklch, var(--base-content) 40%, transparent)' }}>
+                <div className="flex justify-between text-xs mt-1 text-[color-mix(in oklch, var(--base-content) 40%, transparent)]"
+                 >
                   <span>1 km</span><span>30 km</span>
                 </div>
               </div>
@@ -370,20 +366,20 @@ export default function LocationPage() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="card p-4"
-              style={{ borderRadius: 'var(--r-box)', background: 'color-mix(in srgb, var(--primary), transparent 92%)' }}
+              className="card p-4 rounded-[var(--r-box)] bg-[color-mix(in srgb, var(--primary), transparent 92%)]"
+             
             >
               <div className="flex gap-3 items-start">
-                <MapPin size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--primary)' }} />
+                <MapPin size={16} className="mt-0.5 shrink-0 text-primary" />
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-widest mb-1"
-                    style={{ color: 'color-mix(in oklch, var(--base-content) 50%, transparent)' }}>
+                  <p className="text-xs font-bold uppercase tracking-widest mb-1 text-[color-mix(in oklch, var(--base-content) 50%, transparent)]"
+                   >
                     Selected Location
                   </p>
-                  <p className="text-sm font-medium" style={{ color: 'var(--base-content)' }}>
+                  <p className="text-sm font-medium text-base-content">
                     {address || profile?.lastKnownAddress}
                   </p>
-                  <p className="text-xs mt-1" style={{ color: 'color-mix(in oklch, var(--base-content) 50%, transparent)' }}>
+                  <p className="text-xs mt-1 text-[color-mix(in oklch, var(--base-content) 50%, transparent)]">
                     {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
                   </p>
                 </div>
@@ -425,18 +421,18 @@ export default function LocationPage() {
           transition={{ delay: 0.15 }}
           className="lg:col-span-3"
         >
-          <div className="card overflow-hidden" style={{ borderRadius: 'var(--r-box)', height: '520px', position: 'relative' }}>
+          <div className="card overflow-hidden rounded-[var(--r-box)] h-[520px] relative">
             {mapError ? (
-              <div className="h-full flex flex-col items-center justify-center gap-4"
-                style={{ background: 'var(--base-200)' }}>
-                <AlertCircle size={40} style={{ color: 'var(--error)' }} />
-                <p className="text-sm text-center px-6" style={{ color: 'var(--base-content)' }}>{mapError}</p>
+              <div className="h-full flex flex-col items-center justify-center gap-4 bg-base-200"
+               >
+                <AlertCircle size={40} className="text-error" />
+                <p className="text-sm text-center px-6 text-base-content">{mapError}</p>
               </div>
             ) : !mapsReady ? (
-              <div className="h-full flex flex-col items-center justify-center gap-3"
-                style={{ background: 'var(--base-200)' }}>
-                <Loader2 size={32} className="animate-spin" style={{ color: 'var(--primary)' }} />
-                <p className="text-sm" style={{ color: 'color-mix(in oklch, var(--base-content) 55%, transparent)' }}>
+              <div className="h-full flex flex-col items-center justify-center gap-3 bg-base-200"
+               >
+                <Loader2 size={32} className="animate-spin text-primary" />
+                <p className="text-sm text-[color-mix(in oklch, var(--base-content) 55%, transparent)]">
                   Loading map…
                 </p>
               </div>
@@ -447,13 +443,9 @@ export default function LocationPage() {
             {/* Map overlay info */}
             {mapsReady && (
               <div className="absolute bottom-4 left-4 right-4 flex gap-2 pointer-events-none">
-                <div className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2"
-                  style={{
-                    background: 'rgba(0,0,0,0.75)',
-                    color: '#fff',
-                    backdropFilter: 'blur(8px)',
-                  }}>
-                  <Radio size={12} style={{ color: '#a855f7' }} />
+                <div className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 bg-black/75 text-[#fff] backdrop-blur-[8px]"
+                 >
+                  <Radio size={12} className="text-[#a855f7]" />
                   Radius: {radius} km · Click map to reposition
                 </div>
               </div>

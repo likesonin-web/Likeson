@@ -152,19 +152,12 @@ function AnimatedNumber({ value, prefix = '', suffix = '', decimals = 0 }) {
 const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{
-      background: 'var(--base-100)',
-      border: '1px solid var(--base-300)',
-      borderRadius: '12px',
-      padding: '10px 14px',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-      minWidth: 120,
-    }}>
-      {label && <p style={{ fontSize: 10, fontWeight: 800, opacity: 0.5, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</p>}
+    <div className="bg-base-100 border border-base-300 rounded-[12px] py-[10px] px-[14px] shadow-[0_8px_32px_rgba(0,0,0,0.12)] min-w-[120px]">
+      {label && <p className="text-[10px] font-extrabold opacity-50 mb-[6px] uppercase tracking-[0.1em]">{label}</p>}
       {payload.map((p, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-          <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color || p.fill }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--base-content)' }}>
+        <div key={i} className="flex items-center gap-[8px] mb-[2px]">
+          <div className="w-[8px] h-[8px] rounded-[2px]" style={{ background: p.color || p.fill }} />
+          <span className="text-[12px] font-bold text-base-content">
             {p.name}: {typeof p.value === 'number' ? p.value.toLocaleString('en-IN') : p.value}
           </span>
         </div>
@@ -208,8 +201,8 @@ function PlanCard({ plan, viewMode, onEdit, onDelete, onClick, index }) {
         animate="visible"
         whileHover={{ backgroundColor: 'color-mix(in srgb, var(--base-200) 100%, transparent)' }}
         onClick={onClick}
-        className="flex items-center gap-4 px-5 py-3.5 cursor-pointer"
-        style={{ borderBottom: '1px solid var(--base-300)' }}
+        className="flex items-center gap-4 px-5 py-3.5 cursor-pointer border-b border-base-300"
+       
       >
         <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{ background: t.gradient }}>
@@ -217,7 +210,7 @@ function PlanCard({ plan, viewMode, onEdit, onDelete, onClick, index }) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-black text-base-content truncate">{plan.name}</p>
-          <p className="text-[10px] truncate" style={{ opacity: 0.45 }}>{t.tagline}</p>
+          <p className="text-[10px] truncate opacity-45">{t.tagline}</p>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
@@ -226,14 +219,14 @@ function PlanCard({ plan, viewMode, onEdit, onDelete, onClick, index }) {
           </span>
           <span className="text-sm font-black" style={{ color: t.accent }}>₹{monthly}</span>
           <div className="flex gap-0.5" onClick={e => e.stopPropagation()}>
-            <button onClick={() => onEdit(plan)} className="w-7 h-7 rounded-lg flex items-center justify-center"
-              style={{ color: 'var(--primary)' }}
+            <button onClick={() => onEdit(plan)} className="w-7 h-7 rounded-lg flex items-center justify-center text-primary"
+             
               onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--primary), transparent 88%)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <Edit3 size={13} />
             </button>
-            <button onClick={() => onDelete(plan._id)} className="w-7 h-7 rounded-lg flex items-center justify-center"
-              style={{ color: 'var(--error)' }}
+            <button onClick={() => onDelete(plan._id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-error"
+             
               onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--error), transparent 88%)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <Trash2 size={13} />
@@ -253,14 +246,8 @@ function PlanCard({ plan, viewMode, onEdit, onDelete, onClick, index }) {
       animate="visible"
       whileHover={{ y: -6, scale: 1.01 }}
       onClick={onClick}
-      className="relative cursor-pointer overflow-hidden flex flex-col"
-      style={{
-        background: 'var(--base-100)',
-        border: '1.5px solid var(--base-300)',
-        borderRadius: 'var(--r-box)',
-        transition: 'all 0.3s cubic-bezier(0.22,1,0.36,1)',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
-      }}
+      className="relative cursor-pointer overflow-hidden flex flex-col bg-base-100 border-[1.5px] border-base-300 rounded-[var(--r-box)] shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
+      style={{ transition: 'all 0.3s cubic-bezier(0.22,1,0.36,1)' }}
       onMouseEnter={e => {
         e.currentTarget.style.borderColor = t.accent;
         e.currentTarget.style.boxShadow = `0 12px 40px ${t.accent}22`;
@@ -276,21 +263,21 @@ function PlanCard({ plan, viewMode, onEdit, onDelete, onClick, index }) {
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
-          className="absolute -right-8 -top-8 w-32 h-32 rounded-full opacity-[0.07]"
-          style={{ border: '20px solid white' }}
+          className="absolute -right-8 -top-8 w-32 h-32 rounded-full opacity-[0.07] border-[20px] border-[white]"
+         
         />
         <motion.div
           animate={{ rotate: -360 }}
           transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
-          className="absolute -right-2 -top-2 w-16 h-16 rounded-full opacity-[0.06]"
-          style={{ border: '10px solid white' }}
+          className="absolute -right-2 -top-2 w-16 h-16 rounded-full opacity-[0.06] border-[10px] border-[white]"
+         
         />
         <div className="relative z-10 w-full">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                  style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(4px)' }}>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/20 backdrop-blur-[4px]"
+                 >
                   <TIcon size={14} className="text-white" />
                 </div>
                 <span className="text-[9px] font-black text-white/60 uppercase tracking-[0.16em]">
@@ -315,20 +302,20 @@ function PlanCard({ plan, viewMode, onEdit, onDelete, onClick, index }) {
             style={{ background: support.bg, color: support.color }}>
             {support.label}
           </span>
-          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-            style={{ background: 'var(--base-200)', color: 'var(--base-content)' }}>
+          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-base-200 text-base-content"
+           >
             <Users size={9} className="inline mr-1" />
             {maxMembers} {maxMembers === 1 ? 'member' : 'members'}
           </span>
           {!plan.isActive && (
-            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-              style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
+            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[rgba(239,68,68,0.12)] text-[#ef4444]"
+             >
               Inactive
             </span>
           )}
           {plan.isFeatured && (
-            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-              style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>
+            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[rgba(245,158,11,0.12)] text-[#f59e0b]"
+             >
               <Star size={9} className="inline mr-1" />Featured
             </span>
           )}
@@ -356,20 +343,20 @@ function PlanCard({ plan, viewMode, onEdit, onDelete, onClick, index }) {
         </p>
 
         {/* Actions */}
-        <div className="flex gap-2 mt-auto pt-3" style={{ borderTop: '1px solid var(--base-300)' }}
+        <div className="flex gap-2 mt-auto pt-3 border-t border-base-300"
           onClick={e => e.stopPropagation()}>
           <button
             onClick={() => onEdit(plan)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all"
-            style={{ background: 'var(--base-200)', color: 'var(--base-content)' }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all bg-base-200 text-base-content"
+           
             onMouseEnter={e => { e.currentTarget.style.background = `${t.accent}18`; e.currentTarget.style.color = t.accent; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'var(--base-200)'; e.currentTarget.style.color = 'var(--base-content)'; }}>
             <Edit3 size={12} /> Edit
           </button>
           <button
             onClick={() => onDelete(plan._id)}
-            className="w-8 h-8 flex items-center justify-center rounded-xl transition-all flex-shrink-0"
-            style={{ background: 'var(--base-200)' }}
+            className="w-8 h-8 flex items-center justify-center rounded-xl transition-all flex-shrink-0 bg-base-200"
+           
             onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.12)'; e.currentTarget.style.color = '#ef4444'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'var(--base-200)'; e.currentTarget.style.color = ''; }}>
             <Trash2 size={12} />
@@ -402,8 +389,8 @@ function PlanModal({ plan, onClose, onEdit }) {
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="absolute inset-0"
-        style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(16px)' }}
+        className="absolute inset-0 bg-black/70 backdrop-blur-[16px]"
+       
         onClick={onClose}
       />
       <motion.div
@@ -411,25 +398,20 @@ function PlanModal({ plan, onClose, onEdit }) {
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 32 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-2xl overflow-hidden"
-        style={{
-          background: 'var(--base-100)',
-          border: '1.5px solid var(--base-300)',
-          borderRadius: 'calc(var(--r-box) * 1.5)',
-          boxShadow: '0 48px 96px rgba(0,0,0,0.35)',
-        }}>
+        className="relative w-full max-w-2xl overflow-hidden bg-base-100 border-[1.5px] border-base-300 rounded-[calc(var(--r-box) * 1.5)] shadow-[0_48px_96px_rgba(0,0,0,0.35)]"
+       >
 
         {/* Header */}
         <div className="relative h-40 flex items-end p-7 overflow-hidden" style={{ background: t.gradient }}>
           <motion.div animate={{ scale: [1, 1.1, 1], opacity: [0.07, 0.12, 0.07] }}
             transition={{ duration: 4, repeat: Infinity }}
-            className="absolute inset-0"
-            style={{ background: 'radial-gradient(circle at 80% 30%, white 0%, transparent 60%)' }} />
+            className="absolute inset-0 bg-[radial-gradient(circle at 80% 30%, white 0%, transparent 60%)]"
+            />
           <div className="relative z-10 flex items-end justify-between w-full">
             <div>
               <div className="flex items-center gap-2.5 mb-2">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)' }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/20 backdrop-blur-[8px]"
+                 >
                   <TIcon size={20} className="text-white" />
                 </div>
                 <span className="text-xs font-black text-white/60 uppercase tracking-widest">Tier {t.rank}</span>
@@ -448,8 +430,8 @@ function PlanModal({ plan, onClose, onEdit }) {
             </div>
           </div>
           <button onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-xl flex items-center justify-center text-white z-20"
-            style={{ background: 'rgba(255,255,255,0.15)' }}
+            className="absolute top-4 right-4 w-8 h-8 rounded-xl flex items-center justify-center text-white z-20 bg-white/15"
+           
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
             onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}>
             <X size={16} />
@@ -459,15 +441,15 @@ function PlanModal({ plan, onClose, onEdit }) {
         {/* Body */}
         <div className="p-7 grid md:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest mb-4" style={{ opacity: 0.4 }}>Service Details</p>
+            <p className="text-[10px] font-black uppercase tracking-widest mb-4 opacity-40">Service Details</p>
             <div className="space-y-0">
               {rows.map((r, i) => (
                 <motion.div key={i}
                   initial={{ opacity: 0, x: -12 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.04 }}
-                  className="flex items-center gap-3 py-2.5"
-                  style={{ borderBottom: '1px solid var(--base-300)', opacity: r.active ? 1 : 0.3 }}>
+                  className="flex items-center gap-3 py-2.5 border-b border-base-300"
+                  style={{ opacity: r.active ? 1 : 0.3 }}>
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                     style={{ background: r.active ? `${t.accent}18` : 'var(--base-300)' }}>
                     <r.icon size={13} style={{ color: r.active ? t.accent : 'inherit' }} />
@@ -482,24 +464,24 @@ function PlanModal({ plan, onClose, onEdit }) {
           <div className="flex flex-col gap-4">
             {/* Features */}
             {plan.features?.additionalFeatures?.length > 0 && (
-              <div className="rounded-xl p-4" style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}>
-                <p className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ opacity: 0.4 }}>Features</p>
+              <div className="rounded-xl p-4 bg-base-200 border border-base-300">
+                <p className="text-[10px] font-black uppercase tracking-widest mb-3 opacity-40">Features</p>
                 {plan.features.additionalFeatures.map((f, i) => (
                   <motion.div key={i}
                     initial={{ opacity: 0, x: 8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.05 }}
                     className="flex items-start gap-2 mb-2">
-                    <CheckCircle2 size={13} style={{ color: t.accent, flexShrink: 0, marginTop: 1 }} />
-                    <span className="text-xs font-medium" style={{ opacity: 0.75 }}>{f}</span>
+                    <CheckCircle2 size={13} className="shrink-0 mt-[1px]" style={{ color: t.accent }} />
+                    <span className="text-xs font-medium opacity-75">{f}</span>
                   </motion.div>
                 ))}
               </div>
             )}
 
             {/* Plan meta flags */}
-            <div className="rounded-xl p-4" style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}>
-              <p className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ opacity: 0.4 }}>Plan Flags</p>
+            <div className="rounded-xl p-4 bg-base-200 border border-base-300">
+              <p className="text-[10px] font-black uppercase tracking-widest mb-3 opacity-40">Plan Flags</p>
               {[
                 { label: 'No Hidden Charges',       val: plan.features?.noHiddenCharges },
                 { label: 'Monthly Health Summary',  val: plan.features?.monthlyHealthSummary },
@@ -508,7 +490,7 @@ function PlanModal({ plan, onClose, onEdit }) {
                 { label: 'Digital Report Access',   val: plan.features?.digitalReportAccess },
               ].map((f, i) => (
                 <div key={i} className="flex items-center justify-between py-1.5">
-                  <span className="text-xs font-medium" style={{ opacity: 0.6 }}>{f.label}</span>
+                  <span className="text-xs font-medium opacity-60">{f.label}</span>
                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
                     style={f.val ? { background: `${t.accent}18`, color: t.accent } : { background: 'var(--base-300)', opacity: 0.4 }}>
                     {f.val ? '✓ Yes' : '✗ No'}
@@ -521,8 +503,8 @@ function PlanModal({ plan, onClose, onEdit }) {
             <div className="mt-auto flex gap-2">
               <button
                 onClick={() => { onClose(); onEdit(plan); }}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all"
-                style={{ background: t.gradient, color: 'white' }}>
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all text-[white]"
+                style={{ background: t.gradient }}>
                 <Edit3 size={14} /> Edit Plan
               </button>
             </div>
@@ -657,16 +639,16 @@ const DRAWER_TABS = [
 
 function ToggleSwitch({ checked, onChange, label, desc }) {
   return (
-    <div className="flex items-center justify-between py-3" style={{ borderBottom: '1px solid var(--base-300)' }}>
+    <div className="flex items-center justify-between py-3 border-b border-base-300">
       <div>
         <p className="text-xs font-bold">{label}</p>
-        {desc && <p className="text-[10px] mt-0.5" style={{ opacity: 0.45 }}>{desc}</p>}
+        {desc && <p className="text-[10px] mt-0.5 opacity-45">{desc}</p>}
       </div>
       <button type="button" onClick={() => onChange(!checked)}
-        className="relative flex-shrink-0 rounded-full transition-all duration-300"
-        style={{ width: 44, height: 24, background: checked ? 'var(--primary)' : 'var(--base-300)', boxShadow: checked ? '0 0 12px color-mix(in srgb, var(--primary), transparent 55%)' : 'none' }}>
+        className="relative flex-shrink-0 rounded-full transition-all duration-300 w-[44px] h-[24px]"
+        style={{ background: checked ? 'var(--primary)' : 'var(--base-300)', boxShadow: checked ? '0 0 12px color-mix(in srgb, var(--primary), transparent 55%)' : 'none' }}>
         <motion.div animate={{ x: checked ? 22 : 2 }} transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="absolute top-1 w-4 h-4 rounded-full shadow-md" style={{ background: 'white' }} />
+          className="absolute top-1 w-4 h-4 rounded-full shadow-md bg-[white]" />
       </button>
     </div>
   );
@@ -675,24 +657,24 @@ function ToggleSwitch({ checked, onChange, label, desc }) {
 function StepperInput({ label, value, onChange, min = 0, max = 100, suffix }) {
   return (
     <div>
-      <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5" style={{ opacity: 0.45 }}>{label}</label>
+      <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 opacity-45">{label}</label>
       <div className="flex items-center rounded-xl overflow-hidden border" style={{ borderColor: 'var(--base-300)' }}>
         <button type="button" onClick={() => onChange(Math.max(min, value - 1))}
-          className="w-9 h-9 flex items-center justify-center"
-          style={{ background: 'var(--base-200)', flexShrink: 0 }}>
+          className="w-9 h-9 flex items-center justify-center bg-base-200 shrink-0"
+         >
           <Minus size={11} />
         </button>
         <input type="number" value={value}
           onChange={e => onChange(Math.max(min, Math.min(max, Number(e.target.value))))}
-          className="flex-1 text-center text-sm font-black outline-none py-2"
-          style={{ background: 'var(--base-100)', border: 'none', color: 'var(--base-content)' }} />
+          className="flex-1 text-center text-sm font-black outline-none py-2 bg-base-100 border-none text-base-content"
+          />
         <button type="button" onClick={() => onChange(Math.min(max, value + 1))}
-          className="w-9 h-9 flex items-center justify-center"
-          style={{ background: 'var(--base-200)', flexShrink: 0 }}>
+          className="w-9 h-9 flex items-center justify-center bg-base-200 shrink-0"
+         >
           <Plus size={11} />
         </button>
       </div>
-      {suffix && <p className="text-[9px] mt-0.5 font-bold uppercase" style={{ opacity: 0.35 }}>{suffix}</p>}
+      {suffix && <p className="text-[9px] mt-0.5 font-bold uppercase opacity-35">{suffix}</p>}
     </div>
   );
 }
@@ -719,21 +701,21 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
       {isOpen && (
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100]"
-            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-[8px]"
+           
             onClick={onClose} />
 
           <motion.div
             initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed right-0 top-0 h-full w-full max-w-[500px] z-[101] flex flex-col"
-            style={{ background: 'var(--base-100)', borderLeft: '1.5px solid var(--base-300)', boxShadow: '-32px 0 80px rgba(0,0,0,0.25)' }}>
+            className="fixed right-0 top-0 h-full w-full max-w-[500px] z-[101] flex flex-col bg-base-100 border-l-[1.5px] border-base-300 shadow-[-32px_0_80px_rgba(0,0,0,0.25)]"
+           >
 
             {/* Drawer header */}
-            <div className="relative overflow-hidden flex-shrink-0" style={{ background: t.gradient, padding: '22px 24px 18px' }}>
+            <div className="relative overflow-hidden flex-shrink-0 pt-[22px] px-[24px] pb-[18px]" style={{ background: t.gradient }}>
               <motion.div animate={{ rotate: 360 }} transition={{ duration: 50, repeat: Infinity, ease: 'linear' }}
-                className="absolute -right-12 -top-12 w-40 h-40 rounded-full opacity-[0.07]"
-                style={{ border: '24px solid white' }} />
+                className="absolute -right-12 -top-12 w-40 h-40 rounded-full opacity-[0.07] border-[24px] border-[white]"
+                />
               <div className="relative z-10 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5">
@@ -741,15 +723,15 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                   </p>
                   <h2 className="text-xl font-black text-white">{form.name}</h2>
                 </div>
-                <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center text-white"
-                  style={{ background: 'rgba(255,255,255,0.18)' }}>
+                <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center text-white bg-white/18"
+                 >
                   <X size={16} />
                 </button>
               </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex flex-shrink-0" style={{ background: 'var(--base-200)', borderBottom: '1px solid var(--base-300)' }}>
+            <div className="flex flex-shrink-0 bg-base-200 border-b border-base-300">
               {DRAWER_TABS.map(({ id, label, icon: Icon }) => (
                 <button key={id} onClick={() => setTab(id)}
                   className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[9px] font-black uppercase tracking-wider transition-all"
@@ -770,7 +752,7 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                 {tab === 'identity' && (
                   <motion.div key="identity" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-5">
                     <div>
-                      <label className="text-[10px] font-black uppercase tracking-widest block mb-2" style={{ opacity: 0.45 }}>Plan Tier</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest block mb-2 opacity-45">Plan Tier</label>
                       <div className="grid grid-cols-1 gap-2">
                         {PLAN_NAMES.map(name => {
                           const tc = getTier(name);
@@ -789,7 +771,7 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                               </div>
                               <div className="flex-1">
                                 <p className="text-xs font-black">{name}</p>
-                                <p className="text-[9px] mt-0.5" style={{ opacity: 0.45 }}>{tc.tagline}</p>
+                                <p className="text-[9px] mt-0.5 opacity-45">{tc.tagline}</p>
                               </div>
                               {form.name === name && <CheckCircle2 size={16} style={{ color: tc.accent }} />}
                             </button>
@@ -800,7 +782,7 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5" style={{ opacity: 0.45 }}>Price (₹/month)</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 opacity-45">Price (₹/month)</label>
                         <input type="number" className="input-field w-full text-lg font-black"
                           value={form['pricing.monthly']}
                           onChange={e => set('pricing.monthly', e.target.value)} />
@@ -810,13 +792,13 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5" style={{ opacity: 0.45 }}>Ideal For</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 opacity-45">Ideal For</label>
                       <input type="text" className="input-field w-full" placeholder="e.g. Expecting mothers, NRI families..."
                         value={form.idealFor} onChange={e => set('idealFor', e.target.value)} />
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5" style={{ opacity: 0.45 }}>Billing Cycle</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 opacity-45">Billing Cycle</label>
                       <div className="flex gap-2">
                         {[['monthly', '/month'], ['till_delivery', 'Till Delivery']].map(([val, lbl]) => (
                           <button key={val} type="button" onClick={() => { set('pricing.billingCycle', val); set('pricing.billingLabel', lbl); }}
@@ -836,9 +818,9 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
 
                 {tab === 'benefits' && (
                   <motion.div key="benefits" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-5">
-                    <div className="p-4 rounded-xl space-y-4" style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}>
-                      <p className="text-[10px] font-black uppercase tracking-widest" style={{ opacity: 0.4 }}>Consultations</p>
-                      <p className="text-[10px]" style={{ opacity: 0.45 }}>Use <strong>-1</strong> for unlimited</p>
+                    <div className="p-4 rounded-xl space-y-4 bg-base-200 border border-base-300">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Consultations</p>
+                      <p className="text-[10px] opacity-45">Use <strong>-1</strong> for unlimited</p>
                       <StepperInput label="Free/month" value={form['consultations.freePerMonth']}
                         onChange={v => set('consultations.freePerMonth', v)} min={-1} max={99} suffix="consultations per month" />
                       <div className="grid grid-cols-2 gap-2">
@@ -849,8 +831,8 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                       </div>
                     </div>
 
-                    <div className="p-4 rounded-xl space-y-4" style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}>
-                      <p className="text-[10px] font-black uppercase tracking-widest" style={{ opacity: 0.4 }}>Pharmacy</p>
+                    <div className="p-4 rounded-xl space-y-4 bg-base-200 border border-base-300">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Pharmacy</p>
                       <div className="grid grid-cols-2 gap-4">
                         <StepperInput label="Discount Min %" value={form['pharmacy.discountMin']}
                           onChange={v => set('pharmacy.discountMin', v)} min={0} max={25} suffix="max 25% (platform cap)" />
@@ -860,15 +842,15 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                       <ToggleSwitch label="Flat Discount" desc="Apply max % as flat (not range)"
                         checked={form['pharmacy.isFlat']} onChange={v => set('pharmacy.isFlat', v)} />
                       <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5" style={{ opacity: 0.45 }}>Delivery Charge (₹)</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 opacity-45">Delivery Charge (₹)</label>
                         <input type="number" className="input-field w-full" placeholder="0 = free"
                           value={form['pharmacy.deliveryChargePerOrder'] ?? ''}
                           onChange={e => set('pharmacy.deliveryChargePerOrder', e.target.value === '' ? null : Number(e.target.value))} />
                       </div>
                     </div>
 
-                    <div className="p-4 rounded-xl space-y-4" style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}>
-                      <p className="text-[10px] font-black uppercase tracking-widest" style={{ opacity: 0.4 }}>Diagnostics</p>
+                    <div className="p-4 rounded-xl space-y-4 bg-base-200 border border-base-300">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Diagnostics</p>
                       <StepperInput label="Discount %" value={form['diagnostics.discountPercent']}
                         onChange={v => set('diagnostics.discountPercent', v)} min={0} max={25} />
                       <ToggleSwitch label="Home Sample Collection" checked={form['diagnostics.homeSampleCollection']}
@@ -879,13 +861,13 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
 
                 {tab === 'services' && (
                   <motion.div key="services" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-5">
-                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}>
-                      <p className="text-[10px] font-black uppercase tracking-widest" style={{ opacity: 0.4 }}>Transport</p>
+                    <div className="p-4 rounded-xl space-y-3 bg-base-200 border border-base-300">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Transport</p>
                       <ToggleSwitch label="Transport Applicable" checked={form['transport.isApplicable']}
                         onChange={v => set('transport.isApplicable', v)} />
                       {form['transport.isApplicable'] && (
                         <div>
-                          <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5" style={{ opacity: 0.45 }}>Rate (₹/km)</label>
+                          <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 opacity-45">Rate (₹/km)</label>
                           <input type="number" className="input-field w-full"
                             value={form['transport.ratePerKm'] ?? ''}
                             onChange={e => set('transport.ratePerKm', e.target.value === '' ? null : Number(e.target.value))} />
@@ -893,8 +875,8 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                       )}
                     </div>
 
-                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}>
-                      <p className="text-[10px] font-black uppercase tracking-widest" style={{ opacity: 0.4 }}>Care Assistant</p>
+                    <div className="p-4 rounded-xl space-y-3 bg-base-200 border border-base-300">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Care Assistant</p>
                       <ToggleSwitch label="Include Care Assistant" checked={form['careAssistant.included']}
                         onChange={v => set('careAssistant.included', v)} />
                       {form['careAssistant.included'] && (
@@ -905,8 +887,8 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                       )}
                     </div>
 
-                    <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}>
-                      <p className="text-[10px] font-black uppercase tracking-widest" style={{ opacity: 0.4 }}>Support Tier</p>
+                    <div className="p-4 rounded-xl space-y-3 bg-base-200 border border-base-300">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Support Tier</p>
                       {['Standard', 'Priority', 'Dedicated Executive', '24/7 Service'].map(tier => {
                         const sb = SUPPORT_BADGE[tier];
                         return (
@@ -929,8 +911,8 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
 
                 {tab === 'settings' && (
                   <motion.div key="settings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-5">
-                    <div className="p-4 rounded-xl" style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}>
-                      <p className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ opacity: 0.4 }}>Free Trial</p>
+                    <div className="p-4 rounded-xl bg-base-200 border border-base-300">
+                      <p className="text-[10px] font-black uppercase tracking-widest mb-3 opacity-40">Free Trial</p>
                       <ToggleSwitch label="Enable Free Trial" checked={form['freeTrial.enabled']}
                         onChange={v => set('freeTrial.enabled', v)} />
                       {form['freeTrial.enabled'] && (
@@ -941,8 +923,8 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                       )}
                     </div>
 
-                    <div className="p-4 rounded-xl" style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}>
-                      <p className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ opacity: 0.4 }}>Feature Flags</p>
+                    <div className="p-4 rounded-xl bg-base-200 border border-base-300">
+                      <p className="text-[10px] font-black uppercase tracking-widest mb-3 opacity-40">Feature Flags</p>
                       {[
                         ['features.noHiddenCharges',       'No Hidden Charges'],
                         ['features.monthlyHealthSummary',  'Monthly Health Summary'],
@@ -955,8 +937,8 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                       ))}
                     </div>
 
-                    <div className="p-4 rounded-xl" style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}>
-                      <p className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ opacity: 0.4 }}>Display</p>
+                    <div className="p-4 rounded-xl bg-base-200 border border-base-300">
+                      <p className="text-[10px] font-black uppercase tracking-widest mb-3 opacity-40">Display</p>
                       <ToggleSwitch label="Active" desc="Hidden from users if inactive" checked={form.isActive}
                         onChange={v => set('isActive', v)} />
                       <ToggleSwitch label="Featured" desc="Highlighted on the plan selector" checked={form.isFeatured}
@@ -965,7 +947,7 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
                         <StepperInput label="Display Order" value={form.displayOrder}
                           onChange={v => set('displayOrder', v)} min={1} max={99} />
                         <div>
-                          <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5" style={{ opacity: 0.45 }}>Badge Label</label>
+                          <label className="text-[10px] font-black uppercase tracking-widest block mb-1.5 opacity-45">Badge Label</label>
                           <input type="text" className="input-field w-full text-xs"
                             placeholder="Most Popular..."
                             value={form.badgeLabel} onChange={e => set('badgeLabel', e.target.value)} />
@@ -978,10 +960,10 @@ function PlanDrawer({ isOpen, editingPlan, onClose, onSubmit, loading }) {
             </div>
 
             {/* Footer */}
-            <div className="flex-shrink-0 flex gap-3 p-5" style={{ background: 'var(--base-200)', borderTop: '1px solid var(--base-300)' }}>
+            <div className="flex-shrink-0 flex gap-3 p-5 bg-base-200 border-t border-base-300">
               <button type="button" onClick={onClose}
-                className="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
-                style={{ background: 'var(--base-300)', color: 'var(--base-content)' }}>
+                className="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all bg-base-300 text-base-content"
+               >
                 Cancel
               </button>
               <button type="button" onClick={handleSubmit} disabled={loading}
@@ -1054,12 +1036,8 @@ function AnalyticsSection({ plans, subs, trials }) {
         {KPIs.map((k, i) => (
           <motion.div key={i} custom={i} variants={fadeUp}
             whileHover={{ y: -4, scale: 1.02 }}
-            className="relative overflow-hidden rounded-2xl p-5"
-            style={{
-              background: 'var(--base-100)',
-              border: '1.5px solid var(--base-300)',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
-            }}>
+            className="relative overflow-hidden rounded-2xl p-5 bg-base-100 border-[1.5px] border-base-300 shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
+           >
             <div className="absolute inset-0 pointer-events-none"
               style={{ background: `radial-gradient(circle at 90% 10%, ${k.color}14, transparent 65%)` }} />
             <div className="flex items-start justify-between mb-3">
@@ -1073,12 +1051,12 @@ function AnalyticsSection({ plans, subs, trials }) {
                 {Math.abs(k.change)}%
               </span>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{ opacity: 0.4 }}>{k.label}</p>
+            <p className="text-[10px] font-black uppercase tracking-widest mb-0.5 opacity-40">{k.label}</p>
             <p className="text-2xl font-black" style={{ color: k.color }}>
               <AnimatedNumber value={k.val} prefix={k.prefix || ''} />
             </p>
             {k.total !== undefined && (
-              <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ background: 'var(--base-300)' }}>
+              <div className="mt-2 h-1 rounded-full overflow-hidden bg-base-300">
                 <motion.div className="h-full rounded-full"
                   initial={{ width: 0 }}
                   animate={{ width: `${k.total > 0 ? (k.val / k.total) * 100 : 0}%` }}
@@ -1094,11 +1072,11 @@ function AnalyticsSection({ plans, subs, trials }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Area chart — subscription trend */}
         <motion.div custom={0} variants={fadeUp}
-          className="lg:col-span-2 rounded-2xl p-5"
-          style={{ background: 'var(--base-100)', border: '1.5px solid var(--base-300)' }}>
+          className="lg:col-span-2 rounded-2xl p-5 bg-base-100 border-[1.5px] border-base-300"
+         >
           <div className="flex items-center justify-between mb-5">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{ opacity: 0.4 }}>Subscription Trend</p>
+              <p className="text-[10px] font-black uppercase tracking-widest mb-0.5 opacity-40">Subscription Trend</p>
               <p className="text-sm font-black">Growth Overview</p>
             </div>
             <div className="flex gap-1">
@@ -1144,9 +1122,9 @@ function AnalyticsSection({ plans, subs, trials }) {
 
         {/* Pie chart — status distribution */}
         <motion.div custom={1} variants={fadeUp}
-          className="rounded-2xl p-5"
-          style={{ background: 'var(--base-100)', border: '1.5px solid var(--base-300)' }}>
-          <p className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{ opacity: 0.4 }}>Status Distribution</p>
+          className="rounded-2xl p-5 bg-base-100 border-[1.5px] border-base-300"
+         >
+          <p className="text-[10px] font-black uppercase tracking-widest mb-0.5 opacity-40">Status Distribution</p>
           <p className="text-sm font-black mb-4">Subscription Status</p>
           {statusDist.length > 0 ? (
             <>
@@ -1167,7 +1145,7 @@ function AnalyticsSection({ plans, subs, trials }) {
                   <div key={i} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                      <span className="text-[10px] font-semibold" style={{ opacity: 0.65 }}>{d.name}</span>
+                      <span className="text-[10px] font-semibold opacity-65">{d.name}</span>
                     </div>
                     <span className="text-[10px] font-black">{d.value}</span>
                   </div>
@@ -1175,7 +1153,7 @@ function AnalyticsSection({ plans, subs, trials }) {
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center h-32 gap-2" style={{ opacity: 0.35 }}>
+            <div className="flex flex-col items-center justify-center h-32 gap-2 opacity-35">
               <PieChartIcon size={28} />
               <p className="text-xs font-bold">No subscription data</p>
             </div>
@@ -1185,14 +1163,14 @@ function AnalyticsSection({ plans, subs, trials }) {
 
       {/* Bar chart — revenue by plan */}
       <motion.div custom={2} variants={fadeUp}
-        className="rounded-2xl p-5"
-        style={{ background: 'var(--base-100)', border: '1.5px solid var(--base-300)' }}>
+        className="rounded-2xl p-5 bg-base-100 border-[1.5px] border-base-300"
+       >
         <div className="flex items-center justify-between mb-5">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{ opacity: 0.4 }}>Revenue Breakdown</p>
+            <p className="text-[10px] font-black uppercase tracking-widest mb-0.5 opacity-40">Revenue Breakdown</p>
             <p className="text-sm font-black">Monthly Revenue by Plan</p>
           </div>
-          <BarChart2 size={16} style={{ opacity: 0.35 }} />
+          <BarChart2 size={16} className="opacity-35" />
         </div>
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={revenueByPlan} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
@@ -1251,29 +1229,24 @@ function CronPanel({ onClose }) {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="absolute inset-0"
-        style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)' }}
+        className="absolute inset-0 bg-black/65 backdrop-blur-[12px]"
+       
         onClick={onClose} />
       <motion.div
         initial={{ scale: 0.9, opacity: 0, y: 24 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 24 }}
         transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-lg overflow-hidden"
-        style={{
-          background: 'var(--base-100)',
-          border: '1.5px solid var(--base-300)',
-          borderRadius: 'calc(var(--r-box) * 1.5)',
-          boxShadow: '0 48px 96px rgba(0,0,0,0.35)',
-        }}>
+        className="relative w-full max-w-lg overflow-hidden bg-base-100 border-[1.5px] border-base-300 rounded-[calc(var(--r-box) * 1.5)] shadow-[0_48px_96px_rgba(0,0,0,0.35)]"
+       >
 
-        <div className="flex items-center justify-between p-6 pb-4" style={{ borderBottom: '1px solid var(--base-300)' }}>
+        <div className="flex items-center justify-between p-6 pb-4 border-b border-base-300">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{ opacity: 0.4 }}>System</p>
+            <p className="text-[10px] font-black uppercase tracking-widest mb-0.5 opacity-40">System</p>
             <h3 className="text-lg font-black">Cron Jobs</h3>
           </div>
           <button onClick={() => { dispatch(clearCronResults()); onClose(); }}
-            className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--base-200)' }}>
+            className="w-8 h-8 rounded-xl flex items-center justify-center bg-base-200">
             <X size={15} />
           </button>
         </div>
@@ -1311,7 +1284,7 @@ function CronPanel({ onClose }) {
               resultKey: null,
             },
           ].map((job, i) => (
-            <div key={i} className="rounded-xl p-4" style={{ background: 'var(--base-200)', border: '1px solid var(--base-300)' }}>
+            <div key={i} className="rounded-xl p-4 bg-base-200 border border-base-300">
               <div className="flex items-start gap-3 mb-3">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ background: `${job.color}18` }}>
@@ -1319,7 +1292,7 @@ function CronPanel({ onClose }) {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-black">{job.label}</p>
-                  <p className="text-[10px] mt-0.5" style={{ opacity: 0.45 }}>{job.desc}</p>
+                  <p className="text-[10px] mt-0.5 opacity-45">{job.desc}</p>
                 </div>
                 <button onClick={job.action} disabled={job.loading}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex-shrink-0"
@@ -1333,8 +1306,8 @@ function CronPanel({ onClose }) {
               </div>
               {job.result && (
                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                  className="rounded-lg p-3 text-xs font-mono"
-                  style={{ background: 'var(--base-300)', color: 'var(--base-content)' }}>
+                  className="rounded-lg p-3 text-xs font-mono bg-base-300 text-base-content"
+                 >
                   {JSON.stringify(job.result, null, 2)}
                 </motion.div>
               )}
@@ -1440,35 +1413,31 @@ const SubscriptionManagement = () => {
               <motion.div
                 animate={{ rotate: [0, 5, -5, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                className="w-9 h-9 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, var(--primary), var(--secondary))' }}>
+                className="w-9 h-9 rounded-xl flex items-center justify-center bg-[linear-gradient(135deg, var(--primary), var(--secondary))]"
+               >
                 <Crown size={17} className="text-white" />
               </motion.div>
-              <span className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ opacity: 0.4 }}>
+              <span className="text-[10px] font-black uppercase tracking-[0.18em] opacity-40">
                 Subscription Management
               </span>
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-base-content leading-tight">
               Care Plan <span className="text-gradient-primary">Tiers</span>
             </h1>
-            <p className="text-sm mt-1" style={{ opacity: 0.45 }}>
+            <p className="text-sm mt-1 opacity-45">
               Manage fixed plans, pricing, benefits, and billing configuration
             </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={() => setShowAnalytics(v => !v)}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all"
-              style={{
-                background: showAnalytics ? 'color-mix(in srgb, var(--primary), transparent 88%)' : 'var(--base-200)',
-                color: showAnalytics ? 'var(--primary)' : 'var(--base-content)',
-                border: '1.5px solid var(--base-300)',
-              }}>
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-[1.5px] border-base-300"
+              style={{ background: showAnalytics ? 'color-mix(in srgb, var(--primary), transparent 88%)' : 'var(--base-200)', color: showAnalytics ? 'var(--primary)' : 'var(--base-content)' }}>
               <BarChart2 size={13} /> Analytics
             </button>
             <button onClick={() => setShowCron(true)}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all"
-              style={{ background: 'var(--base-200)', border: '1.5px solid var(--base-300)' }}>
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-base-200 border-[1.5px] border-base-300"
+             >
               <Zap size={13} /> Cron Jobs
             </button>
             <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
@@ -1498,14 +1467,14 @@ const SubscriptionManagement = () => {
         className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         {/* Search */}
         <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ opacity: 0.4 }} />
+          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-40" />
           <input type="text" placeholder="Search plans..."
             className="input-field w-full pl-10 text-sm"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)} />
           {searchTerm && (
             <button onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2" style={{ opacity: 0.45 }}>
+              className="absolute right-3 top-1/2 -translate-y-1/2 opacity-45">
               <X size={13} />
             </button>
           )}
@@ -1515,12 +1484,8 @@ const SubscriptionManagement = () => {
         <div className="flex gap-1.5">
           {[['all', 'All'], ['active', 'Active'], ['inactive', 'Inactive']].map(([val, lbl]) => (
             <button key={val} onClick={() => setFilterActive(val)}
-              className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
-              style={{
-                background: filterActive === val ? 'var(--primary)' : 'var(--base-200)',
-                color: filterActive === val ? 'white' : 'var(--base-content)',
-                border: '1.5px solid var(--base-300)',
-              }}>
+              className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border-[1.5px] border-base-300"
+              style={{ background: filterActive === val ? 'var(--primary)' : 'var(--base-200)', color: filterActive === val ? 'white' : 'var(--base-content)' }}>
               {lbl}
             </button>
           ))}
@@ -1528,7 +1493,7 @@ const SubscriptionManagement = () => {
 
         <div className="flex items-center gap-2 ml-auto">
           {/* View mode */}
-          <div className="flex rounded-xl overflow-hidden" style={{ border: '1.5px solid var(--base-300)' }}>
+          <div className="flex rounded-xl overflow-hidden border-[1.5px] border-base-300">
             {[
               { id: 'grid',    icon: Grid,       title: 'Grid' },
               { id: 'compact', icon: LayoutList,  title: 'Compact' },
@@ -1543,7 +1508,7 @@ const SubscriptionManagement = () => {
               </button>
             ))}
           </div>
-          <span className="text-xs font-bold" style={{ opacity: 0.4 }}>
+          <span className="text-xs font-bold opacity-40">
             {filtered.length} plan{filtered.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -1556,12 +1521,12 @@ const SubscriptionManagement = () => {
           <motion.div
             animate={{ y: [0, -8, 0] }}
             transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-            className="w-16 h-16 rounded-2xl flex items-center justify-center"
-            style={{ background: 'color-mix(in srgb, var(--primary), transparent 88%)' }}>
-            <Package size={28} style={{ color: 'var(--primary)' }} />
+            className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[color-mix(in srgb, var(--primary), transparent 88%)]"
+           >
+            <Package size={28} className="text-primary" />
           </motion.div>
           <h3 className="text-lg font-black">No plans found</h3>
-          <p className="text-sm" style={{ opacity: 0.45 }}>
+          <p className="text-sm opacity-45">
             {searchTerm ? `No results for "${searchTerm}"` : 'Create your first subscription tier'}
           </p>
           {!searchTerm && (
@@ -1574,8 +1539,8 @@ const SubscriptionManagement = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="overflow-hidden rounded-2xl"
-          style={{ border: '1.5px solid var(--base-300)' }}>
+          className="overflow-hidden rounded-2xl border-[1.5px] border-base-300"
+         >
           <AnimatePresence mode="popLayout">
             {filtered.map((plan, i) => (
               <PlanCard key={plan._id} plan={plan} viewMode="compact" index={i}
@@ -1608,22 +1573,22 @@ const SubscriptionManagement = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="rounded-2xl overflow-hidden"
-          style={{ border: '1.5px solid var(--base-300)' }}>
-          <div className="flex items-center justify-between px-6 py-4" style={{ background: 'var(--base-200)', borderBottom: '1px solid var(--base-300)' }}>
+          className="rounded-2xl overflow-hidden border-[1.5px] border-base-300"
+         >
+          <div className="flex items-center justify-between px-6 py-4 bg-base-200 border-b border-base-300">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{ opacity: 0.4 }}>Admin View</p>
+              <p className="text-[10px] font-black uppercase tracking-widest mb-0.5 opacity-40">Admin View</p>
               <p className="text-sm font-black">Recent Subscriptions</p>
             </div>
             <div className="flex items-center gap-2">
-              {subLoading && <RefreshCw size={13} className="animate-spin" style={{ opacity: 0.4 }} />}
+              {subLoading && <RefreshCw size={13} className="animate-spin opacity-40" />}
               <button onClick={() => setSubPage(p => Math.max(1, p - 1))} disabled={subPage === 1}
-                className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--base-300)', opacity: subPage === 1 ? 0.35 : 1 }}>
+                className="w-7 h-7 rounded-lg flex items-center justify-center bg-base-300" style={{ opacity: subPage === 1 ? 0.35 : 1 }}>
                 <ChevronDown size={12} />
               </button>
-              <span className="text-xs font-black" style={{ opacity: 0.5 }}>pg {subPage}</span>
+              <span className="text-xs font-black opacity-50">pg {subPage}</span>
               <button onClick={() => setSubPage(p => p + 1)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--base-300)' }}>
+                className="w-7 h-7 rounded-lg flex items-center justify-center bg-base-300">
                 <ChevronUp size={12} />
               </button>
             </div>
@@ -1631,9 +1596,9 @@ const SubscriptionManagement = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--base-300)', background: 'var(--base-200)' }}>
+                <tr className="border-b border-base-300 bg-base-200">
                   {['User', 'Plan', 'Status', 'Expiry', 'Auto-Renew'].map(h => (
-                    <th key={h} className="text-left px-5 py-3 text-[10px] font-black uppercase tracking-widest" style={{ opacity: 0.4 }}>{h}</th>
+                    <th key={h} className="text-left px-5 py-3 text-[10px] font-black uppercase tracking-widest opacity-40">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1646,7 +1611,7 @@ const SubscriptionManagement = () => {
                       initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.03 }}
-                      style={{ borderBottom: '1px solid var(--base-300)' }}
+                      className="border-b border-base-300"
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--base-200)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <td className="px-5 py-3.5 font-semibold">{s.user?.name ?? '—'}</td>
@@ -1661,7 +1626,7 @@ const SubscriptionManagement = () => {
                           {s.status}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 font-medium" style={{ opacity: 0.6 }}>
+                      <td className="px-5 py-3.5 font-medium opacity-60">
                         {s.expiryDate ? new Date(s.expiryDate).toLocaleDateString('en-IN') : '—'}
                       </td>
                       <td className="px-5 py-3.5">

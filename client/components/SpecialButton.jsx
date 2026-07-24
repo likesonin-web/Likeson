@@ -260,11 +260,8 @@ function renderLabel(label, textAnimation) {
         <span className="relative z-10">{label}</span>
         <MotionSpan
           aria-hidden="true"
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.6) 50%, transparent 70%)',
-            backgroundSize: '200% 100%',
-          }}
+          className="absolute inset-0 pointer-events-none bg-[linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.6) 50%, transparent 70%)]"
+          style={{ backgroundSize: '200% 100%' }}
           variants={{ rest: { backgroundPosition: '200% 0%' }, hover: { backgroundPosition: '-200% 0%' } }}
           transition={{ duration: 0.9, ease: 'easeInOut' }}
         />

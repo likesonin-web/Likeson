@@ -75,7 +75,7 @@ const ROLE_COLORS = {
 function RoleBadge({ role }) {
   const cfg = ROLE_COLORS[role] || { bg: "rgba(107,114,128,0.1)", color: "#6b7280" };
   return (
-    <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: cfg.bg, color: cfg.color }}>
+    <span className="py-[2px] px-[8px] rounded-[20px] text-[10px] font-bold" style={{ background: cfg.bg, color: cfg.color }}>
       {role}
     </span>
   );
@@ -89,51 +89,37 @@ function RoleBadge({ role }) {
 function UserPickerRow({ u, selected, onClick }) {
   return (
     <button onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
-        borderRadius: 9, border: "none", cursor: "pointer", textAlign: "left", width: "100%",
-        background: selected ? "rgba(99,102,241,0.08)" : "transparent",
-      }}
+      className="flex items-center gap-[10px] py-[9px] px-[10px] rounded-[9px] border-none cursor-pointer text-left w-full" style={{ background: selected ? "rgba(99,102,241,0.08)" : "transparent" }}
       onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "var(--base-200,#f3f4f6)"; }}
       onMouseLeave={e => { if (!selected) e.currentTarget.style.background = selected ? "rgba(99,102,241,0.08)" : "transparent"; }}
     >
       {/* Avatar from real API `avatar` field */}
-      <div style={{ position: "relative", flexShrink: 0 }}>
+      <div className="relative shrink-0">
         {u.avatar ? (
-          <img src={u.avatar} alt="" style={{ width: 34, height: 34, borderRadius: 9, objectFit: "cover" }} />
+          <img src={u.avatar} alt="" className="w-[34px] h-[34px] rounded-[9px] object-cover" />
         ) : (
-          <div style={{
-            width: 34, height: 34, borderRadius: 9,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: "rgba(99,102,241,0.1)", fontSize: 13, fontWeight: 800,
-            color: "var(--primary,#6366f1)",
-          }}>
+          <div className="w-[34px] h-[34px] rounded-[9px] flex items-center justify-center bg-[rgba(99,102,241,0.1)] text-[13px] font-extrabold text-primary">
             {(u.name || u.email || "?")[0].toUpperCase()}
           </div>
         )}
         {/* isOnline dot — real API field */}
-        <span style={{
-          position: "absolute", bottom: 1, right: 1,
-          width: 8, height: 8, borderRadius: "50%",
-          background: u.isOnline ? "#22c55e" : "#d1d5db",
-          border: "1.5px solid var(--base-100,#fff)",
-        }} />
+        <span className="absolute bottom-[1px] right-[1px] w-[8px] h-[8px] rounded-[50%] border-[1.5px] border-base-100" style={{ background: u.isOnline ? "#22c55e" : "#d1d5db" }} />
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="flex-1 min-w-0">
         {/* name */}
-        <p style={{ fontSize: 12, fontWeight: 700, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <p className="text-[12px] font-bold m-[0px] overflow-hidden text-ellipsis whitespace-nowrap">
           {u.name || "—"}
         </p>
         {/* email */}
-        <p style={{ fontSize: 10, opacity: 0.45, margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <p className="text-[10px] opacity-45 mt-[2px] mx-[0px] mb-[0px] overflow-hidden text-ellipsis whitespace-nowrap">
           {u.email}
         </p>
       </div>
 
-      <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+      <div className="shrink-0 flex flex-col items-end gap-[4px]">
         <RoleBadge role={u.role} />
-        {selected && <CheckCircle size={11} style={{ color: "var(--primary,#6366f1)" }} />}
+        {selected && <CheckCircle size={11} className="text-primary" />}
       </div>
     </button>
   );
@@ -154,79 +140,69 @@ function SessionCard({ session, index, onRevoke, revoking }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ delay: Math.min(index * 0.04, 0.28) }}
-      style={{
-        padding: "14px 18px", borderRadius: 12,
-        border: "1px solid var(--base-300,#e5e7eb)",
-        background: "var(--base-100,#fff)",
-        display: "flex", alignItems: "flex-start", gap: 14,
-        opacity: isStale ? 0.55 : 1,
-      }}
+      className="py-[14px] px-[18px] rounded-[12px] border border-base-300 bg-base-100 flex items-start gap-[14px]" style={{ opacity: isStale ? 0.55 : 1 }}
     >
       {/* Device icon */}
-      <div style={{
-        width: 38, height: 38, borderRadius: 9, flexShrink: 0,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: isStale ? "rgba(107,114,128,0.08)" : "rgba(99,102,241,0.1)",
-      }}>
+      <div className="w-[38px] h-[38px] rounded-[9px] shrink-0 flex items-center justify-center" style={{ background: isStale ? "rgba(107,114,128,0.08)" : "rgba(99,102,241,0.1)" }}>
         <PIcon size={17} style={{ color: isStale ? "#6b7280" : "var(--primary,#6366f1)" }} />
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="flex-1 min-w-0">
         {/* Title + status badges */}
-        <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", marginBottom: 5 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>
+        <div className="flex items-center gap-[7px] flex-wrap mb-[5px]">
+          <p className="text-[13px] font-bold m-[0px]">
             {session.deviceName || session.platform || "Unknown device"}
           </p>
           {session.isCurrent && (
-            <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 800, background: "rgba(34,197,94,0.12)", color: "#16a34a", letterSpacing: "0.05em" }}>
+            <span className="py-[2px] px-[8px] rounded-[20px] text-[10px] font-extrabold bg-[rgba(34,197,94,0.12)] text-[#16a34a] tracking-[0.05em]">
               CURRENT
             </span>
           )}
           {session.isRevoked && (
-            <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: "rgba(239,68,68,0.08)", color: "#dc2626" }}>
+            <span className="py-[2px] px-[8px] rounded-[20px] text-[10px] font-bold bg-[rgba(239,68,68,0.08)] text-[#dc2626]">
               REVOKED
             </span>
           )}
           {session.isExpired && !session.isRevoked && (
-            <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: "rgba(107,114,128,0.1)", color: "#6b7280" }}>
+            <span className="py-[2px] px-[8px] rounded-[20px] text-[10px] font-bold bg-[rgba(107,114,128,0.1)] text-[#6b7280]">
               EXPIRED
             </span>
           )}
         </div>
 
         {/* IP, location, userAgent */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 11, opacity: 0.5, marginBottom: 6 }}>
+        <div className="flex flex-wrap gap-[10px] text-[11px] opacity-50 mb-[6px]">
           {session.ip && (
-            <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span className="flex items-center gap-[3px]">
               <Globe size={9} />{session.ip}
             </span>
           )}
           {session.location && (
-            <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span className="flex items-center gap-[3px]">
               <MapPin size={9} />{session.location}
             </span>
           )}
           {session.userAgent && (
-            <span style={{ fontFamily: "monospace", fontSize: 10, maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span className="font-mono text-[10px] max-w-[300px] overflow-hidden text-ellipsis whitespace-nowrap">
               {session.userAgent}
             </span>
           )}
         </div>
 
         {/* Timestamps */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 11, opacity: 0.4 }}>
+        <div className="flex flex-wrap gap-[14px] text-[11px] opacity-40">
           {session.createdAt && (
-            <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span className="flex items-center gap-[3px]">
               <Clock size={9} />Signed in {fmt(session.createdAt)}
             </span>
           )}
           {session.lastActiveAt && (
-            <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span className="flex items-center gap-[3px]">
               <Activity size={9} />Active {timeAgo(session.lastActiveAt)}
             </span>
           )}
           {session.expiresAt && (
-            <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span className="flex items-center gap-[3px]">
               <Key size={9} />Expires {fmt(session.expiresAt)}
             </span>
           )}
@@ -235,25 +211,20 @@ function SessionCard({ session, index, onRevoke, revoking }) {
 
       {/* Revoke — only for non-current, non-stale */}
       {!session.isCurrent && !isStale && (
-        <div style={{ flexShrink: 0 }}>
+        <div className="shrink-0">
           {!confirm ? (
             <button onClick={() => setConfirm(true)}
-              style={{
-                display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
-                borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                background: "rgba(239,68,68,0.08)", color: "#dc2626",
-                border: "1px solid rgba(239,68,68,0.2)",
-              }}>
+              className="flex items-center gap-[5px] py-[6px] px-[12px] rounded-[8px] text-[12px] font-bold cursor-pointer bg-[rgba(239,68,68,0.08)] text-[#dc2626] border border-[rgba(239,68,68,0.2)]">
               <LogOut size={12} />Revoke
             </button>
           ) : (
-            <div style={{ display: "flex", gap: 6 }}>
+            <div className="flex gap-[6px]">
               <button onClick={() => { onRevoke(session._id); setConfirm(false); }} disabled={revoking}
-                style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#dc2626", color: "white", border: "none", cursor: revoking ? "not-allowed" : "pointer", opacity: revoking ? 0.6 : 1 }}>
+                className="py-[6px] px-[12px] rounded-[8px] text-[12px] font-bold bg-[#dc2626] text-[white] border-none" style={{ cursor: revoking ? "not-allowed" : "pointer", opacity: revoking ? 0.6 : 1 }}>
                 {revoking ? "…" : "Yes"}
               </button>
               <button onClick={() => setConfirm(false)}
-                style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "var(--base-200,#f3f4f6)", border: "none", cursor: "pointer" }}>
+                className="py-[6px] px-[12px] rounded-[8px] text-[12px] font-bold bg-base-200 border-none cursor-pointer">
                 No
               </button>
             </div>
@@ -338,66 +309,63 @@ export default function SessionManagement() {
   const expiredSessions = (sessions || []).filter(s => s.isRevoked  || s.isExpired);
 
   return (
-    <div style={{ minHeight: "100vh", padding: 24, background: "var(--base-100,#f9fafb)" }}>
+    <div className="min-h-[100vh] p-[24px] bg-base-100">
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-          <Link href="/admin" style={{ fontSize: 12, opacity: 0.45, textDecoration: "none" }}>Admin</Link>
-          <ChevronRight size={12} style={{ opacity: 0.3 }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary,#6366f1)" }}>Session Management</span>
+      <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-[28px]">
+        <div className="flex items-center gap-[6px] mb-[6px]">
+          <Link href="/admin" className="text-[12px] opacity-45 no-underline">Admin</Link>
+          <ChevronRight size={12} className="opacity-30" />
+          <span className="text-[12px] font-bold text-primary">Session Management</span>
         </div>
-        <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0, letterSpacing: "-0.02em" }}>Session Management</h1>
-        <p style={{ fontSize: 13, opacity: 0.45, marginTop: 4 }}>View and revoke active login sessions for any user</p>
+        <h1 className="text-[24px] font-black m-[0px] tracking-[-0.02em]">Session Management</h1>
+        <p className="text-[13px] opacity-45 mt-[4px]">View and revoke active login sessions for any user</p>
       </motion.div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 20, alignItems: "start" }}>
+      <div className="grid grid-cols-[320px_1fr] gap-[20px]" style={{ alignItems: "start" }}>
 
         {/* ── LEFT SIDEBAR ─────────────────────────────────────────────────── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="flex flex-col gap-[14px]">
 
           {/* Manual ID lookup */}
-          <div style={{ padding: "18px 20px", borderRadius: 14, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-            <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12 }}>
+          <div className="py-[18px] px-[20px] rounded-[14px] border border-base-300 bg-base-100">
+            <p className="text-[11px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[12px]">
               Lookup by User ID
             </p>
-            <form onSubmit={handleManualFetch} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{
-                display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
-                border: `1px solid ${idError ? "#ef4444" : "var(--base-300,#e5e7eb)"}`, borderRadius: 9,
-              }}>
-                <Key size={13} style={{ opacity: 0.4, flexShrink: 0 }} />
+            <form onSubmit={handleManualFetch} className="flex flex-col gap-[8px]">
+              <div className="flex items-center gap-[8px] py-[8px] px-[12px] rounded-[9px]" style={{ border: `1px solid ${idError ? "#ef4444" : "var(--base-300,#e5e7eb)"}` }}>
+                <Key size={13} className="opacity-40 shrink-0" />
                 <input value={userIdInput}
                   onChange={e => { setUserIdInput(e.target.value); if (idError) setIdError(""); }}
                   placeholder="664abc123def456789012345" maxLength={24}
-                  style={{ border: "none", outline: "none", fontSize: 12, fontFamily: "monospace", background: "transparent", flex: 1 }} />
+                  className="border-none outline-none text-[12px] font-mono bg-[transparent] flex-1" />
               </div>
-              {idError && <p style={{ fontSize: 11, color: "#ef4444", fontWeight: 600, margin: 0 }}>{idError}</p>}
+              {idError && <p className="text-[11px] text-[#ef4444] font-semibold m-[0px]">{idError}</p>}
               <button type="submit" disabled={sessionsLoading}
-                style={{ padding: "8px 0", borderRadius: 9, fontSize: 13, fontWeight: 700, background: "var(--primary,#6366f1)", color: "white", border: "none", cursor: sessionsLoading ? "not-allowed" : "pointer", opacity: sessionsLoading ? 0.6 : 1 }}>
+                className="py-[8px] px-[0px] rounded-[9px] text-[13px] font-bold bg-primary text-[white] border-none" style={{ cursor: sessionsLoading ? "not-allowed" : "pointer", opacity: sessionsLoading ? 0.6 : 1 }}>
                 {sessionsLoading ? "Loading…" : "Fetch Sessions"}
               </button>
             </form>
           </div>
 
           {/* User picker — uses real API fields */}
-          <div style={{ padding: "18px 20px", borderRadius: 14, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-            <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>
+          <div className="py-[18px] px-[20px] rounded-[14px] border border-base-300 bg-base-100">
+            <p className="text-[11px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[10px]">
               Or pick a user
             </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", border: "1px solid var(--base-300,#e5e7eb)", borderRadius: 9, marginBottom: 10 }}>
-              <Search size={13} style={{ opacity: 0.4 }} />
+            <div className="flex items-center gap-[8px] py-[7px] px-[12px] border border-base-300 rounded-[9px] mb-[10px]">
+              <Search size={13} className="opacity-40" />
               <input value={userSearch} onChange={e => setUserSearch(e.target.value)}
                 placeholder="Search name or email…"
-                style={{ border: "none", outline: "none", fontSize: 12, background: "transparent", flex: 1 }} />
+                className="border-none outline-none text-[12px] bg-[transparent] flex-1" />
             </div>
-            <div style={{ maxHeight: 300, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
+            <div className="max-h-[300px] overflow-y-auto flex flex-col gap-[2px]">
               {usersLoading ? (
-                <div style={{ padding: "20px 0", textAlign: "center", opacity: 0.4, fontSize: 12 }}>
-                  <RefreshCw size={16} style={{ display: "block", margin: "0 auto 6px" }} className="animate-spin" />Loading…
+                <div className="py-[20px] px-[0px] text-center opacity-40 text-[12px]">
+                  <RefreshCw size={16} className="block mt-[0px] mx-[auto] mb-[6px] animate-spin" />Loading…
                 </div>
               ) : allUsers.length === 0 ? (
-                <p style={{ fontSize: 12, opacity: 0.35, textAlign: "center", padding: "20px 0" }}>No users found</p>
+                <p className="text-[12px] opacity-35 text-center py-[20px] px-[0px]">No users found</p>
               ) : allUsers.map(u => (
                 <UserPickerRow key={u._id} u={u} selected={selectedUserId === u._id} onClick={() => selectFromPicker(u)} />
               ))}
@@ -409,73 +377,73 @@ export default function SessionManagement() {
         <div>
           {!selectedUserId ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              style={{ padding: "60px 40px", borderRadius: 16, textAlign: "center", border: "1px dashed var(--base-300,#e5e7eb)", opacity: 0.4 }}>
-              <Shield size={36} style={{ margin: "0 auto 14px" }} />
-              <p style={{ fontSize: 14, fontWeight: 700 }}>Select a user to view their sessions</p>
-              <p style={{ fontSize: 12, marginTop: 4 }}>Pick from the list or enter a User ID</p>
+              className="py-[60px] px-[40px] rounded-[16px] text-center border border-dashed border-base-300 opacity-40">
+              <Shield size={36} className="mt-[0px] mx-[auto] mb-[14px]" />
+              <p className="text-[14px] font-bold">Select a user to view their sessions</p>
+              <p className="text-[12px] mt-[4px]">Pick from the list or enter a User ID</p>
             </motion.div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="flex flex-col gap-[16px]">
 
               {/* Selected user header — uses real API fields from selectedUserInfo */}
               {selectedUserInfo && (
                 <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-                  style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
+                  className="flex items-center gap-[14px] py-[14px] px-[18px] rounded-[12px] border border-base-300 bg-base-100">
                   {/* avatar — real field */}
-                  <div style={{ position: "relative", flexShrink: 0 }}>
+                  <div className="relative shrink-0">
                     {selectedUserInfo.avatar ? (
-                      <img src={selectedUserInfo.avatar} alt="" style={{ width: 46, height: 46, borderRadius: 11, objectFit: "cover" }} />
+                      <img src={selectedUserInfo.avatar} alt="" className="w-[46px] h-[46px] rounded-[11px] object-cover" />
                     ) : (
-                      <div style={{ width: 46, height: 46, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(99,102,241,0.1)", fontSize: 18, fontWeight: 900, color: "var(--primary,#6366f1)" }}>
+                      <div className="w-[46px] h-[46px] rounded-[11px] flex items-center justify-center bg-[rgba(99,102,241,0.1)] text-[18px] font-black text-primary">
                         {(selectedUserInfo.name || selectedUserInfo.email || "?")[0].toUpperCase()}
                       </div>
                     )}
                     {/* isOnline — real field */}
-                    <span style={{ position: "absolute", bottom: 1, right: 1, width: 10, height: 10, borderRadius: "50%", background: selectedUserInfo.isOnline ? "#22c55e" : "#d1d5db", border: "2px solid var(--base-100,#fff)" }} />
+                    <span className="absolute bottom-[1px] right-[1px] w-[10px] h-[10px] rounded-[50%] border-[2px] border-base-100" style={{ background: selectedUserInfo.isOnline ? "#22c55e" : "#d1d5db" }} />
                   </div>
 
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-[8px] flex-wrap mb-[3px]">
                       {/* name — real field */}
-                      <p style={{ fontSize: 14, fontWeight: 800, margin: 0 }}>{selectedUserInfo.name || "—"}</p>
+                      <p className="text-[14px] font-extrabold m-[0px]">{selectedUserInfo.name || "—"}</p>
                       <RoleBadge role={selectedUserInfo.role} />
                       {selectedUserInfo.isBlocked && (
-                        <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: "rgba(239,68,68,0.1)", color: "#dc2626" }}>Blocked</span>
+                        <span className="py-[2px] px-[8px] rounded-[20px] text-[10px] font-bold bg-[rgba(239,68,68,0.1)] text-[#dc2626]">Blocked</span>
                       )}
                     </div>
                     {/* email · phone · lastLoginAt — all real fields */}
-                    <p style={{ fontSize: 11, opacity: 0.45, margin: 0 }}>
+                    <p className="text-[11px] opacity-45 m-[0px]">
                       {selectedUserInfo.email} · {selectedUserInfo.phone} · Last login {fmt(selectedUserInfo.lastLoginAt)}
                     </p>
                     {/* lastLoginIp — real field */}
                     {selectedUserInfo.lastLoginIp && (
-                      <p style={{ fontSize: 10, opacity: 0.3, margin: "2px 0 0", fontFamily: "monospace" }}>
+                      <p className="text-[10px] opacity-30 mt-[2px] mx-[0px] mb-[0px] font-mono">
                         IP {selectedUserInfo.lastLoginIp} · Logins: {selectedUserInfo.loginCount}
                       </p>
                     )}
                   </div>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <div className="flex items-center gap-[8px] shrink-0">
                     <button onClick={() => loadSessions(selectedUserId)} disabled={sessionsLoading}
-                      style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: "transparent" }}>
-                      <RefreshCw size={14} style={{ opacity: 0.5 }} className={sessionsLoading ? "animate-spin" : ""} />
+                      className="w-[34px] h-[34px] rounded-[8px] border border-base-300 flex items-center justify-center cursor-pointer bg-[transparent]">
+                      <RefreshCw size={14} className={`opacity-50 ${sessionsLoading ? "animate-spin" : ""}`} />
                     </button>
 
                     {activeSessions.length > 0 && (
                       !confirmRevokeAll ? (
                         <button onClick={() => setConfirmRevokeAll(true)}
-                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.2)" }}>
+                          className="flex items-center gap-[6px] py-[7px] px-[14px] rounded-[8px] text-[12px] font-bold cursor-pointer bg-[rgba(239,68,68,0.08)] text-[#dc2626] border border-[rgba(239,68,68,0.2)]">
                           <LogOut size={13} />Revoke All
                         </button>
                       ) : (
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#dc2626" }}>Sure?</span>
+                        <div className="flex gap-[6px] items-center">
+                          <span className="text-[12px] font-semibold text-[#dc2626]">Sure?</span>
                           <button onClick={handleRevokeAll} disabled={revokeAllLoading}
-                            style={{ padding: "6px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700, background: "#dc2626", color: "white", border: "none", cursor: "pointer", opacity: revokeAllLoading ? 0.6 : 1 }}>
+                            className="py-[6px] px-[12px] rounded-[7px] text-[12px] font-bold bg-[#dc2626] text-[white] border-none cursor-pointer" style={{ opacity: revokeAllLoading ? 0.6 : 1 }}>
                             {revokeAllLoading ? "…" : "Yes"}
                           </button>
                           <button onClick={() => setConfirmRevokeAll(false)}
-                            style={{ padding: "6px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700, background: "var(--base-200,#f3f4f6)", border: "none", cursor: "pointer" }}>
+                            className="py-[6px] px-[12px] rounded-[7px] text-[12px] font-bold bg-base-200 border-none cursor-pointer">
                             No
                           </button>
                         </div>
@@ -487,7 +455,7 @@ export default function SessionManagement() {
 
               {/* Stats */}
               {sessions && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                <div className="grid grid-cols-[repeat(3,_1fr)] gap-[12px]">
                   {[
                     { label: "Total",          value: sessions.length,        color: "var(--primary,#6366f1)", icon: Users       },
                     { label: "Active",         value: activeSessions.length,  color: "#16a34a",               icon: CheckCircle },
@@ -495,11 +463,11 @@ export default function SessionManagement() {
                   ].map(s => {
                     const SIcon = s.icon;
                     return (
-                      <div key={s.label} style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)", display: "flex", alignItems: "center", gap: 10 }}>
-                        <SIcon size={18} style={{ color: s.color, flexShrink: 0 }} />
+                      <div key={s.label} className="py-[14px] px-[16px] rounded-[12px] border border-base-300 bg-base-100 flex items-center gap-[10px]">
+                        <SIcon size={18} className="shrink-0" style={{ color: s.color }} />
                         <div>
-                          <p style={{ fontSize: 20, fontWeight: 900, color: s.color, margin: 0 }}>{s.value}</p>
-                          <p style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>{s.label}</p>
+                          <p className="text-[20px] font-black m-[0px]" style={{ color: s.color }}>{s.value}</p>
+                          <p className="text-[10px] font-bold opacity-45 uppercase tracking-[0.06em] m-[0px]">{s.label}</p>
                         </div>
                       </div>
                     );
@@ -509,9 +477,9 @@ export default function SessionManagement() {
 
               {/* Loading */}
               {sessionsLoading && (
-                <div style={{ padding: "40px 0", textAlign: "center", opacity: 0.4 }}>
-                  <RefreshCw size={24} className="animate-spin" style={{ display: "block", margin: "0 auto 10px" }} />
-                  <p style={{ fontSize: 13 }}>Loading sessions…</p>
+                <div className="py-[40px] px-[0px] text-center opacity-40">
+                  <RefreshCw size={24} className="animate-spin block mt-[0px] mx-[auto] mb-[10px]" />
+                  <p className="text-[13px]">Loading sessions…</p>
                 </div>
               )}
 
@@ -519,15 +487,15 @@ export default function SessionManagement() {
                 <>
                   {/* Active */}
                   <div>
-                    <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>
+                    <p className="text-[11px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[10px]">
                       Active Sessions ({activeSessions.length})
                     </p>
                     {activeSessions.length === 0 ? (
-                      <div style={{ padding: "24px", borderRadius: 12, border: "1px dashed var(--base-300,#e5e7eb)", textAlign: "center", opacity: 0.35 }}>
-                        <p style={{ fontSize: 13 }}>No active sessions</p>
+                      <div className="p-[24px] rounded-[12px] border border-dashed border-base-300 text-center opacity-35">
+                        <p className="text-[13px]">No active sessions</p>
                       </div>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div className="flex flex-col gap-[10px]">
                         <AnimatePresence>
                           {activeSessions.map((s, i) => (
                             <SessionCard key={s._id} session={s} index={i} onRevoke={handleRevoke} revoking={revokeLoading} />
@@ -540,10 +508,10 @@ export default function SessionManagement() {
                   {/* Expired / revoked */}
                   {expiredSessions.length > 0 && (
                     <div>
-                      <p style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>
+                      <p className="text-[11px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[10px]">
                         Expired / Revoked ({expiredSessions.length})
                       </p>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div className="flex flex-col gap-[10px]">
                         {expiredSessions.map((s, i) => (
                           <SessionCard key={s._id} session={s} index={i} onRevoke={() => {}} revoking={false} />
                         ))}
@@ -552,9 +520,9 @@ export default function SessionManagement() {
                   )}
 
                   {sessions.length === 0 && (
-                    <div style={{ padding: "40px", borderRadius: 14, border: "1px dashed var(--base-300,#e5e7eb)", textAlign: "center", opacity: 0.35 }}>
-                      <Lock size={28} style={{ margin: "0 auto 10px" }} />
-                      <p style={{ fontSize: 13, fontWeight: 600 }}>No sessions found for this user</p>
+                    <div className="p-[40px] rounded-[14px] border border-dashed border-base-300 text-center opacity-35">
+                      <Lock size={28} className="mt-[0px] mx-[auto] mb-[10px]" />
+                      <p className="text-[13px] font-semibold">No sessions found for this user</p>
                     </div>
                   )}
                 </>

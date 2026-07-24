@@ -123,8 +123,6 @@ const getTokens = (type) => THEME_MAP[type] || THEME_MAP.info;
 const isCurrentlyLive = (marquee) => {
   const now = new Date();
   
-  // FIX: Only check status and dates if they actually exist in the API response.
-  // The backend already filters for live marquees, so missing = safe to show.
   if (marquee.status && marquee.status !== 'published') return false;
   if (marquee.startsAt && new Date(marquee.startsAt) > now) return false;
   if (marquee.endsAt && new Date(marquee.endsAt) <= now) return false;
@@ -147,7 +145,6 @@ function useCarousel(length) {
     return () => clearInterval(timer);
   }, [length, next, paused]);
 
-  // Safeguard: Ensure idx never falls out of bounds if array shrinks
   useEffect(() => {
     if (length > 0) setIdx((i) => Math.min(i, length - 1));
   }, [length]);
@@ -158,7 +155,7 @@ function useCarousel(length) {
 // ─── UI Components ───────────────────────────────────────────────────────────
 
 const StatusDot = memo(({ tokens }) => (
-  <span className="relative inline-flex w-2 h-2 flex-shrink-0" aria-hidden="true">
+  <span className="relative inline-flex w-2.5 h-2.5 flex-shrink-0" aria-hidden="true">
     {tokens.urgent && (
       <motion.span
         className={`absolute inset-0 rounded-full ${tokens.dot}`}
@@ -166,17 +163,19 @@ const StatusDot = memo(({ tokens }) => (
         transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
       />
     )}
-    <span className={`relative inline-flex w-2 h-2 rounded-full ${tokens.dot}`} />
+    <span className={`relative inline-flex w-2.5 h-2.5 rounded-full ${tokens.dot}`} />
   </span>
 ));
 StatusDot.displayName = 'StatusDot';
 
 const IconBubble = memo(({ tokens, animate }) => {
   const Icon = tokens.icon;
-  const iconEl = <Icon className="w-3.5 h-3.5" strokeWidth={2.3} />;
+  // Increased icon size slightly
+  const iconEl = <Icon className="w-4 h-4" strokeWidth={2.3} />;
   
   return (
-    <span className={`flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center ${tokens.iconWrap}`} aria-hidden="true">
+    // Increased bubble size from w-6/h-6 to w-8/h-8
+    <span className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${tokens.iconWrap}`} aria-hidden="true">
       {animate ? (
         <motion.span animate={{ rotate: [-4, 4, -4] }} transition={{ duration: 0.45, repeat: Infinity, ease: 'easeInOut' }}>
           {iconEl}
@@ -188,7 +187,7 @@ const IconBubble = memo(({ tokens, animate }) => {
 IconBubble.displayName = 'IconBubble';
 
 const AccentBar = memo(({ tokens, animated }) => {
-  const barClass = `h-[2.5px] w-full bg-gradient-to-r ${tokens.bar}`;
+  const barClass = `h-[3px] w-full bg-gradient-to-r ${tokens.bar}`; // slightly thicker bar
   if (!animated) return <div className={barClass} aria-hidden="true" />;
   
   return (
@@ -214,11 +213,12 @@ const ScrollRow = memo(({ message, subText, tokens, dur, paused }) => (
     {[0, 1, 2].map((i) => (
       <span key={i} className="inline-flex items-center gap-3 font-poppins">
         <StatusDot tokens={tokens} />
-        <span className={`text-xs font-semibold tracking-wide ${tokens.text}`}>
+        {/* Increased text sizes */}
+        <span className={`text-sm font-semibold tracking-wide ${tokens.text}`}>
           {message}
         </span>
-        {subText && <span className={`text-xs font-normal ${tokens.subtext}`}>— {subText}</span>}
-        <span className={`text-[10px] font-bold select-none ${tokens.separator}`} aria-hidden="true">✦</span>
+        {subText && <span className={`text-sm font-normal ${tokens.subtext}`}>— {subText}</span>}
+        <span className={`text-xs font-bold select-none ${tokens.separator}`} aria-hidden="true">✦</span>
       </span>
     ))}
   </motion.div>
@@ -228,7 +228,6 @@ ScrollRow.displayName = 'ScrollRow';
 const CtaPill = memo(({ cta, tokens, onCtaClick, id }) => {
   if (!cta?.url || !cta?.label) return null;
 
-  // Intelligently route based on URL type
   const isExternal = cta.url.startsWith('http') || cta.target === '_blank';
   const Component = isExternal ? 'a' : Link;
 
@@ -238,11 +237,12 @@ const CtaPill = memo(({ cta, tokens, onCtaClick, id }) => {
       target={cta.target || '_self'}
       rel={isExternal ? 'noopener noreferrer' : undefined}
       onClick={() => onCtaClick(id)}
-      className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary font-poppins ${tokens.pill}`}
+      // Increased padding and font size for the button (px-4 py-1.5 text-xs)
+      className={`inline-flex items-center gap-1 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary font-poppins ${tokens.pill}`}
       aria-label={`${cta.label}${cta.target === '_blank' ? ' (opens in new tab)' : ''}`}
     >
       {cta.label}
-      {cta.target === '_blank' && <ExternalLink className="w-2.5 h-2.5" aria-hidden="true" />}
+      {cta.target === '_blank' && <ExternalLink className="w-3 h-3" aria-hidden="true" />}
     </Component>
   );
 });
@@ -265,10 +265,11 @@ const MarqueeStrip = memo(({ marquee, onDismiss, onCtaClick }) => {
       className={`w-full border-b overflow-hidden bg-gradient-to-r ${tokens.gradient}`}
     >
       <AccentBar tokens={tokens} />
-      <div className="relative flex items-center h-8 px-3 gap-2.5 max-w-screen-2xl mx-auto">
+      {/* Increased height from h-8 to h-12 */}
+      <div className="relative flex items-center h-12 px-3 gap-3 max-w-screen-2xl mx-auto">
         <IconBubble tokens={tokens} animate={tokens.urgent} />
 
-        {marquee.icon && <span className="flex-shrink-0 text-sm leading-none" aria-hidden="true">{marquee.icon}</span>}
+        {marquee.icon && <span className="flex-shrink-0 text-base leading-none" aria-hidden="true">{marquee.icon}</span>}
 
         <div
           className="flex-1 overflow-hidden relative cursor-default"
@@ -280,16 +281,17 @@ const MarqueeStrip = memo(({ marquee, onDismiss, onCtaClick }) => {
           <ScrollRow message={marquee.message} subText={marquee.subText} tokens={tokens} dur={dur} paused={paused} />
         </div>
 
-        <div className="flex-shrink-0 flex items-center gap-1.5 ml-2">
+        <div className="flex-shrink-0 flex items-center gap-2 ml-2">
           <CtaPill cta={marquee.cta} tokens={tokens} onCtaClick={onCtaClick} id={marquee._id} />
           {marquee.isDismissible !== false && (
             <button
               type="button"
               onClick={() => onDismiss(marquee)}
               aria-label="Dismiss announcement"
-              className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 outline-none ${tokens.dismiss}`}
+              // Increased dismiss button size (w-7 h-7) and icon size (w-4 h-4)
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 outline-none ${tokens.dismiss}`}
             >
-              <X className="w-3 h-3" strokeWidth={2.5} aria-hidden="true" />
+              <X className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -313,14 +315,15 @@ const MarqueeCarousel = memo(({ marquees, onDismiss, onCtaClick }) => {
       className={`w-full border-b overflow-hidden transition-colors duration-500 bg-gradient-to-r ${tokens.gradient}`}
     >
       <AccentBar tokens={tokens} animated />
-      <div className="relative flex items-center h-8 px-3 gap-2 max-w-screen-2xl mx-auto">
+      {/* Increased height from h-8 to h-12 */}
+      <div className="relative flex items-center h-12 px-3 gap-3 max-w-screen-2xl mx-auto">
         <button
           type="button"
           onClick={prev}
           aria-label="Previous announcement"
-          className={`flex-shrink-0 hidden md:flex items-center gap-0.5 text-[10px] font-bold tabular-nums transition-colors outline-none font-poppins ${tokens.counter}`}
+          className={`flex-shrink-0 hidden md:flex items-center gap-0.5 text-xs font-bold tabular-nums transition-colors outline-none font-poppins ${tokens.counter}`}
         >
-          <ChevronLeft className="w-3 h-3" aria-hidden="true" />
+          <ChevronLeft className="w-4 h-4" aria-hidden="true" />
           <span aria-hidden="true">{idx + 1}/{marquees.length}</span>
         </button>
 
@@ -344,20 +347,21 @@ const MarqueeCarousel = memo(({ marquees, onDismiss, onCtaClick }) => {
           </AnimatePresence>
         </div>
 
-        <div className="flex-shrink-0 flex items-center gap-1.5 ml-2">
+        <div className="flex-shrink-0 flex items-center gap-2 ml-2">
           <CtaPill cta={current.cta} tokens={tokens} onCtaClick={onCtaClick} id={current._id} />
           {current.isDismissible !== false && (
             <button
               type="button"
               onClick={() => onDismiss(current)}
               aria-label="Dismiss announcement"
-              className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 outline-none ${tokens.dismiss}`}
+              // Increased dismiss button size
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 outline-none ${tokens.dismiss}`}
             >
-              <X className="w-3 h-3" strokeWidth={2.5} aria-hidden="true" />
+              <X className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
             </button>
           )}
           <button type="button" onClick={next} aria-label="Next announcement" className={`flex-shrink-0 transition-colors outline-none ${tokens.counter}`}>
-            <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+            <ChevronRight className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -371,12 +375,10 @@ MarqueeCarousel.displayName = 'MarqueeCarousel';
 export default function Marquee() {
   const dispatch = useDispatch();
   
-  // Explicit fallback to empty array to prevent fatal selector errors
   const allMarquees = useSelector(selectMarquees) || [];
   const loading = useSelector(selectUserLoading);
   const user = useSelector((s) => s.user?.user) || null;
 
-  // Hydration state sync
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -400,7 +402,6 @@ export default function Marquee() {
     dispatch(trackMarqueeClick(id)); 
   }, [dispatch]);
 
-  // Prevent rendering on server to avoid hydration mismatch, and handle loading/empty states
   if (!isMounted || loading || visible.length === 0) return null;
 
   return (

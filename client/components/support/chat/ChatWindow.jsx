@@ -53,6 +53,7 @@ export default function ChatWindow({ ticketId, currentUser }) {
   const highlightTimeoutRef = useRef(null);
 
   useEffect(() => {
+    if (!ticketId) return undefined;
     let cancelled = false;
 
     async function joinWithRetry(attempt = 1) {
@@ -172,7 +173,7 @@ export default function ChatWindow({ ticketId, currentUser }) {
         {messages.length === 0 ? (
           <EmptyState icon="inbox" title="No messages yet" description="Send the first message to get things moving." />
         ) : (
-          <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+          <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const item = items[virtualRow.index];
               return (
@@ -180,7 +181,7 @@ export default function ChatWindow({ ticketId, currentUser }) {
                   key={item._id}
                   data-index={virtualRow.index}
                   ref={virtualizer.measureElement}
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)` }}
+                  className="absolute top-[0px] left-[0px] w-full" style={{ transform: `translateY(${virtualRow.start}px)` }}
                 >
                   {item.__type === 'separator' ? (
                     <div className="flex justify-center my-3">

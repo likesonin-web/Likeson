@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Image from "next/image";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -127,7 +128,7 @@ function getPlatformIcon(platform) {
 function RoleBadge({ role }) {
   const cfg = ROLE_COLORS[role] || { bg: "rgba(107,114,128,0.1)", color: "#6b7280" };
   return (
-    <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: cfg.bg, color: cfg.color }}>
+    <span className="py-[2px] px-[8px] rounded-[20px] text-[10px] font-bold" style={{ background: cfg.bg, color: cfg.color }}>
       {role}
     </span>
   );
@@ -136,7 +137,7 @@ function RoleBadge({ role }) {
 function KycBadge({ status, size = "sm" }) {
   const cfg = kycCfg(status);
   return (
-    <span style={{ padding: size === "lg" ? "6px 14px" : "3px 10px", borderRadius: 20, fontSize: size === "lg" ? 12 : 11, fontWeight: 700, background: cfg.bg, color: cfg.color }}>
+    <span className="rounded-[20px] font-bold" style={{ padding: size === "lg" ? "6px 14px" : "3px 10px", fontSize: size === "lg" ? 12 : 11, background: cfg.bg, color: cfg.color }}>
       {cfg.label}
     </span>
   );
@@ -144,30 +145,25 @@ function KycBadge({ status, size = "sm" }) {
 
 function SectionCard({ title, icon: Icon, iconColor = "var(--primary,#6366f1)", children, badge }) {
   return (
-    <div style={{ borderRadius: 14, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)", overflow: "hidden" }}>
-      <div style={{ padding: "13px 20px", borderBottom: "1px solid var(--base-300,#e5e7eb)", display: "flex", alignItems: "center", gap: 8 }}>
+    <div className="rounded-[14px] border border-base-300 bg-base-100 overflow-hidden">
+      <div className="py-[13px] px-[20px] border-b border-base-300 flex items-center gap-[8px]">
         <Icon size={14} style={{ color: iconColor }} />
-        <p style={{ fontSize: 13, fontWeight: 800, margin: 0, flex: 1 }}>{title}</p>
+        <p className="text-[13px] font-extrabold m-[0px] flex-1">{title}</p>
         {badge}
       </div>
-      <div style={{ padding: "16px 20px" }}>{children}</div>
+      <div className="py-[16px] px-[20px]">{children}</div>
     </div>
   );
 }
 
 function InfoRow({ label, value, mono, badge, last }) {
   return (
-    <div style={{
-      display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12,
-      paddingBottom: last ? 0 : 10,
-      borderBottom: last ? "none" : "1px solid var(--base-200,#f3f4f6)",
-      marginBottom: last ? 0 : 10,
-    }}>
-      <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.07em", flexShrink: 0, width: 140 }}>
+    <div className="flex items-start justify-between gap-[12px]" style={{ paddingBottom: last ? 0 : 10, borderBottom: last ? "none" : "1px solid var(--base-200,#f3f4f6)", marginBottom: last ? 0 : 10 }}>
+      <span className="text-[11px] font-bold opacity-40 uppercase tracking-[0.07em] shrink-0 w-[140px]">
         {label}
       </span>
       {badge || (
-        <span style={{ fontSize: 12, textAlign: "right", flex: 1, fontFamily: mono ? "monospace" : "inherit", fontWeight: mono ? 400 : 600, wordBreak: "break-all" }}>
+        <span className="text-[12px] text-right flex-1" style={{ fontFamily: mono ? "monospace" : "inherit", fontWeight: mono ? 400 : 600, wordBreak: "break-all" }}>
           {value ?? "—"}
         </span>
       )}
@@ -182,31 +178,27 @@ function InfoRow({ label, value, mono, badge, last }) {
 function UserPickerRow({ u, selected, onClick }) {
   return (
     <button onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 9, padding: "8px 9px",
-        borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", width: "100%",
-        background: selected ? "rgba(99,102,241,0.08)" : "transparent",
-      }}
+      className="flex items-center gap-[9px] py-[8px] px-[9px] rounded-[8px] border-none cursor-pointer text-left w-full" style={{ background: selected ? "rgba(99,102,241,0.08)" : "transparent" }}
       onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "var(--base-200,#f3f4f6)"; }}
       onMouseLeave={e => { e.currentTarget.style.background = selected ? "rgba(99,102,241,0.08)" : "transparent"; }}
     >
-      <div style={{ position: "relative", flexShrink: 0 }}>
+      <div className="relative shrink-0">
         {u.avatar ? (
-          <img src={u.avatar} alt="" style={{ width: 30, height: 30, borderRadius: 8, objectFit: "cover" }} />
+          <Image src={u.avatar} alt="" width={30} height={30} className="rounded-[8px] object-cover" />
         ) : (
-          <div style={{ width: 30, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(99,102,241,0.1)", fontSize: 12, fontWeight: 800, color: "var(--primary,#6366f1)" }}>
+          <div className="w-[30px] h-[30px] rounded-[8px] flex items-center justify-center bg-[rgba(99,102,241,0.1)] text-[12px] font-extrabold text-primary">
             {(u.name || u.email || "?")[0].toUpperCase()}
           </div>
         )}
-        <span style={{ position: "absolute", bottom: 0, right: 0, width: 7, height: 7, borderRadius: "50%", background: u.isOnline ? "#22c55e" : "#d1d5db", border: "1.5px solid var(--base-100,#fff)" }} />
+        <span className="absolute bottom-[0px] right-[0px] w-[7px] h-[7px] rounded-[50%] border-[1.5px] border-base-100" style={{ background: u.isOnline ? "#22c55e" : "#d1d5db" }} />
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 11, fontWeight: 700, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.name || "—"}</p>
-        <p style={{ fontSize: 10, opacity: 0.4, margin: "1px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.email}</p>
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] font-bold m-[0px] overflow-hidden text-ellipsis whitespace-nowrap">{u.name || "—"}</p>
+        <p className="text-[10px] opacity-40 mt-[1px] mx-[0px] mb-[0px] overflow-hidden text-ellipsis whitespace-nowrap">{u.email}</p>
       </div>
-      <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}>
+      <div className="shrink-0 flex flex-col items-end gap-[3px]">
         <RoleBadge role={u.role} />
-        {selected && <CheckCircle size={11} style={{ color: "var(--primary,#6366f1)" }} />}
+        {selected && <CheckCircle size={11} className="text-primary" />}
       </div>
     </button>
   );
@@ -224,49 +216,46 @@ function SessionRow({ session, index }) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
-      style={{
-        display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px",
-        borderRadius: 10, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)",
-      }}
+      className="flex items-start gap-[12px] py-[12px] px-[14px] rounded-[10px] border border-base-300 bg-base-100"
     >
-      <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(99,102,241,0.1)" }}>
-        <PIcon size={16} style={{ color: "var(--primary,#6366f1)" }} />
+      <div className="w-[34px] h-[34px] rounded-[8px] shrink-0 flex items-center justify-center bg-[rgba(99,102,241,0.1)]">
+        <PIcon size={16} className="text-primary" />
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="flex-1 min-w-0">
         {/* deviceName + platform */}
-        <p style={{ fontSize: 13, fontWeight: 700, margin: "0 0 3px" }}>
+        <p className="text-[13px] font-bold mt-[0px] mx-[0px] mb-[3px]">
           {session.deviceName || "Unknown device"}
-          {session.platform && <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.45, marginLeft: 6 }}>({session.platform})</span>}
+          {session.platform && <span className="text-[10px] font-medium opacity-45 ml-[6px]">({session.platform})</span>}
         </p>
         {/* userAgent */}
         {session.userAgent && (
-          <p style={{ fontSize: 10, fontFamily: "monospace", opacity: 0.35, margin: "0 0 5px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <p className="text-[10px] font-mono opacity-35 mt-[0px] mx-[0px] mb-[5px] overflow-hidden text-ellipsis whitespace-nowrap">
             {session.userAgent}
           </p>
         )}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 11, opacity: 0.45 }}>
+        <div className="flex flex-wrap gap-[12px] text-[11px] opacity-45">
           {/* ipAddress — real field name */}
           {session.ipAddress && (
-            <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span className="flex items-center gap-[3px]">
               <Globe size={9} />{session.ipAddress}
             </span>
           )}
           {/* createdAt */}
           {session.createdAt && (
-            <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span className="flex items-center gap-[3px]">
               <Clock size={9} />Signed in {fmt(session.createdAt)}
             </span>
           )}
           {/* lastActiveAt */}
           {session.lastActiveAt && (
-            <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span className="flex items-center gap-[3px]">
               <Activity size={9} />Active {timeAgo(session.lastActiveAt)}
             </span>
           )}
         </div>
       </div>
       {/* session _id suffix */}
-      <span style={{ fontSize: 9, fontFamily: "monospace", opacity: 0.25, flexShrink: 0, marginTop: 2 }}>
+      <span className="text-[9px] font-mono opacity-25 shrink-0 mt-[2px]">
         …{session._id?.slice(-6)}
       </span>
     </motion.div>
@@ -288,29 +277,25 @@ function SecurityEventRow({ event, index }) {
       initial={{ opacity: 0, x: -6 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.04 }}
-      style={{
-        display: "flex", alignItems: "flex-start", gap: 10, padding: "11px 14px",
-        borderRadius: 10, background: event.isRead ? "transparent" : cfg.bg,
-        border: `1px solid ${event.isRead ? "var(--base-300,#e5e7eb)" : "color-mix(in srgb, " + cfg.color + ", transparent 70%)"}`,
-      }}
+      className="flex items-start gap-[10px] py-[11px] px-[14px] rounded-[10px]" style={{ background: event.isRead ? "transparent" : cfg.bg, border: `1px solid ${event.isRead ? "var(--base-300,#e5e7eb)" : "color-mix(in srgb, " + cfg.color + ", transparent 70%)"}` }}
     >
-      <div style={{ width: 30, height: 30, borderRadius: 7, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: cfg.bg }}>
+      <div className="w-[30px] h-[30px] rounded-[7px] shrink-0 flex items-center justify-center" style={{ background: cfg.bg }}>
         <EIcon size={14} style={{ color: cfg.color }} />
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", marginBottom: 3 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, margin: 0 }}>{event.title}</p>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-[7px] flex-wrap mb-[3px]">
+          <p className="text-[12px] font-bold m-[0px]">{event.title}</p>
           {/* priority badge */}
-          <span style={{ padding: "1px 6px", borderRadius: 10, fontSize: 9, fontWeight: 800, background: `${priorityColor}18`, color: priorityColor, letterSpacing: "0.05em" }}>
+          <span className="py-[1px] px-[6px] rounded-[10px] text-[9px] font-extrabold tracking-[0.05em]" style={{ background: `${priorityColor}18`, color: priorityColor }}>
             {event.priority?.toUpperCase()}
           </span>
           {/* unread dot */}
           {!event.isRead && (
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.color, flexShrink: 0 }} />
+            <span className="w-[6px] h-[6px] rounded-[50%] shrink-0" style={{ background: cfg.color }} />
           )}
         </div>
-        <p style={{ fontSize: 11, opacity: 0.5, margin: "0 0 4px", lineHeight: 1.4 }}>{event.body}</p>
-        <span style={{ fontSize: 10, opacity: 0.3 }}>{fmt(event.createdAt)}</span>
+        <p className="text-[11px] opacity-50 mt-[0px] mx-[0px] mb-[4px] leading-[1.4]">{event.body}</p>
+        <span className="text-[10px] opacity-30">{fmt(event.createdAt)}</span>
       </div>
     </motion.div>
   );
@@ -338,8 +323,8 @@ function SendNotificationPanel({ userId, loading, onSubmit }) {
   const ls = { display: "block", fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-[12px]">
+      <div className="grid grid-cols-[1fr_1fr] gap-[10px]">
         <div>
           <label style={ls}>Type</label>
           <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))} style={fs}>
@@ -359,16 +344,16 @@ function SendNotificationPanel({ userId, loading, onSubmit }) {
       </div>
       <div>
         <label style={ls}>Body *</label>
-        <textarea value={form.body} onChange={e => setForm(p => ({ ...p, body: e.target.value }))} placeholder="Notification message" required rows={3} style={{ ...fs, resize: "vertical" }} />
+        <textarea value={form.body} onChange={e => setForm(p => ({ ...p, body: e.target.value }))} placeholder="Notification message" required rows={3} className="resize-y" style={{ ...fs }} />
       </div>
       <div>
         <label style={ls}>Channels</label>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="flex gap-[8px] flex-wrap">
           {NOTIF_CHANNELS.map(ch => {
             const active = form.channels.includes(ch);
             return (
               <button key={ch} type="button" onClick={() => toggleChannel(ch)}
-                style={{ padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: "pointer", border: active ? "1.5px solid var(--primary,#6366f1)" : "1px solid var(--base-300,#e5e7eb)", background: active ? "rgba(99,102,241,0.1)" : "transparent", color: active ? "var(--primary,#6366f1)" : "inherit" }}>
+                className="py-[5px] px-[12px] rounded-[20px] text-[11px] font-bold cursor-pointer" style={{ border: active ? "1.5px solid var(--primary,#6366f1)" : "1px solid var(--base-300,#e5e7eb)", background: active ? "rgba(99,102,241,0.1)" : "transparent", color: active ? "var(--primary,#6366f1)" : "inherit" }}>
                 {ch}
               </button>
             );
@@ -376,7 +361,7 @@ function SendNotificationPanel({ userId, loading, onSubmit }) {
         </div>
       </div>
       <button type="submit" disabled={loading || !form.title.trim() || !form.body.trim()}
-        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px 0", borderRadius: 9, fontSize: 13, fontWeight: 700, background: "var(--primary,#6366f1)", color: "white", border: "none", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1 }}>
+        className="flex items-center justify-center gap-[7px] py-[10px] px-[0px] rounded-[9px] text-[13px] font-bold bg-primary text-[white] border-none" style={{ cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1 }}>
         {loading ? <><RefreshCw size={13} className="animate-spin" />Sending…</> : <><Send size={13} />Send Notification</>}
       </button>
     </form>
@@ -399,40 +384,40 @@ function AdjustCoinsPanel({ userId, loading, onSubmit, coinsObj }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-[12px]">
       {/* Real fields: coins.balance, coins.balanceInRupees */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <div style={{ padding: "12px 14px", borderRadius: 9, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)", textAlign: "center" }}>
-          <p style={{ fontSize: 18, fontWeight: 900, color: "var(--primary,#6366f1)", margin: 0 }}>{(coinsObj?.balance || 0).toLocaleString()}</p>
-          <p style={{ fontSize: 10, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>Coins Balance</p>
+      <div className="grid grid-cols-[1fr_1fr] gap-[10px]">
+        <div className="py-[12px] px-[14px] rounded-[9px] bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] text-center">
+          <p className="text-[18px] font-black text-primary m-[0px]">{(coinsObj?.balance || 0).toLocaleString()}</p>
+          <p className="text-[10px] font-bold opacity-50 uppercase tracking-[0.06em] m-[0px]">Coins Balance</p>
         </div>
-        <div style={{ padding: "12px 14px", borderRadius: 9, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)", textAlign: "center" }}>
-          <p style={{ fontSize: 18, fontWeight: 900, color: "#16a34a", margin: 0 }}>₹{(coinsObj?.balanceInRupees || 0).toFixed(2)}</p>
-          <p style={{ fontSize: 10, fontWeight: 700, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>In Rupees</p>
+        <div className="py-[12px] px-[14px] rounded-[9px] bg-[rgba(34,197,94,0.06)] border border-[rgba(34,197,94,0.2)] text-center">
+          <p className="text-[18px] font-black text-[#16a34a] m-[0px]">₹{(coinsObj?.balanceInRupees || 0).toFixed(2)}</p>
+          <p className="text-[10px] font-bold opacity-50 uppercase tracking-[0.06em] m-[0px]">In Rupees</p>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div className="grid grid-cols-[1fr_1fr] gap-[10px]">
         <button type="button" onClick={() => setForm(p => ({ ...p, action: "credit" }))}
-          style={{ padding: "9px 0", borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: "pointer", border: form.action === "credit" ? "1.5px solid #16a34a" : "1px solid var(--base-300,#e5e7eb)", background: form.action === "credit" ? "rgba(34,197,94,0.1)" : "transparent", color: form.action === "credit" ? "#16a34a" : "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          className="py-[9px] px-[0px] rounded-[9px] text-[12px] font-bold cursor-pointer flex items-center justify-center gap-[6px]" style={{ border: form.action === "credit" ? "1.5px solid #16a34a" : "1px solid var(--base-300,#e5e7eb)", background: form.action === "credit" ? "rgba(34,197,94,0.1)" : "transparent", color: form.action === "credit" ? "#16a34a" : "inherit" }}>
           <TrendingUp size={13} />Credit
         </button>
         <button type="button" onClick={() => setForm(p => ({ ...p, action: "debit" }))}
-          style={{ padding: "9px 0", borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: "pointer", border: form.action === "debit" ? "1.5px solid #dc2626" : "1px solid var(--base-300,#e5e7eb)", background: form.action === "debit" ? "rgba(239,68,68,0.1)" : "transparent", color: form.action === "debit" ? "#dc2626" : "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          className="py-[9px] px-[0px] rounded-[9px] text-[12px] font-bold cursor-pointer flex items-center justify-center gap-[6px]" style={{ border: form.action === "debit" ? "1.5px solid #dc2626" : "1px solid var(--base-300,#e5e7eb)", background: form.action === "debit" ? "rgba(239,68,68,0.1)" : "transparent", color: form.action === "debit" ? "#dc2626" : "inherit" }}>
           <TrendingDown size={13} />Debit
         </button>
       </div>
 
       <div>
-        <label style={{ display: "block", fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>Amount *</label>
-        <input type="number" min="1" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="e.g. 500" required style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12, boxSizing: "border-box", outline: "none" }} />
+        <label className="block text-[10px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[5px]">Amount *</label>
+        <input type="number" min="1" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="e.g. 500" required className="w-full py-[8px] px-[12px] rounded-[8px] border border-base-300 text-[12px] box-border outline-none" />
       </div>
       <div>
-        <label style={{ display: "block", fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>Reason *</label>
-        <input value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} placeholder="Reason for adjustment" required style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12, boxSizing: "border-box", outline: "none" }} />
+        <label className="block text-[10px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[5px]">Reason *</label>
+        <input value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} placeholder="Reason for adjustment" required className="w-full py-[8px] px-[12px] rounded-[8px] border border-base-300 text-[12px] box-border outline-none" />
       </div>
       <button type="submit" disabled={loading || !form.amount || !form.reason.trim()}
-        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px 0", borderRadius: 9, fontSize: 13, fontWeight: 700, background: form.action === "credit" ? "#16a34a" : "#dc2626", color: "white", border: "none", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1 }}>
+        className="flex items-center justify-center gap-[7px] py-[10px] px-[0px] rounded-[9px] text-[13px] font-bold text-[white] border-none" style={{ background: form.action === "credit" ? "#16a34a" : "#dc2626", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1 }}>
         {loading
           ? <><RefreshCw size={13} className="animate-spin" />Processing…</>
           : form.action === "credit"
@@ -465,17 +450,17 @@ function KycPanel({ userId, currentStatus, loading, onSubmit }) {
   const changed = newStatus !== currentStatus;
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-[14px]">
       <div>
-        <p style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Current Status</p>
+        <p className="text-[10px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[8px]">Current Status</p>
         <KycBadge status={currentStatus} size="lg" />
       </div>
       <div>
-        <p style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Set New Status</p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <p className="text-[10px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[8px]">Set New Status</p>
+        <div className="flex flex-wrap gap-[8px]">
           {KYC_STATUSES.map(s => (
             <button key={s.value} type="button" onClick={() => setNewStatus(s.value)}
-              style={{ padding: "6px 14px", borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: "pointer", border: newStatus === s.value ? `1.5px solid ${s.color}` : "1px solid var(--base-300,#e5e7eb)", background: newStatus === s.value ? s.bg : "transparent", color: newStatus === s.value ? s.color : "inherit" }}>
+              className="py-[6px] px-[14px] rounded-[20px] text-[11px] font-bold cursor-pointer" style={{ border: newStatus === s.value ? `1.5px solid ${s.color}` : "1px solid var(--base-300,#e5e7eb)", background: newStatus === s.value ? s.bg : "transparent", color: newStatus === s.value ? s.color : "inherit" }}>
               {s.label}
             </button>
           ))}
@@ -483,22 +468,22 @@ function KycPanel({ userId, currentStatus, loading, onSubmit }) {
       </div>
       {newStatus === "rejected" && (
         <div>
-          <label style={{ display: "block", fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>Rejection Reason</label>
-          <textarea value={rejection} onChange={e => setRejection(e.target.value)} placeholder="Explain why KYC was rejected…" rows={2} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", fontSize: 12, resize: "vertical", boxSizing: "border-box", outline: "none" }} />
+          <label className="block text-[10px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[5px]">Rejection Reason</label>
+          <textarea value={rejection} onChange={e => setRejection(e.target.value)} placeholder="Explain why KYC was rejected…" rows={2} className="w-full py-[8px] px-[12px] rounded-[8px] border border-base-300 text-[12px] resize-y box-border outline-none" />
         </div>
       )}
       {changed && (
         !confirm ? (
           <button type="button" onClick={() => setConfirm(true)}
-            style={{ padding: "10px 0", borderRadius: 9, fontSize: 13, fontWeight: 700, background: kycCfg(newStatus).bg, color: kycCfg(newStatus).color, border: `1.5px solid ${kycCfg(newStatus).color}`, cursor: "pointer" }}>
+            className="py-[10px] px-[0px] rounded-[9px] text-[13px] font-bold cursor-pointer" style={{ background: kycCfg(newStatus).bg, color: kycCfg(newStatus).color, border: `1.5px solid ${kycCfg(newStatus).color}` }}>
             Update to → {kycCfg(newStatus).label}
           </button>
         ) : (
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="submit" disabled={loading} style={{ flex: 1, padding: "10px 0", borderRadius: 9, fontSize: 13, fontWeight: 700, background: "var(--primary,#6366f1)", color: "white", border: "none", cursor: "pointer", opacity: loading ? 0.6 : 1 }}>
+          <div className="flex gap-[8px]">
+            <button type="submit" disabled={loading} className="flex-1 py-[10px] px-[0px] rounded-[9px] text-[13px] font-bold bg-primary text-[white] border-none cursor-pointer" style={{ opacity: loading ? 0.6 : 1 }}>
               {loading ? "Updating…" : "Confirm Update"}
             </button>
-            <button type="button" onClick={() => setConfirm(false)} style={{ flex: 1, padding: "10px 0", borderRadius: 9, fontSize: 13, fontWeight: 700, background: "var(--base-200,#f3f4f6)", border: "none", cursor: "pointer" }}>
+            <button type="button" onClick={() => setConfirm(false)} className="flex-1 py-[10px] px-[0px] rounded-[9px] text-[13px] font-bold bg-base-200 border-none cursor-pointer">
               Cancel
             </button>
           </div>
@@ -590,54 +575,54 @@ export default function SecurityManagement() {
   const events = sec?.recentSecurityEvents ?? [];
 
   return (
-    <div style={{ minHeight: "100vh", padding: 24, background: "var(--base-100,#f9fafb)" }}>
+    <div className="min-h-[100vh] p-[24px] bg-base-100">
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-          <Link href="/admin" style={{ fontSize: 12, opacity: 0.45, textDecoration: "none" }}>Admin</Link>
-          <ChevronRight size={12} style={{ opacity: 0.3 }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary,#6366f1)" }}>Security Management</span>
+      <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-[28px]">
+        <div className="flex items-center gap-[6px] mb-[6px]">
+          <Link href="/admin" className="text-[12px] opacity-45 no-underline">Admin</Link>
+          <ChevronRight size={12} className="opacity-30" />
+          <span className="text-[12px] font-bold text-primary">Security Management</span>
         </div>
-        <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0, letterSpacing: "-0.02em" }}>Security Management</h1>
-        <p style={{ fontSize: 13, opacity: 0.45, marginTop: 4 }}>Sessions, KYC, coins, notifications and security events per user</p>
+        <h1 className="text-[24px] font-black m-[0px] tracking-[-0.02em]">Security Management</h1>
+        <p className="text-[13px] opacity-45 mt-[4px]">Sessions, KYC, coins, notifications and security events per user</p>
       </motion.div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20, alignItems: "start" }}>
+      <div className="grid grid-cols-[300px_1fr] gap-[20px]" style={{ alignItems: "start" }}>
 
         {/* ── LEFT SIDEBAR ─────────────────────────────────────────────────── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="flex flex-col gap-[14px]">
 
           {/* Manual ID lookup */}
-          <div style={{ padding: "16px 18px", borderRadius: 14, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-            <p style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Lookup by User ID</p>
-            <form onSubmit={handleManualFetch} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", border: `1px solid ${idError ? "#ef4444" : "var(--base-300,#e5e7eb)"}`, borderRadius: 8 }}>
-                <Key size={12} style={{ opacity: 0.4, flexShrink: 0 }} />
+          <div className="py-[16px] px-[18px] rounded-[14px] border border-base-300 bg-base-100">
+            <p className="text-[10px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[10px]">Lookup by User ID</p>
+            <form onSubmit={handleManualFetch} className="flex flex-col gap-[8px]">
+              <div className="flex items-center gap-[8px] py-[7px] px-[10px] rounded-[8px]" style={{ border: `1px solid ${idError ? "#ef4444" : "var(--base-300,#e5e7eb)"}` }}>
+                <Key size={12} className="opacity-40 shrink-0" />
                 <input value={userIdInput}
                   onChange={e => { setUserIdInput(e.target.value); if (idError) setIdError(""); }}
                   placeholder="24-char ObjectId" maxLength={24}
-                  style={{ border: "none", outline: "none", fontSize: 11, fontFamily: "monospace", background: "transparent", flex: 1 }} />
+                  className="border-none outline-none text-[11px] font-mono bg-[transparent] flex-1" />
               </div>
-              {idError && <p style={{ fontSize: 10, color: "#ef4444", fontWeight: 600, margin: 0 }}>{idError}</p>}
+              {idError && <p className="text-[10px] text-[#ef4444] font-semibold m-[0px]">{idError}</p>}
               <button type="submit" disabled={securityLoading}
-                style={{ padding: "7px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "var(--primary,#6366f1)", color: "white", border: "none", cursor: securityLoading ? "not-allowed" : "pointer", opacity: securityLoading ? 0.6 : 1 }}>
+                className="py-[7px] px-[0px] rounded-[8px] text-[12px] font-bold bg-primary text-[white] border-none" style={{ cursor: securityLoading ? "not-allowed" : "pointer", opacity: securityLoading ? 0.6 : 1 }}>
                 {securityLoading ? "Loading…" : "Load Security"}
               </button>
             </form>
           </div>
 
           {/* User picker */}
-          <div style={{ padding: "16px 18px", borderRadius: 14, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-            <p style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Or pick a user</p>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", border: "1px solid var(--base-300,#e5e7eb)", borderRadius: 8, marginBottom: 8 }}>
-              <Search size={12} style={{ opacity: 0.4 }} />
+          <div className="py-[16px] px-[18px] rounded-[14px] border border-base-300 bg-base-100">
+            <p className="text-[10px] font-bold opacity-45 uppercase tracking-[0.07em] mb-[10px]">Or pick a user</p>
+            <div className="flex items-center gap-[8px] py-[6px] px-[10px] border border-base-300 rounded-[8px] mb-[8px]">
+              <Search size={12} className="opacity-40" />
               <input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Search name / email…"
-                style={{ border: "none", outline: "none", fontSize: 11, background: "transparent", flex: 1 }} />
+                className="border-none outline-none text-[11px] bg-[transparent] flex-1" />
             </div>
-            <div style={{ maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
+            <div className="max-h-[260px] overflow-y-auto flex flex-col gap-[2px]">
               {usersLoading
-                ? <p style={{ fontSize: 11, opacity: 0.35, textAlign: "center", padding: "16px 0" }}>Loading…</p>
+                ? <p className="text-[11px] opacity-35 text-center py-[16px] px-[0px]">Loading…</p>
                 : allUsers.map(u => (
                     <UserPickerRow key={u._id} u={u} selected={selectedUserId === u._id} onClick={() => selectFromPicker(u)} />
                   ))
@@ -647,17 +632,17 @@ export default function SecurityManagement() {
 
           {/* Section nav — only shown once data loads */}
           {selectedUserId && sec && (
-            <div style={{ padding: "8px", borderRadius: 14, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)", display: "flex", flexDirection: "column", gap: 2 }}>
+            <div className="p-[8px] rounded-[14px] border border-base-300 bg-base-100 flex flex-col gap-[2px]">
               {SECTIONS.map(s => {
                 const SIcon = s.icon;
                 const active = activeSection === s.key;
                 return (
                   <button key={s.key} onClick={() => setActiveSection(s.key)}
-                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 9, border: "none", cursor: "pointer", textAlign: "left", background: active ? "rgba(99,102,241,0.08)" : "transparent", color: active ? "var(--primary,#6366f1)" : "inherit", fontWeight: active ? 700 : 500, fontSize: 13 }}>
+                    className="flex items-center gap-[8px] py-[9px] px-[12px] rounded-[9px] border-none cursor-pointer text-left text-[13px]" style={{ background: active ? "rgba(99,102,241,0.08)" : "transparent", color: active ? "var(--primary,#6366f1)" : "inherit", fontWeight: active ? 700 : 500 }}>
                     <SIcon size={14} style={{ color: active ? "var(--primary,#6366f1)" : undefined, opacity: active ? 1 : 0.45 }} />
                     {s.label}
                     {s.key === "events" && events.length > 0 && (
-                      <span style={{ marginLeft: "auto", padding: "1px 6px", borderRadius: 10, fontSize: 9, fontWeight: 800, background: "rgba(239,68,68,0.1)", color: "#dc2626" }}>
+                      <span className="ml-[auto] py-[1px] px-[6px] rounded-[10px] text-[9px] font-extrabold bg-[rgba(239,68,68,0.1)] text-[#dc2626]">
                         {events.filter(e => !e.isRead).length || events.length}
                       </span>
                     )}
@@ -672,19 +657,19 @@ export default function SecurityManagement() {
         <div>
           {!selectedUserId ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              style={{ padding: "60px 40px", borderRadius: 16, textAlign: "center", border: "1px dashed var(--base-300,#e5e7eb)", opacity: 0.4 }}>
-              <Shield size={36} style={{ margin: "0 auto 14px" }} />
-              <p style={{ fontSize: 14, fontWeight: 700 }}>Select a user to view security details</p>
+              className="py-[60px] px-[40px] rounded-[16px] text-center border border-dashed border-base-300 opacity-40">
+              <Shield size={36} className="mt-[0px] mx-[auto] mb-[14px]" />
+              <p className="text-[14px] font-bold">Select a user to view security details</p>
             </motion.div>
           ) : securityLoading ? (
-            <div style={{ padding: "60px 0", textAlign: "center", opacity: 0.4 }}>
-              <RefreshCw size={24} className="animate-spin" style={{ display: "block", margin: "0 auto 10px" }} />
-              <p style={{ fontSize: 13 }}>Loading security data…</p>
+            <div className="py-[60px] px-[0px] text-center opacity-40">
+              <RefreshCw size={24} className="animate-spin block mt-[0px] mx-[auto] mb-[10px]" />
+              <p className="text-[13px]">Loading security data…</p>
             </div>
           ) : !sec ? (
-            <div style={{ padding: "60px 0", textAlign: "center", opacity: 0.35 }}>
-              <XCircle size={28} style={{ margin: "0 auto 10px" }} />
-              <p style={{ fontSize: 13 }}>No data found for this user</p>
+            <div className="py-[60px] px-[0px] text-center opacity-35">
+              <XCircle size={28} className="mt-[0px] mx-[auto] mb-[10px]" />
+              <p className="text-[13px]">No data found for this user</p>
             </div>
           ) : (
             <AnimatePresence mode="wait">
@@ -694,45 +679,45 @@ export default function SecurityManagement() {
               {/* ════════════════════════════════════════════════════════════ */}
               {activeSection === "overview" && (
                 <motion.div key="overview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  className="flex flex-col gap-[16px]">
 
                   {/* Identity card — uses sec._id, sec.name, sec.email, sec.role + selectedUserInfo for avatar/isOnline */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", borderRadius: 14, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)" }}>
-                    <div style={{ position: "relative", flexShrink: 0 }}>
+                  <div className="flex items-center gap-[16px] py-[16px] px-[20px] rounded-[14px] border border-base-300 bg-base-100">
+                    <div className="relative shrink-0">
                       {selectedUserInfo?.avatar ? (
-                        <img src={selectedUserInfo.avatar} alt="" style={{ width: 56, height: 56, borderRadius: 14, objectFit: "cover" }} />
+                        <Image src={selectedUserInfo.avatar} alt="" width={56} height={56} className="rounded-[14px] object-cover" />
                       ) : (
-                        <div style={{ width: 56, height: 56, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(99,102,241,0.1)", fontSize: 22, fontWeight: 900, color: "var(--primary,#6366f1)" }}>
+                        <div className="w-[56px] h-[56px] rounded-[14px] flex items-center justify-center bg-[rgba(99,102,241,0.1)] text-[22px] font-black text-primary">
                           {(sec.name || sec.email || "?")[0]?.toUpperCase()}
                         </div>
                       )}
                       {selectedUserInfo && (
-                        <span style={{ position: "absolute", bottom: 2, right: 2, width: 12, height: 12, borderRadius: "50%", background: selectedUserInfo.isOnline ? "#22c55e" : "#d1d5db", border: "2px solid var(--base-100,#fff)" }} />
+                        <span className="absolute bottom-[2px] right-[2px] w-[12px] h-[12px] rounded-[50%] border-[2px] border-base-100" style={{ background: selectedUserInfo.isOnline ? "#22c55e" : "#d1d5db" }} />
                       )}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                        <p style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>{sec.name || "—"}</p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-[8px] flex-wrap mb-[4px]">
+                        <p className="text-[16px] font-extrabold m-[0px]">{sec.name || "—"}</p>
                         <RoleBadge role={sec.role} />
                         {/* account.isBlocked — real field */}
-                        {acct.isBlocked && <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: "rgba(239,68,68,0.1)", color: "#dc2626" }}>Blocked</span>}
+                        {acct.isBlocked && <span className="py-[2px] px-[8px] rounded-[20px] text-[10px] font-bold bg-[rgba(239,68,68,0.1)] text-[#dc2626]">Blocked</span>}
                         {/* account.isEmailVerified — real field */}
-                        {acct.isEmailVerified && <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: "rgba(34,197,94,0.1)", color: "#16a34a" }}>Email Verified</span>}
+                        {acct.isEmailVerified && <span className="py-[2px] px-[8px] rounded-[20px] text-[10px] font-bold bg-[rgba(34,197,94,0.1)] text-[#16a34a]">Email Verified</span>}
                       </div>
-                      <p style={{ fontSize: 12, opacity: 0.5, margin: "0 0 2px" }}>{sec.email}</p>
+                      <p className="text-[12px] opacity-50 mt-[0px] mx-[0px] mb-[2px]">{sec.email}</p>
                       {/* loginActivity.lastLoginAt, lastLoginIp, totalLogins — real fields */}
-                      <p style={{ fontSize: 11, opacity: 0.35, margin: 0, fontFamily: "monospace" }}>
+                      <p className="text-[11px] opacity-35 m-[0px] font-mono">
                         Last login {fmt(login.lastLoginAt)} · {login.lastLoginIp} · {login.totalLogins} total logins
                       </p>
                     </div>
                     <button onClick={() => loadSecurity(selectedUserId)}
-                      style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid var(--base-300,#e5e7eb)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: "transparent", flexShrink: 0 }}>
-                      <RefreshCw size={14} style={{ opacity: 0.5 }} />
+                      className="w-[34px] h-[34px] rounded-[8px] border border-base-300 flex items-center justify-center cursor-pointer bg-[transparent] shrink-0">
+                      <RefreshCw size={14} className="opacity-50" />
                     </button>
                   </div>
 
                   {/* Stats — real fields from nested objects */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+                  <div className="grid grid-cols-[repeat(auto-fill,_minmax(150px,_1fr))] gap-[12px]">
                     {[
                       { label: "Coins Balance",  value: (coins.balance || 0).toLocaleString(),      color: "#d97706", icon: TrendingUp  },
                       { label: "Total Earned",   value: (coins.totalEarned || 0).toLocaleString(),   color: "#16a34a", icon: TrendingUp  },
@@ -742,11 +727,11 @@ export default function SecurityManagement() {
                     ].map(s => {
                       const SIcon = s.icon;
                       return (
-                        <div key={s.label} style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid var(--base-300,#e5e7eb)", background: "var(--base-100,#fff)", display: "flex", alignItems: "center", gap: 10 }}>
-                          <SIcon size={16} style={{ color: s.color, flexShrink: 0 }} />
+                        <div key={s.label} className="py-[14px] px-[16px] rounded-[12px] border border-base-300 bg-base-100 flex items-center gap-[10px]">
+                          <SIcon size={16} className="shrink-0" style={{ color: s.color }} />
                           <div>
-                            <p style={{ fontSize: 17, fontWeight: 900, color: s.color, margin: 0 }}>{s.value}</p>
-                            <p style={{ fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>{s.label}</p>
+                            <p className="text-[17px] font-black m-[0px]" style={{ color: s.color }}>{s.value}</p>
+                            <p className="text-[10px] font-bold opacity-40 uppercase tracking-[0.06em] m-[0px]">{s.label}</p>
                           </div>
                         </div>
                       );
@@ -760,17 +745,17 @@ export default function SecurityManagement() {
                     <InfoRow label="Email"           value={sec.email}            mono />
                     <InfoRow label="Role"            badge={<RoleBadge role={sec.role} />} />
                     <InfoRow label="Email Verified"  badge={
-                      <span style={{ fontSize: 12, fontWeight: 700, color: acct.isEmailVerified ? "#16a34a" : "#dc2626" }}>
+                      <span className="text-[12px] font-bold" style={{ color: acct.isEmailVerified ? "#16a34a" : "#dc2626" }}>
                         {acct.isEmailVerified ? "✓ Yes" : "✗ No"}
                       </span>
                     } />
                     <InfoRow label="Phone Verified"  badge={
-                      <span style={{ fontSize: 12, fontWeight: 700, color: acct.isPhoneVerified ? "#16a34a" : "#dc2626" }}>
+                      <span className="text-[12px] font-bold" style={{ color: acct.isPhoneVerified ? "#16a34a" : "#dc2626" }}>
                         {acct.isPhoneVerified ? "✓ Yes" : "✗ No"}
                       </span>
                     } />
                     <InfoRow label="Blocked"         badge={
-                      <span style={{ fontSize: 12, fontWeight: 700, color: acct.isBlocked ? "#dc2626" : "#16a34a" }}>
+                      <span className="text-[12px] font-bold" style={{ color: acct.isBlocked ? "#dc2626" : "#16a34a" }}>
                         {acct.isBlocked ? "✗ Yes" : "✓ No"}
                       </span>
                     } />
@@ -794,9 +779,9 @@ export default function SecurityManagement() {
                     <InfoRow label="Coins Awarded"    value={(ref.totalCoinsAwarded || 0).toLocaleString()}  />
                     {ref.referredBy && (
                       <InfoRow label="Referred By" badge={
-                        <div style={{ textAlign: "right" }}>
-                          <p style={{ fontSize: 12, fontWeight: 600, margin: 0 }}>{ref.referredBy.name}</p>
-                          <p style={{ fontSize: 10, opacity: 0.45, margin: 0 }}>{ref.referredBy.email}</p>
+                        <div className="text-right">
+                          <p className="text-[12px] font-semibold m-[0px]">{ref.referredBy.name}</p>
+                          <p className="text-[10px] opacity-45 m-[0px]">{ref.referredBy.email}</p>
                         </div>
                       } last />
                     )}
@@ -811,20 +796,20 @@ export default function SecurityManagement() {
               {/* ════════════════════════════════════════════════════════════ */}
               {activeSection === "sessions" && (
                 <motion.div key="sessions" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  className="flex flex-col gap-[16px]">
                   <SectionCard title={`Active Sessions (${sess.total ?? 0})`} icon={Activity}
                     badge={
-                      <span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: "rgba(99,102,241,0.1)", color: "var(--primary,#6366f1)" }}>
+                      <span className="py-[2px] px-[8px] rounded-[10px] text-[11px] font-bold bg-[rgba(99,102,241,0.1)] text-primary">
                         {sess.total ?? 0} total
                       </span>
                     }>
                     {!sess.list || sess.list.length === 0 ? (
-                      <div style={{ padding: "24px 0", textAlign: "center", opacity: 0.35 }}>
-                        <Lock size={24} style={{ margin: "0 auto 8px" }} />
-                        <p style={{ fontSize: 12 }}>No active sessions found</p>
+                      <div className="py-[24px] px-[0px] text-center opacity-35">
+                        <Lock size={24} className="mt-[0px] mx-[auto] mb-[8px]" />
+                        <p className="text-[12px]">No active sessions found</p>
                       </div>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div className="flex flex-col gap-[10px]">
                         {sess.list.map((s, i) => (
                           <SessionRow key={s._id} session={s} index={i} />
                         ))}
@@ -839,7 +824,7 @@ export default function SecurityManagement() {
               {/* ════════════════════════════════════════════════════════════ */}
               {activeSection === "kyc" && (
                 <motion.div key="kyc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  className="flex flex-col gap-[16px]">
                   <SectionCard title="Update KYC Status" icon={Award} iconColor="#d97706">
                     <KycPanel
                       userId={selectedUserId}
@@ -856,21 +841,21 @@ export default function SecurityManagement() {
               {/* ════════════════════════════════════════════════════════════ */}
               {activeSection === "coins" && (
                 <motion.div key="coins" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  className="flex flex-col gap-[16px]">
 
                   <SectionCard title="Coin Summary" icon={TrendingUp} iconColor="#d97706">
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
+                    <div className="grid grid-cols-[repeat(4,_1fr)] gap-[10px] mb-[16px]">
                       {[
                         { label: "Balance",       value: coins.balance      || 0, color: "var(--primary,#6366f1)" },
                         { label: "In Rupees",     value: `₹${(coins.balanceInRupees || 0).toFixed(2)}`, color: "#16a34a", raw: true },
                         { label: "Total Earned",  value: coins.totalEarned  || 0, color: "#16a34a" },
                         { label: "Total Redeemed",value: coins.totalRedeemed|| 0, color: "#dc2626" },
                       ].map(c => (
-                        <div key={c.label} style={{ padding: "12px 10px", borderRadius: 10, background: "var(--base-200,#f3f4f6)", textAlign: "center" }}>
-                          <p style={{ fontSize: 18, fontWeight: 900, color: c.color, margin: 0 }}>
+                        <div key={c.label} className="py-[12px] px-[10px] rounded-[10px] bg-base-200 text-center">
+                          <p className="text-[18px] font-black m-[0px]" style={{ color: c.color }}>
                             {c.raw ? c.value : Number(c.value).toLocaleString()}
                           </p>
-                          <p style={{ fontSize: 9, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>{c.label}</p>
+                          <p className="text-[9px] font-bold opacity-45 uppercase tracking-[0.06em] m-[0px]">{c.label}</p>
                         </div>
                       ))}
                     </div>
@@ -887,9 +872,9 @@ export default function SecurityManagement() {
                       />
                     </SectionCard>
                   ) : (
-                    <div style={{ padding: "24px", borderRadius: 14, border: "1px dashed var(--base-300,#e5e7eb)", textAlign: "center", opacity: 0.35 }}>
-                      <Lock size={24} style={{ margin: "0 auto 8px" }} />
-                      <p style={{ fontSize: 13 }}>Coin adjustment requires superadmin access</p>
+                    <div className="p-[24px] rounded-[14px] border border-dashed border-base-300 text-center opacity-35">
+                      <Lock size={24} className="mt-[0px] mx-[auto] mb-[8px]" />
+                      <p className="text-[13px]">Coin adjustment requires superadmin access</p>
                     </div>
                   )}
                 </motion.div>
@@ -900,7 +885,7 @@ export default function SecurityManagement() {
               {/* ════════════════════════════════════════════════════════════ */}
               {activeSection === "notification" && (
                 <motion.div key="notification" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  className="flex flex-col gap-[16px]">
                   <SectionCard title="Send Manual Notification" icon={Bell} iconColor="var(--primary,#6366f1)">
                     <SendNotificationPanel
                       userId={selectedUserId}
@@ -917,22 +902,22 @@ export default function SecurityManagement() {
               {/* ════════════════════════════════════════════════════════════ */}
               {activeSection === "events" && (
                 <motion.div key="events" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  className="flex flex-col gap-[16px]">
                   <SectionCard title={`Recent Security Events (${events.length})`} icon={AlertTriangle} iconColor="#dc2626"
                     badge={
                       events.filter(e => !e.isRead).length > 0 && (
-                        <span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 800, background: "rgba(239,68,68,0.1)", color: "#dc2626" }}>
+                        <span className="py-[2px] px-[8px] rounded-[10px] text-[10px] font-extrabold bg-[rgba(239,68,68,0.1)] text-[#dc2626]">
                           {events.filter(e => !e.isRead).length} unread
                         </span>
                       )
                     }>
                     {events.length === 0 ? (
-                      <div style={{ padding: "24px 0", textAlign: "center", opacity: 0.35 }}>
-                        <Bell size={24} style={{ margin: "0 auto 8px" }} />
-                        <p style={{ fontSize: 12 }}>No security events</p>
+                      <div className="py-[24px] px-[0px] text-center opacity-35">
+                        <Bell size={24} className="mt-[0px] mx-[auto] mb-[8px]" />
+                        <p className="text-[12px]">No security events</p>
                       </div>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div className="flex flex-col gap-[8px]">
                         {events.map((ev, i) => (
                           <SecurityEventRow key={ev._id} event={ev} index={i} />
                         ))}
@@ -947,28 +932,28 @@ export default function SecurityManagement() {
               {/* ════════════════════════════════════════════════════════════ */}
               {activeSection === "devices" && (
                 <motion.div key="devices" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  className="flex flex-col gap-[16px]">
                   <SectionCard title="Registered Devices" icon={Cpu} iconColor="var(--info,#3b82f6)">
                     <InfoRow label="Total Devices" value={devs.total ?? 0} />
 
                     {/* byPlatform — real field: devices.byPlatform{} */}
                     {Object.keys(devs.byPlatform || {}).length > 0 ? (
                       <>
-                        <p style={{ fontSize: 10, fontWeight: 700, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, marginTop: 4 }}>By Platform</p>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <p className="text-[10px] font-bold opacity-40 uppercase tracking-[0.07em] mb-[8px] mt-[4px]">By Platform</p>
+                        <div className="flex gap-[8px] flex-wrap">
                           {Object.entries(devs.byPlatform).map(([platform, count]) => (
-                            <div key={platform} style={{ padding: "8px 14px", borderRadius: 9, background: "var(--base-200,#f3f4f6)", textAlign: "center" }}>
-                              <p style={{ fontSize: 16, fontWeight: 900, margin: 0 }}>{count}</p>
-                              <p style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>{platform}</p>
+                            <div key={platform} className="py-[8px] px-[14px] rounded-[9px] bg-base-200 text-center">
+                              <p className="text-[16px] font-black m-[0px]">{count}</p>
+                              <p className="text-[10px] font-bold opacity-45 uppercase tracking-[0.06em] m-[0px]">{platform}</p>
                             </div>
                           ))}
                         </div>
                       </>
                     ) : (
-                      <div style={{ padding: "20px 0", textAlign: "center", opacity: 0.3, marginTop: 8 }}>
-                        <Cpu size={22} style={{ margin: "0 auto 8px" }} />
+                      <div className="py-[20px] px-[0px] text-center opacity-30 mt-[8px]">
+                        <Cpu size={22} className="mt-[0px] mx-[auto] mb-[8px]" />
                         {/* devices.total = 0 from real response */}
-                        <p style={{ fontSize: 12 }}>No device tokens registered (total: {devs.total ?? 0})</p>
+                        <p className="text-[12px]">No device tokens registered (total: {devs.total ?? 0})</p>
                       </div>
                     )}
                   </SectionCard>

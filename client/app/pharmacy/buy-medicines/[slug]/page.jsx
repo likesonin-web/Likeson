@@ -6,6 +6,7 @@ import React, {
   useRef,
   useCallback,
   useMemo,
+  memo,
 } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams, useRouter } from 'next/navigation';
@@ -76,6 +77,7 @@ import {
   clearCoupon,
 } from '@/store/slices/pharmacyOrderSlice';
 import { uploadSingleFile } from '@/store/slices/uploadSlice';
+import { selectUser } from '@/store/slices/userSlice';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -140,6 +142,23 @@ const fmt = (n) =>
 
 const pct = (base, percent) =>
   parseFloat(((base * percent) / 100).toFixed(2));
+
+// ─── Shared Components ────────────────────────────────────────────────────────
+
+const IconTooltip = memo(function IconTooltip({ label, className, children }) {
+  return (
+    <div className={`relative group/tip inline-flex ${className || ""}`}>
+      {children}
+      <span
+        role="tooltip"
+        aria-hidden="true"
+        className="pointer-events-none capitalize absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap px-2 py-1 rounded-md text-[10px] font-bold shadow-lg opacity-0 scale-90 translate-y-[-2px] transition-all duration-150 z-[130] group-hover/tip:opacity-100 group-hover/tip:scale-100 group-hover/tip:translate-y-0 bg-base-content text-base-100"
+      >
+        {label}
+      </span>
+    </div>
+  );
+});
 
 // ─── ImageGallery ─────────────────────────────────────────────────────────────
 
@@ -221,13 +240,15 @@ const ImageGallery = React.memo(({ images, activeIdx, onIdxChange, onOpenFull })
             />
           )}
 
-          <button
-            onClick={onOpenFull}
-            aria-label="Open fullscreen image"
-            className="btn btn-ghost absolute top-4 right-4 p-2 z-30"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </button>
+          <IconTooltip label="Fullscreen" className="absolute top-4 right-4 z-30">
+            <button
+              onClick={onOpenFull}
+              aria-label="Open fullscreen image"
+              className="btn btn-ghost p-2 cursor-pointer"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </IconTooltip>
         </div>
 
         <AnimatePresence>
@@ -258,7 +279,7 @@ const ImageGallery = React.memo(({ images, activeIdx, onIdxChange, onOpenFull })
               key={i}
               onClick={() => onIdxChange(i)}
               aria-label={`View image ${i + 1}`}
-              className={`shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all duration-200 ${i === activeIdx ? 'border-primary opacity-100 scale-105' : 'border-base-300 opacity-60 scale-100'}`}
+              className={`shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all duration-200 cursor-pointer ${i === activeIdx ? 'border-primary opacity-100 scale-105' : 'border-base-300 opacity-60 scale-100'}`}
             >
               <img
                 src={img.url}
@@ -426,13 +447,13 @@ const StoreInventoryCard = React.memo(({ inv }) => {
             </span>
           )}
           {canDeliver && (
-            <span className="badge badge-xs badge-success text-success-content">
+            <span className="badge badge-xs badge-success ">
               <Truck className="w-2.5 h-2.5 mr-0.5" />
               Delivers
             </span>
           )}
           {express && (
-            <span className="badge badge-xs badge-warning text-warning-content">
+            <span className="badge badge-xs badge-warning ">
               <Zap className="w-2.5 h-2.5 mr-0.5" />
               Express
             </span>
@@ -462,27 +483,12 @@ const StoreInventoryCard = React.memo(({ inv }) => {
               green
             />
           )}
-          <PricingRow
+<PricingRow
             label="Final Price"
             value={`₹${fmt(pb.finalPrice)}`}
             highlight
             large
           />
-          <div className="mt-3 pt-3 border-t border-base-300">
-            <p className="text-xs font-black uppercase tracking-widest mb-2 text-base-content/40">
-              Platform breakdown
-            </p>
-            <PricingRow
-              label="Platform Cut"
-              sub={`(${pb.platformCutPercent}%)`}
-              value={`₹${fmt(pb.platformCut)}`}
-              muted
-            />
-            <PricingRow
-              label="Store Net / unit"
-              value={`₹${fmt(pb.storeNetPerUnit)}`}
-            />
-          </div>
           {pb.note && (
             <p className="text-xs mt-2 italic text-base-content/50">
               {pb.note}
@@ -703,7 +709,7 @@ const PrescriptionUploader = React.memo(({
               href={prescriptionUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-bold mt-1.5 inline-block text-primary"
+              className="text-xs font-bold mt-1.5 inline-block text-primary cursor-pointer hover:underline"
             >
               View uploaded prescription ↗
             </a>
@@ -727,7 +733,7 @@ const PrescriptionUploader = React.memo(({
         )}
         <input
           type="file"
-          className="hidden"
+          className="hidden peer"
           onChange={onUpload}
           accept="image/*,application/pdf"
           disabled={isUploading}
@@ -746,7 +752,7 @@ const QuantitySelector = React.memo(({ quantity, onDecrement, onIncrement, max }
       onClick={onDecrement}
       disabled={quantity <= 1}
       aria-label="Decrease quantity"
-      className="btn btn-sm btn-circle bg-base-200 border border-base-300"
+      className="btn btn-sm btn-circle bg-base-200 border border-base-300 cursor-pointer disabled:cursor-not-allowed"
     >
       <Minus className="w-4 h-4" />
     </button>
@@ -755,7 +761,7 @@ const QuantitySelector = React.memo(({ quantity, onDecrement, onIncrement, max }
       onClick={onIncrement}
       disabled={max !== undefined && quantity >= max}
       aria-label="Increase quantity"
-      className="btn btn-sm btn-circle bg-base-200 border border-base-300"
+      className="btn btn-sm btn-circle bg-base-200 border border-base-300 cursor-pointer disabled:cursor-not-allowed"
     >
       <Plus className="w-4 h-4" />
     </button>
@@ -793,7 +799,7 @@ const FullscreenZoomModal = React.memo(({ images, activeIdx, onIdxChange, onClos
         <div className="flex items-center gap-3">
           <button
             onClick={() => setScale((s) => Math.max(s - 0.5, 1))}
-            className="btn btn-sm"
+            className="btn btn-sm cursor-pointer"
             aria-label="Zoom out"
           >
             <Minus className="w-4 h-4" />
@@ -803,14 +809,14 @@ const FullscreenZoomModal = React.memo(({ images, activeIdx, onIdxChange, onClos
           </span>
           <button
             onClick={() => setScale((s) => Math.min(s + 0.5, 5))}
-            className="btn btn-sm"
+            className="btn btn-sm cursor-pointer"
             aria-label="Zoom in"
           >
             <Plus className="w-4 h-4" />
           </button>
           <button
             onClick={() => { onClose(); setScale(1); }}
-            className="btn btn-sm btn-error ml-2"
+            className="btn btn-sm btn-error ml-2 cursor-pointer"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -836,7 +842,7 @@ const FullscreenZoomModal = React.memo(({ images, activeIdx, onIdxChange, onClos
             <button
               key={i}
               onClick={() => { onIdxChange(i); setScale(1); }}
-              className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${i === activeIdx ? 'border-primary opacity-100' : 'border-transparent opacity-50'}`}
+              className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${i === activeIdx ? 'border-primary opacity-100' : 'border-transparent opacity-50'}`}
             >
               <img src={img.url} className="w-full h-full object-cover" alt="" />
             </button>
@@ -858,6 +864,8 @@ export default function MedicineDetails() {
   const dispatch = useDispatch();
   const router = useRouter();
   const { slug } = useParams();
+
+  const user = useSelector(selectUser);
 
   const [cartState, setCartState] = useState('idle'); // 'idle' | 'adding' | 'success'
 
@@ -960,6 +968,12 @@ export default function MedicineDetails() {
   }, [med, prescriptionUrl, maxStock, bestStoreId]);
 
   const handleAddToCart = useCallback(async () => {
+    if (!user) {
+      toast.error('Please log in to add items to your cart.');
+      router.push('/login');
+      return;
+    }
+
     if (!guardPreFlight()) return;
     setCartState('adding');
     try {
@@ -977,7 +991,7 @@ export default function MedicineDetails() {
       setCartState('idle');
       toast.error(err?.message || 'Failed to add to cart. Please try again.');
     }
-  }, [dispatch, med, quantity, bestStoreId, prescriptionUrl, guardPreFlight]);
+  }, [dispatch, med, quantity, bestStoreId, prescriptionUrl, guardPreFlight, user, router]);
 
   const decrement = useCallback(() => setQuantity((q) => Math.max(1, q - 1)), []);
   const increment = useCallback(
@@ -1045,13 +1059,13 @@ export default function MedicineDetails() {
         <div className="flex gap-4">
           <button
             onClick={() => router.back()}
-            className="btn btn-secondary flex items-center gap-2"
+            className="btn btn-secondary flex items-center gap-2 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" /> Go Back
           </button>
           <button
             onClick={() => dispatch(fetchMedicineBySlug(slug))}
-            className="btn btn-primary flex items-center gap-2"
+            className="btn btn-primary flex items-center gap-2 cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" /> Retry
           </button>
@@ -1076,14 +1090,14 @@ export default function MedicineDetails() {
             >
               <button
                 onClick={() => router.push('/pharmacy')}
-                className="hover:text-primary transition-colors text-inherit"
+                className="hover:text-primary transition-colors text-inherit cursor-pointer"
               >
                 Pharmacy
               </button>
               <ChevronRight className="w-3 h-3 shrink-0" />
               <button
                 onClick={() => router.push(`/pharmacy?category=${med.category}`)}
-                className="hover:text-primary transition-colors text-inherit"
+                className="hover:text-primary transition-colors text-inherit cursor-pointer"
               >
                 {med.category}
               </button>
@@ -1122,20 +1136,24 @@ export default function MedicineDetails() {
               </div>
 
               <div className="flex gap-2 no-print shrink-0 mt-2 md:mt-0 w-full md:w-auto">
-                <button
-                  onClick={handleShare}
-                  aria-label="Share"
-                  className="btn btn-ghost flex-1 md:flex-none flex items-center justify-center border-2 border-base-300"
-                >
-                  <Share2 className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => window.print()}
-                  aria-label="Print"
-                  className="btn btn-ghost flex-1 md:flex-none flex items-center justify-center border-2 border-base-300"
-                >
-                  <Printer className="w-5 h-5" />
-                </button>
+                <IconTooltip label="Share">
+                  <button
+                    onClick={handleShare}
+                    aria-label="Share"
+                    className="btn btn-ghost flex-1 md:flex-none flex items-center justify-center border-2 border-base-300 cursor-pointer"
+                  >
+                    <Share2 className="w-5 h-5" />
+                  </button>
+                </IconTooltip>
+                <IconTooltip label="Print">
+                  <button
+                    onClick={() => window.print()}
+                    aria-label="Print"
+                    className="btn btn-ghost flex-1 md:flex-none flex items-center justify-center border-2 border-base-300 cursor-pointer"
+                  >
+                    <Printer className="w-5 h-5" />
+                  </button>
+                </IconTooltip>
               </div>
             </div>
           </div>
@@ -1424,7 +1442,7 @@ export default function MedicineDetails() {
                         role="tab"
                         aria-selected={isActive}
                         onClick={() => setActiveTab(key)}
-                        className={`relative pb-4 px-4 sm:px-6 font-black uppercase tracking-widest whitespace-nowrap transition-all text-[0.65rem] ${isActive ? 'text-primary' : 'text-base-content/50'}`}
+                        className={`relative pb-4 px-4 sm:px-6 font-black uppercase tracking-widest whitespace-nowrap transition-all text-[0.65rem] cursor-pointer ${isActive ? 'text-primary' : 'text-base-content/50 hover:text-base-content/80'}`}
                       >
                         {tab}
                         {isActive && (
@@ -1676,24 +1694,12 @@ export default function MedicineDetails() {
                               </p>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                             <div>
                               <p className="text-xs font-bold uppercase tracking-wider text-base-content/50">
                                 MRP
                               </p>
                               <p className="text-xl font-black text-primary">₹{fmt(med.referenceMrp)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs font-bold uppercase tracking-wider text-base-content/50">
-                                PTR
-                              </p>
-                              <p className="text-xl font-black text-base-content">₹{fmt(med.ptr)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs font-bold uppercase tracking-wider text-base-content/50">
-                                PTS
-                              </p>
-                              <p className="text-xl font-black text-base-content">₹{fmt(med.pts)}</p>
                             </div>
                             <div>
                               <p className="text-xs font-bold uppercase tracking-wider text-base-content/50">
@@ -1907,7 +1913,7 @@ export default function MedicineDetails() {
                       key={item._id}
                       whileHover={{ y: -6 }}
                       onClick={() => router.push(`/pharmacy/buy-medicines/${item?.slug}`)}
-                      className="glass-card p-3 text-left flex flex-col gap-3 transition-all rounded-3xl border-2 border-base-300"
+                      className="glass-card p-3 text-left flex flex-col gap-3 transition-all rounded-3xl border-2 border-base-300 cursor-pointer"
                     >
                       <div className="aspect-square rounded-2xl border overflow-hidden flex items-center justify-center relative bg-base-100 border-base-200">
                         {item.images?.[0]?.url ? (
@@ -1961,8 +1967,8 @@ export default function MedicineDetails() {
                               </p>
                             )}
                           </div>
-                          <div className="w-7 h-7 rounded-lg flex items-center justify-center transition-all bg-base-200">
-                            <ChevronRight className="w-4 h-4 text-primary" />
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center transition-all bg-base-200 group-hover:bg-primary group-hover:text-primary-content">
+                            <ChevronRight className="w-4 h-4 text-inherit" />
                           </div>
                         </div>
                       </div>
