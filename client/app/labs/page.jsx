@@ -19,7 +19,7 @@ import {
   Sparkles,
   Loader2,
 } from "lucide-react";
-
+import Container from "@/components/ui/Container";
 import {
   fetchPublicLabs,
   fetchFeaturedLabs,
@@ -351,7 +351,7 @@ export default function LabsPage() {
 
   return (
     <div className="min-h-screen bg-base-100 font-poppins">
-      
+      <Container className="pt-6 md:pt-8 lg:pt-10">
       {/* ── Hero / Search ───────────────────────────────────────────── */}
       <div 
         className="relative overflow-visible pt-8 pb-10 md:pt-10 md:pb-14 border-b border-base-200" 
@@ -708,6 +708,7 @@ export default function LabsPage() {
         )}
 
       </div>
+      </Container>
     </div>
   );
 }

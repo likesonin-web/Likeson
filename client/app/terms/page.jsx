@@ -10,7 +10,7 @@ import {
   AlertCircle, ArrowLeft, ShieldAlert,
   UserCheck, Gavel, BadgeCheck, BookMarked,
 } from 'lucide-react';
-
+import Container                             from '@/components/ui/Container';
 import {
   fetchActiveDocByType,
   recordConsent,
@@ -203,7 +203,7 @@ export default function TermsAndConditionsPage() {
 
   return (
     <div className="min-h-screen bg-base-100">
-
+      <Container className="py-10">
       {/* ── Hero header ─────────────────────────────────────────────────────── */}
       <header className="border-b border-base-300 bg-base-200">
         <div className="container-custom py-10">
@@ -443,6 +443,7 @@ export default function TermsAndConditionsPage() {
           <ConsentBanner doc={doc} loading={loading} onAccept={handleAccept} />
         )}
       </AnimatePresence>
+      </Container>
     </div>
   );
 }

@@ -2,10 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
-import { selectUser } from '../../../store/slices/userSlice';
-import { createTicket, selectTicketLoaders } from '../../../store/slices/ticketSlice';
-import SupportShell from '../../../components/support/layout/SupportShell';
-import CreateTicketWizard from '../../../components/support/ticket/CreateTicketWizard';
+import { selectUser } from '@/store/slices/userSlice';
+import { createTicket, selectTicketLoaders } from '@/store/slices/ticketSlice';
+import SupportShell from '@/components/support/layout/SupportShell';
+import CreateTicketWizard from '@/components/support/ticket/CreateTicketWizard';
 
 export default function PartnerNewTicketPage() {
   const user = useSelector(selectUser);

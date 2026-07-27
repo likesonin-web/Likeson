@@ -1882,8 +1882,11 @@ export default function MedicinePage({ router }) {
   const walletBalance = useSelector(selectWalletBalance);
   const isUploading = useSelector((s) => s.upload.isUploading);
 
-  const mySub = useSelector(selectMySubscription);
+const mySub = useSelector(selectMySubscription);
   const subscriptionDiscountPct = mySub?.limits?.pharmacyDiscountPercent ?? 0;
+
+  // Check if user is logged in (adjust 'state.auth.user' to match your actual Redux state structure)
+  const isAuthenticated = useSelector((state) => !!state.user?.user);
 
 // ── UI State ──
   const [search, setSearch] = useState("");
@@ -2041,8 +2044,17 @@ useEffect(() => {
     [dispatch],
   );
 
-  const handleAddToCart = useCallback(
+const handleAddToCart = useCallback(
     (medicine) => {
+      // 1. Check Auth before adding to cart or asking for prescription
+      if (!isAuthenticated) {
+        toast.error("Please login to add items to your cart.");
+        const loginPath = "/login"; // Adjust this if your login route is different (e.g., /auth/login)
+        if (router) router.push(loginPath);
+        else window.location.href = loginPath;
+        return;
+      }
+
       if (medicine.isPrescriptionRequired) {
         setRxMedicine(medicine);
         setPendingRxAction("cart");
@@ -2051,11 +2063,20 @@ useEffect(() => {
       }
       executeAddToCart(medicine);
     },
-    [executeAddToCart],
+    [executeAddToCart, isAuthenticated, router],
   );
 
-  const handleBuyNow = useCallback(
+const handleBuyNow = useCallback(
     (medicine) => {
+      // 1. Check Auth before buying or asking for prescription
+      if (!isAuthenticated) {
+        toast.error("Please login to purchase medicines.");
+        const loginPath = "/login"; // Adjust this if your login route is different
+        if (router) router.push(loginPath);
+        else window.location.href = loginPath;
+        return;
+      }
+
       const bestInv = getBestInventory(medicine.inventory);
       if (
         !extractStoreId(bestInv?.storeId) &&

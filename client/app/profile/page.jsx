@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -8,7 +9,7 @@ import {
   Bell, Monitor, Key, Lock, ChevronRight, ChevronDown, ChevronUp,
   Plus, Trash2, Edit3, Upload, Eye, CheckCircle, Clock, AlertCircle,
   Activity, Droplets, Thermometer, Wind, Zap, Weight, Ruler,
-  CreditCard, Building2, Star, LogOut, Smartphone, Globe, 
+  CreditCard, Building2, Star, LogOut, Smartphone, Globe,
   Settings, Camera, Download, X, Check, Calendar, Users,
   Stethoscope, ClipboardList, BookOpen, TrendingUp, Award,
   BarChart3, RefreshCw, Info,
@@ -25,12 +26,6 @@ import {
   deleteGovernmentScheme,
   addPrivateInsurance,
   deletePrivateInsurance,
-  addMedicalEvent,
-  updateMedicalEvent,
-  deleteMedicalEvent,
-  addMedicine,
-  updateMedicine,
-  deleteMedicine,
   updateConsent,
   fetchAuditSessions,
   deleteAuditSession,
@@ -86,10 +81,9 @@ const TABS = [
   { id: 'sessions',   label: 'Sessions',        icon: Monitor },
 ];
 
-const KYC_TYPES = ['Aadhaar','PAN','VoterID','Driving License','Passport','NREGA Job Card'];
 const BLOOD_GROUPS = ['A+','A-','B+','B-','AB+','AB-','O+','O-','Bombay Phenotype (hh)','Rh-null (Golden Blood)','Rare/Other'];
 const GENDERS = ['Male','Female','Transgender','Other','Prefer not to say'];
-const FREQ_OPTIONS = ['OD','BD','TDS','QID','SOS','HS','AC','PC','STAT','Weekly','Monthly','As Directed'];
+const KYC_TYPES = ['Aadhaar','PAN','VoterID','Driving License','Passport','NREGA Job Card'];
 const GOV_SCHEMES = [
   'Ayushman Bharat (PM-JAY)','Central Government Health Scheme (CGHS)',
   'Employees State Insurance (ESI)','Dr. YSR Aarogyasri (Andhra Pradesh)',
@@ -181,7 +175,7 @@ function Modal({ open, onClose, title, children }) {
           <motion.div
             initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="card bg-base-100 w-full max-w-lg max-h-[60vh] overflow-y-auto"
+            className="card bg-base-100 w-full mt-20 max-w-lg max-h-[60vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-5 border-b border-base-300">
@@ -306,7 +300,7 @@ function OverviewSection({ user, profile }) {
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <label className="label-text">Your Referral Code</label>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex w-fit items-center gap-2 mt-1">
               <code className="bg-primary/10 text-primary font-bold px-4 py-2 rounded-lg text-xs tracking-widest flex-1">
                 {user?.referralCode || '—'}
               </code>
@@ -370,8 +364,8 @@ function OverviewSection({ user, profile }) {
             { label: 'Referred By',         value: user?.referredBy ? 'Another user' : 'Direct signup', note: 'Whether you joined via referral' },
           ].map(({ label, value, note }) => (
             <div key={label}>
-              <p className="label-text">{label}</p>
-              <p className="text-base-content font-semibold">{String(value)}</p>
+              <p className="label-text text-base-content/50">{label}</p>
+              <p className="text-base-content font-family-poppins font-medium">{String(value)}</p>
               <FieldNote>{note}</FieldNote>
             </div>
           ))}
@@ -817,9 +811,7 @@ function InsuranceSection({ profile }) {
               <input type="number" className="input-field mt-1" value={insForm.sumInsured} onChange={e=>setInsForm(p=>({...p,sumInsured:e.target.value}))} placeholder="e.g. 500000" />
               <FieldNote>Total coverage amount in INR</FieldNote>
             </div>
-            <div>
-              {/* placeholder for layout balance */}
-            </div>
+            <div>{/* layout balance */}</div>
             <div>
               <label className="label-text">Valid From</label>
               <input type="date" className="input-field mt-1" value={insForm.validFrom} onChange={e=>setInsForm(p=>({...p,validFrom:e.target.value}))} />
@@ -845,39 +837,23 @@ function InsuranceSection({ profile }) {
   );
 }
 
-// ─── Medical Timeline Section ─────────────────────────────────────────────────
+// ─── Medical Timeline Section (read-only) ─────────────────────────────────────
 
 function MedicalSection() {
-  const dispatch = useDispatch();
   const timeline = useSelector(selectMedicalTimeline);
   const loading = useSelector(selectSectionLoading('medicalTimeline'));
-  const [modal, setModal] = useState(false);
-  const [editModal, setEditModal] = useState(null);
-  const [form, setForm] = useState({ eventTitle: '', hospitalName: '', description: '', doctorName: '', date: '' });
-  const [files, setFiles] = useState([]);
-
-  const handleAdd = () => {
-    const fd = new FormData();
-    Object.entries(form).forEach(([k,v]) => v && fd.append(k,v));
-    files.forEach(f => fd.append('reportFiles', f));
-    dispatch(addMedicalEvent(fd)).then(() => { setModal(false); setForm({ eventTitle:'', hospitalName:'', description:'', doctorName:'', date:'' }); setFiles([]); });
-  };
-
-  const handleUpdate = (eventId) => {
-    dispatch(updateMedicalEvent({ eventId, payload: editModal })).then(() => setEditModal(null));
-  };
 
   return (
     <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-4">
       <motion.div variants={fadeUp} className="card p-5">
-        <SectionHeader
-          icon={ClipboardList}
-          title="Medical Timeline"
-          action={<button className="btn btn-primary btn-sm" onClick={() => setModal(true)}><Plus size={13}/>Add Event</button>}
-        />
-        <p className="text-[11px] text-base-content/50 mb-4">Chronological record of hospital visits, surgeries, diagnoses and medical events.</p>
-        {loading ? <LoadingRow count={4}/> : timeline.length === 0 ? (
-          <EmptyState icon={ClipboardList} message="No medical events recorded" sub="Log hospital visits, surgeries, and diagnoses" />
+        <SectionHeader icon={ClipboardList} title="Medical Timeline" />
+        <p className="text-[11px] text-base-content/50 mb-4">
+          Chronological record of hospital visits, surgeries, diagnoses and medical events.
+          Entries are added by your care team.
+        </p>
+
+        {loading ? <LoadingRow count={4} /> : timeline.length === 0 ? (
+          <EmptyState icon={ClipboardList} message="No medical events recorded" sub="Events appear here once logged by a doctor or care assistant" />
         ) : (
           <div className="relative">
             <div className="absolute left-6 top-0 bottom-0 w-px bg-base-300" />
@@ -886,34 +862,22 @@ function MedicalSection() {
                 <motion.div key={ev._id} variants={fadeUp} className="flex gap-4">
                   <div className="relative z-10 shrink-0 w-3 h-3 rounded-full bg-primary mt-2 ml-[18px]" />
                   <div className="glass-card flex-1 p-4">
-                    <div className="flex items-start justify-between gap-2 flex-wrap">
-                      <div>
-                        <p className="font-semibold text-xs text-base-content">{ev.eventTitle}</p>
-                        <p className="text-[11px] text-base-content/50 mt-0.5">
-                          {ev.hospitalName && `${ev.hospitalName} · `}
-                          {ev.doctorName && `Dr. ${ev.doctorName} · `}
-                          {ev.date ? new Date(ev.date).toLocaleDateString('en-IN') : ''}
-                        </p>
-                        {ev.description && <p className="text-[11px] text-base-content/60 mt-1">{ev.description}</p>}
-                        {ev.reportUrls?.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {ev.reportUrls.map((url, i) => (
-                              <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="badge badge-info badge-xs">
-                                Report {i+1}
-                              </a>
-                            ))}
-                          </div>
-                        )}
+                    <p className="font-semibold text-xs text-base-content">{ev.eventTitle}</p>
+                    <p className="text-[11px] text-base-content/50 mt-0.5">
+                      {ev.hospitalName && `${ev.hospitalName} · `}
+                      {ev.doctorName && `Dr. ${ev.doctorName} · `}
+                      {ev.date ? new Date(ev.date).toLocaleDateString('en-IN') : ''}
+                    </p>
+                    {ev.description && <p className="text-[11px] text-base-content/60 mt-1">{ev.description}</p>}
+                    {ev.reportUrls?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {ev.reportUrls.map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="badge badge-info badge-xs">
+                            Report {i + 1}
+                          </a>
+                        ))}
                       </div>
-                      <div className="flex gap-1 shrink-0">
-                        <button className="btn btn-ghost btn-xs btn-circle" onClick={() => setEditModal({ _id: ev._id, eventTitle: ev.eventTitle, hospitalName: ev.hospitalName||'', description: ev.description||'', doctorName: ev.doctorName||'', date: ev.date ? ev.date.slice(0,10) : '' })}>
-                          <Edit3 size={12}/>
-                        </button>
-                        <button className="btn btn-ghost btn-xs btn-circle text-error" onClick={() => dispatch(deleteMedicalEvent(ev._id))}>
-                          <Trash2 size={12}/>
-                        </button>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </motion.div>
               ))}
@@ -921,169 +885,26 @@ function MedicalSection() {
           </div>
         )}
       </motion.div>
-
-      {/* Add Event Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title="Add Medical Event">
-        <div className="space-y-4">
-          <div>
-            <label className="label-text">Event Title *</label>
-            <input className="input-field mt-1" value={form.eventTitle} onChange={e=>setForm(p=>({...p,eventTitle:e.target.value}))} placeholder="e.g. Appendix Surgery, Dengue Treatment" />
-            <FieldNote>Short descriptive title — shown in timeline and emergency card</FieldNote>
-          </div>
-          <div>
-            <label className="label-text">Hospital / Clinic Name</label>
-            <input className="input-field mt-1" value={form.hospitalName} onChange={e=>setForm(p=>({...p,hospitalName:e.target.value}))} />
-            <FieldNote>Name of the facility where treatment was received</FieldNote>
-          </div>
-          <div>
-            <label className="label-text">Treating Doctor</label>
-            <input className="input-field mt-1" value={form.doctorName} onChange={e=>setForm(p=>({...p,doctorName:e.target.value}))} placeholder="Dr. Name" />
-            <FieldNote>Doctor who treated or diagnosed you</FieldNote>
-          </div>
-          <div>
-            <label className="label-text">Event Date</label>
-            <input type="date" className="input-field mt-1" value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))} />
-            <FieldNote>Actual date of visit or procedure — used for chronological ordering</FieldNote>
-          </div>
-          <div>
-            <label className="label-text">Description / Notes</label>
-            <textarea className="input-field mt-1 resize-none" rows={3} value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))} placeholder="Diagnosis, procedure, outcome..." />
-            <FieldNote>Detailed notes visible to you and shared doctors on request</FieldNote>
-          </div>
-          <div>
-            <label className="label-text">Report Files (up to 5)</label>
-            <input type="file" multiple className="input-field mt-1" accept="image/*,application/pdf" onChange={e=>setFiles(Array.from(e.target.files).slice(0,5))} />
-            <FieldNote>Lab reports, discharge summaries, scan images — JPG/PNG/PDF</FieldNote>
-          </div>
-          <button className="btn btn-primary w-full" onClick={handleAdd} disabled={!form.eventTitle || loading}>
-            {loading ? <span className="loading loading-sm"/> : <Plus size={14}/>} Add Event
-          </button>
-        </div>
-      </Modal>
-
-      {/* Edit Event Modal */}
-      <Modal open={!!editModal} onClose={() => setEditModal(null)} title="Edit Medical Event">
-        {editModal && (
-          <div className="space-y-4">
-            <div>
-              <label className="label-text">Event Title</label>
-              <input className="input-field mt-1" value={editModal.eventTitle} onChange={e=>setEditModal(p=>({...p,eventTitle:e.target.value}))} />
-              <FieldNote>Short descriptive name for this medical event</FieldNote>
-            </div>
-            <div>
-              <label className="label-text">Hospital Name</label>
-              <input className="input-field mt-1" value={editModal.hospitalName} onChange={e=>setEditModal(p=>({...p,hospitalName:e.target.value}))} />
-              <FieldNote>Name of the hospital or clinic</FieldNote>
-            </div>
-            <div>
-              <label className="label-text">Doctor Name</label>
-              <input className="input-field mt-1" value={editModal.doctorName} onChange={e=>setEditModal(p=>({...p,doctorName:e.target.value}))} />
-              <FieldNote>Attending physician's name</FieldNote>
-            </div>
-            <div>
-              <label className="label-text">Date</label>
-              <input type="date" className="input-field mt-1" value={editModal.date} onChange={e=>setEditModal(p=>({...p,date:e.target.value}))} />
-              <FieldNote>Actual date of visit or procedure</FieldNote>
-            </div>
-            <div>
-              <label className="label-text">Description</label>
-              <textarea className="input-field mt-1 resize-none" rows={3} value={editModal.description} onChange={e=>setEditModal(p=>({...p,description:e.target.value}))} />
-              <FieldNote>Notes about the diagnosis, procedure, or outcome</FieldNote>
-            </div>
-            <button className="btn btn-primary w-full" onClick={() => handleUpdate(editModal._id)} disabled={loading}>
-              {loading ? <span className="loading loading-sm"/> : <Check size={14}/>} Save Changes
-            </button>
-          </div>
-        )}
-      </Modal>
     </motion.div>
   );
 }
 
-// ─── Medicines Section ────────────────────────────────────────────────────────
+// ─── Medicines Section (read-only) ─────────────────────────────────────────────
 
 function MedicinesSection() {
-  const dispatch = useDispatch();
   const medicines = useSelector(selectMedicineHistory);
   const loading = useSelector(selectSectionLoading('medicineHistory'));
-  const [modal, setModal] = useState(false);
-  const [editModal, setEditModal] = useState(null);
-  const blankMed = { medicineName:'', dosage:'', frequency:'', startDate:'', endDate:'', isOngoing:true, prescribingDoctor:'', instructions:'' };
-  const [form, setForm] = useState(blankMed);
-
-  const handleAdd = () => {
-    dispatch(addMedicine(form)).then(() => { setModal(false); setForm(blankMed); });
-  };
-  const handleUpdate = () => {
-    dispatch(updateMedicine({ medId: editModal._id, payload: editModal })).then(() => setEditModal(null));
-  };
-
-  const MedForm = ({ data, setData, onSave, btnLabel }) => (
-    <div className="space-y-4">
-      <div>
-        <label className="label-text">Medicine Name *</label>
-        <input className="input-field mt-1" value={data.medicineName} onChange={e=>setData(p=>({...p,medicineName:e.target.value}))} placeholder="e.g. Metformin 500mg" />
-        <FieldNote>Brand or generic name of the medicine</FieldNote>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="label-text">Dosage</label>
-          <input className="input-field mt-1" value={data.dosage} onChange={e=>setData(p=>({...p,dosage:e.target.value}))} placeholder="e.g. 500mg" />
-          <FieldNote>Strength per dose</FieldNote>
-        </div>
-        <div>
-          <label className="label-text">Frequency</label>
-          <select className="input-field mt-1" value={data.frequency} onChange={e=>setData(p=>({...p,frequency:e.target.value}))}>
-            <option value="">Select</option>
-            {FREQ_OPTIONS.map(f=><option key={f}>{f}</option>)}
-          </select>
-          <FieldNote>How often it is taken (OD = once, BD = twice, TDS = thrice daily)</FieldNote>
-        </div>
-        <div>
-          <label className="label-text">Start Date</label>
-          <input type="date" className="input-field mt-1" value={data.startDate} onChange={e=>setData(p=>({...p,startDate:e.target.value}))} />
-          <FieldNote>Date you started this medicine</FieldNote>
-        </div>
-        <div>
-          <label className="label-text">End Date</label>
-          <input type="date" className="input-field mt-1" value={data.endDate} onChange={e=>setData(p=>({...p,endDate:e.target.value}))} disabled={data.isOngoing} />
-          <FieldNote>Leave blank if still ongoing</FieldNote>
-        </div>
-      </div>
-      <div>
-        <label className="label cursor-pointer gap-2 w-fit">
-          <input type="checkbox" className="checkbox checkbox-sm checkbox-success" checked={!!data.isOngoing} onChange={e=>setData(p=>({...p,isOngoing:e.target.checked}))} />
-          <span className="label-text">Currently taking (ongoing)</span>
-        </label>
-        <FieldNote>Check if you are still taking this medicine</FieldNote>
-      </div>
-      <div>
-        <label className="label-text">Prescribing Doctor</label>
-        <input className="input-field mt-1" value={data.prescribingDoctor} onChange={e=>setData(p=>({...p,prescribingDoctor:e.target.value}))} placeholder="Dr. Name" />
-        <FieldNote>Doctor who prescribed this medicine</FieldNote>
-      </div>
-      <div>
-        <label className="label-text">Instructions / Special Notes</label>
-        <textarea className="input-field mt-1 resize-none" rows={2} value={data.instructions} onChange={e=>setData(p=>({...p,instructions:e.target.value}))} placeholder="e.g. Take after food, avoid grapefruit" />
-        <FieldNote>Any special instructions from your doctor for taking this medicine</FieldNote>
-      </div>
-      <button className="btn btn-primary w-full" onClick={onSave} disabled={!data.medicineName || loading}>
-        {loading ? <span className="loading loading-sm"/> : <Check size={14}/>} {btnLabel}
-      </button>
-    </div>
-  );
 
   return (
     <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-4">
       <motion.div variants={fadeUp} className="card p-5">
-        <SectionHeader
-          icon={Pill}
-          title="Medicine History"
-          action={<button className="btn btn-primary btn-sm" onClick={() => setModal(true)}><Plus size={13}/>Add Medicine</button>}
-        />
-        <p className="text-[11px] text-base-content/50 mb-4">Track all past and current medications for accurate medical history.</p>
-        {loading ? <LoadingRow count={4}/> : medicines.length === 0 ? (
-          <EmptyState icon={Pill} message="No medicines recorded" sub="Add current and past medications" />
+        <SectionHeader icon={Pill} title="Medicine History" />
+        <p className="text-[11px] text-base-content/50 mb-4">
+          Current and past medications, added by your prescribing doctor.
+        </p>
+
+        {loading ? <LoadingRow count={4} /> : medicines.length === 0 ? (
+          <EmptyState icon={Pill} message="No medicines recorded" sub="Medicines appear here after a prescription is issued" />
         ) : (
           <div className="space-y-3">
             {medicines.map((m) => (
@@ -1106,26 +927,11 @@ function MedicinesSection() {
                   </p>
                   {m.instructions && <p className="text-[11px] text-base-content/50 italic mt-0.5">{m.instructions}</p>}
                 </div>
-                <div className="flex gap-1 shrink-0">
-                  <button className="btn btn-ghost btn-xs btn-circle" onClick={() => setEditModal({...m, startDate: m.startDate?.slice(0,10)||'', endDate: m.endDate?.slice(0,10)||''})}>
-                    <Edit3 size={12}/>
-                  </button>
-                  <button className="btn btn-ghost btn-xs btn-circle text-error" onClick={() => dispatch(deleteMedicine(m._id))}>
-                    <Trash2 size={12}/>
-                  </button>
-                </div>
               </motion.div>
             ))}
           </div>
         )}
       </motion.div>
-
-      <Modal open={modal} onClose={() => setModal(false)} title="Add Medicine">
-        <MedForm data={form} setData={setForm} onSave={handleAdd} btnLabel="Add Medicine" />
-      </Modal>
-      <Modal open={!!editModal} onClose={() => setEditModal(null)} title="Edit Medicine">
-        {editModal && <MedForm data={editModal} setData={setEditModal} onSave={handleUpdate} btnLabel="Save Changes" />}
-      </Modal>
     </motion.div>
   );
 }
@@ -1432,9 +1238,9 @@ function ReportsSection() {
           title="Medical Reports"
           action={<button className="btn btn-ghost btn-sm" onClick={() => dispatch(fetchReports())}><RefreshCw size={13}/></button>}
         />
-        <p className="text-[11px] text-base-content/50 mb-4">Reports are linked to medical timeline events. Upload files from the Medical tab.</p>
+        <p className="text-[11px] text-base-content/50 mb-4">Reports are linked to medical timeline events.</p>
         {loading ? <LoadingRow count={3}/> : reports.length === 0 ? (
-          <EmptyState icon={FileText} message="No reports found" sub="Upload report files from the Medical Timeline tab" />
+          <EmptyState icon={FileText} message="No reports found" sub="Reports appear once uploaded by your care team" />
         ) : (
           <div className="space-y-4">
             {reports.map((r) => (
@@ -1526,6 +1332,7 @@ function NotificationsSection() {
 
 function SessionsSection({ user }) {
   const dispatch = useDispatch();
+  const router = useRouter();
   const sessions = useSelector(selectAuditSessions);
   const deviceTokens = useSelector(selectDeviceTokens);
   const loading = useSelector(selectSectionLoading('auditSessions'));
@@ -1533,6 +1340,15 @@ function SessionsSection({ user }) {
   useEffect(() => { dispatch(fetchAuditSessions()); }, [dispatch]);
 
   const platformIcon = { android: Smartphone, ios: Smartphone, web: Globe, desktop: Monitor };
+
+  // Signing out of all devices includes the current session — send the
+  // user back to login once the server confirms the sessions are cleared.
+  const handleSignOutAll = async () => {
+    const result = await dispatch(deleteAllAuditSessions());
+    if (deleteAllAuditSessions.fulfilled?.match?.(result) ?? !result?.error) {
+      router.push('/login');
+    }
+  };
 
   return (
     <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-6">
@@ -1544,8 +1360,8 @@ function SessionsSection({ user }) {
           title="Active Sessions"
           action={
             sessions.length > 0 && (
-              <button className="btn btn-error btn-sm" onClick={() => dispatch(deleteAllAuditSessions())}>
-                <LogOut size={13}/> Sign Out All
+              <button className="btn btn-error btn-sm" onClick={handleSignOutAll} disabled={loading}>
+                {loading ? <span className="loading loading-xs"/> : <LogOut size={13}/>} Sign Out All
               </button>
             )
           }
@@ -1656,7 +1472,6 @@ export default function CustomerProfilePage() {
   const user = useSelector(selectCustomerUser);
   const profile = useSelector(selectCustomerProfile);
   const loading = useSelector(selectProfileLoading);
-  // ✅ FIX: The unreadCount hook is now safely grouped with all other hooks
   const unreadCount = useSelector(selectUnreadCount);
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -1693,7 +1508,7 @@ export default function CustomerProfilePage() {
 
   return (
     <div className="min-h-screen bg-base-100" data-theme="customer">
-      
+
       {/* Top bar — mobile */}
       <div className="lg:hidden sticky top-0 z-40 bg-base-100 border-b border-base-300 px-4 py-3 flex items-center gap-3">
         <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0">

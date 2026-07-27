@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, memo } from "react";
 import Link from "next/link";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,6 +40,7 @@ import {
   selectHospitalError,
 } from "@/store/slices/hospitalSlice";
 import Container from "@/components/ui/Container";
+
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,14 +63,8 @@ const SORT_OPTIONS = [
 ];
 
 const RESULTS_PER_PAGE = 12;
-const NEARBY_RADIUS_METERS = 100000; // 100 km — matches HomeHospitals
+const NEARBY_RADIUS_METERS = 100000;
 
-// Location modes — mirrors HomeHospitals so "near me" behaves identically
-// user         → resolved from the signed-in user's saved location on mount
-// nearby       → resolved from live GPS (button press)
-// manual-near  → typed address successfully geocoded to coordinates
-// manual       → typed address could not be geocoded, filtered by city text instead
-// browse       → no location context, plain directory browse
 const MODE = {
   USER: "user",
   NEARBY: "nearby",
@@ -98,7 +93,7 @@ async function geocodeAddress(address) {
       return { lat, lng };
     }
   } catch {
-    // silent fallback — caller treats null as "use city filter instead"
+    // silent fallback
   }
   return null;
 }
@@ -169,6 +164,26 @@ function StatCell({ icon: Icon, value, label }) {
   );
 }
 
+function HighlightedText({ text, highlight }) {
+  if (!text) return null;
+  if (!highlight.trim()) return <>{text}</>;
+
+  const parts = text.split(new RegExp(`(${highlight})`, "gi"));
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === highlight.toLowerCase() ? (
+          <span key={i} className="bg-primary/20 text-primary font-black rounded-[2px] px-[2px]">
+            {part}
+          </span>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Hospital card
 // ─────────────────────────────────────────────────────────────────────────────
@@ -199,7 +214,6 @@ function HospitalCard({ hospital, index }) {
       initial="hidden"
       animate="visible"
     >
-      {/* ── Media ── */}
       <div className="relative h-40 bg-base-200 overflow-hidden">
         {hospital.images?.[0] || hospital.logo ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -243,7 +257,6 @@ function HospitalCard({ hospital, index }) {
         )}
       </div>
 
-      {/* ── Body ── */}
       <div className="p-5 flex flex-col gap-3 flex-1">
         <div className="flex items-start justify-between gap-3">
           <h3 className="text-lg font-black leading-tight text-base-content line-clamp-1">
@@ -280,7 +293,6 @@ function HospitalCard({ hospital, index }) {
           </span>
         </div>
 
-        {/* ── Quick stats ── */}
         <div className="grid grid-cols-4 rounded-[var(--r-field)] border border-base-300 bg-base-200/50">
           <StatCell
             icon={BedDouble}
@@ -336,7 +348,6 @@ function HospitalCard({ hospital, index }) {
           </a>
         )}
 
-        {/* ── Actions ── */}
         <div className="mt-auto pt-2 w-full flex items-center gap-2">
           <SpecialButton
             title="Details"
@@ -345,7 +356,6 @@ function HospitalCard({ hospital, index }) {
             role="hospital"
             variant="outline"
             className="flex-1 w-40"
-
           />
           <SpecialButton
             title="Book"
@@ -355,7 +365,6 @@ function HospitalCard({ hospital, index }) {
             variant="solid"
             animation="press"
             textAnimation="letterStagger"
-             
             role="hospital"
           />
         </div>
@@ -458,7 +467,7 @@ function Pagination({ page, pages, onChange }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Location bar — same behavior/priority order as HomeHospitals, page-styled
+// Location bar with Instant Search Autocomplete Dropdown
 // ─────────────────────────────────────────────────────────────────────────────
 
 function LocationBar({
@@ -470,8 +479,22 @@ function LocationBar({
   onClear,
   gpsLoading,
   geocoding,
+  hospitals,
 }) {
   const [inputVal, setInputVal] = useState(manualAddress || "");
+  const [isFocused, setIsFocused] = useState(false);
+  const containerRef = useRef(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const modeLabel =
     mode === MODE.USER
@@ -486,34 +509,101 @@ function LocationBar({
 
   const submit = () => {
     const v = inputVal.trim();
-    if (v.length > 2) onManualSearch(v);
+    if (v.length > 0) {
+      setIsFocused(false);
+      onManualSearch(v);
+    }
   };
 
+  // Filter hospitals dynamically as user types for the autocomplete popup
+  const filteredSuggestions = inputVal.trim().length >= 1
+    ? hospitals.filter((h) => 
+        h.name.toLowerCase().includes(inputVal.toLowerCase()) ||
+        h.address?.city?.toLowerCase().includes(inputVal.toLowerCase()) ||
+        h.hospitalType?.toLowerCase().includes(inputVal.toLowerCase())
+      ).slice(0, 5)
+    : [];
+
   return (
-    <div className="glass-card p-4 md:p-5 max-w-3xl">
+    <div className="glass-card p-4 md:p-5 max-w-3xl relative" ref={containerRef}>
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
-          <MapPin className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-base-content/40" />
+          <MapPin className="w-4 h-4 absolute left-3.5 top-1/2   -translate-y-1/2 text-base-content/40" />
           <input
             type="text"
             value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onChange={(e) => {
+              setInputVal(e.target.value);
+              setIsFocused(true);
+              onManualSearch(e.target.value); // Real-time search trigger
+            }}
             onKeyDown={(e) => e.key === "Enter" && submit()}
             placeholder="Search by hospital name, city, or area"
-            className="input-field pl-10 pr-8"
+            className="input-field h-13 pl-10 pr-8"
           />
           {inputVal && (
             <button
               onClick={() => {
                 setInputVal("");
+                setIsFocused(false);
                 onClear();
               }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/30 hover:text-base-content transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/30 hover:text-base-content transition-colors cursor-pointer"
               aria-label="Clear search"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           )}
+
+          {/* Autocomplete Popup Dropdown */}
+          <AnimatePresence>
+            {isFocused && filteredSuggestions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-full left-0 right-0 mt-2 bg-base-100 shadow-2xl border border-base-200 rounded-xl overflow-hidden z-[100] max-h-60 overflow-y-auto"
+              >
+                <div className="p-1.5">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-base-content/40 px-3 pt-2 pb-1">
+                    Matching Hospitals
+                  </p>
+                  {filteredSuggestions.map((h) => (
+                    <button
+                      key={h._id}
+                      type="button"
+                      onClick={() => {
+                        setInputVal(h.name);
+                        setIsFocused(false);
+                        onManualSearch(h.name);
+                      }}
+                      className="w-full text-left flex items-center gap-3 p-2.5 rounded-lg hover:bg-base-200 transition-colors cursor-pointer group"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <Building2 className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-base-content truncate group-hover:text-primary transition-colors">
+                          <HighlightedText text={h.name} highlight={inputVal} />
+                        </p>
+                        <p className="text-[10px] text-base-content/50 truncate flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-3 h-3 text-primary/60 shrink-0" />
+                          <HighlightedText text={h.address?.city || "Unknown City"} highlight={inputVal} />
+                          {h.hospitalType && (
+                            <span className="badge badge-xs badge-primary/10 text-primary ml-1">
+                              <HighlightedText text={h.hospitalType} highlight={inputVal} />
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="flex gap-2 shrink-0">
@@ -601,8 +691,6 @@ export default function HospitalsPage() {
     : loading.fetchAllHospitals;
   const hospitals = nearby ? nearbyHospitals : allHospitals;
 
-  // ── Fetchers ────────────────────────────────────────────────────────────────
-
   const runBrowse = useCallback(
     (targetPage = 1, city = cityFilter) => {
       currentPageRef.current = targetPage;
@@ -637,7 +725,6 @@ export default function HospitalsPage() {
     [dispatch, coords, hospitalType],
   );
 
-  // ── Initial load — saved location first, same priority as HomeHospitals ─────
   useEffect(() => {
     if (didInit.current) return;
     didInit.current = true;
@@ -653,25 +740,18 @@ export default function HospitalsPage() {
       setMode(MODE.BROWSE);
       runBrowse(1, "");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?._id]);
+  }, [user?._id, runBrowse, runNearby]);
 
-  // ── Re-fetch current mode when type/sort filters change ─────────────────────
   useEffect(() => {
     if (!didInit.current) return;
     if (nearby) runNearby(1);
     else runBrowse(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hospitalType, sort]);
-
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  }, [hospitalType, sort, nearby, runNearby, runBrowse]);
 
   const handleUseGPS = () => {
     if (mode === MODE.USER) return;
 
-    // Helper to fallback to Redux user location if GPS fails
     const fallbackToUserLocation = (baseErrorMsg) => {
-      // 1. If not logged in
       if (!user) {
         setGpsError(
           `${baseErrorMsg} You are not logged in. Please log in to use a saved location, or search manually.`,
@@ -680,33 +760,22 @@ export default function HospitalsPage() {
         return;
       }
 
-      // 2. Check for saved coordinates in the user model
-      // Note: MongoDB stores as [longitude, latitude]
       const savedCoords = user?.location?.coordinates;
       if (savedCoords && (savedCoords[0] !== 0 || savedCoords[1] !== 0)) {
         const loc = { lat: savedCoords[1], lng: savedCoords[0] };
-
         setCoords(loc);
         setManualAddress("");
         setCityFilter("");
         setMode(MODE.USER);
         setLocationLabel(user.lastKnownAddress || "your saved location");
-
-        // Let the user know we used their saved location instead
-        setGpsError(
-          `${baseErrorMsg} Using your saved profile location instead.`,
-        );
+        setGpsError(`${baseErrorMsg} Using your saved profile location instead.`);
         runNearby(1, loc);
       } else {
-        // 3. Logged in, but no saved location exists
-        setGpsError(
-          `${baseErrorMsg} No saved location found in your profile. Enter it manually.`,
-        );
+        setGpsError(`${baseErrorMsg} No saved location found in your profile.`);
       }
       setGpsLoading(false);
     };
 
-    // Check if geolocation is supported at all
     if (!("geolocation" in navigator)) {
       fallbackToUserLocation("Geolocation not supported.");
       return;
@@ -715,10 +784,8 @@ export default function HospitalsPage() {
     setGpsLoading(true);
     setGpsError("");
 
-    // Request GPS location
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        // Success: Use live GPS
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setCoords(loc);
         setManualAddress("");
@@ -728,12 +795,10 @@ export default function HospitalsPage() {
         runNearby(1, loc);
       },
       (err) => {
-        // Error: Fallback to profile location
         const baseMsg =
           err.code === 1
             ? "Location permission denied."
             : "Could not get your live location.";
-
         fallbackToUserLocation(baseMsg);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
@@ -793,54 +858,45 @@ export default function HospitalsPage() {
   return (
     <div data-theme="hospital" className="min-h-screen bg-base-100">
       <Container className="">
-        {/* ═══════════════════════════════ HERO / SEARCH (Center Pattern + Corner Glows) ═══════════════════════════ */}
-        <section className="relative overflow-hidden border-b border-base-300 bg-base-100">
-          {/* ── 1. Corner Edge Glows (Top-Left & Bottom-Right Only) ── */}
+        {/* ═══════════════════════════════ HERO / SEARCH ═══════════════════════════ */}
+        <section className="relative   border-b border-base-300 bg-base-100">
+          {/* Corner Edge Glows in Primary/Secondary Theme */}
           <div
             className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden"
             aria-hidden="true"
           >
-            {/* Top-Left Glow (Primary) */}
-            <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[60%] bg-primary/10 dark:bg-primary/15 blur-[100px] md:blur-[140px] rounded-full" />
-
-            {/* Bottom-Right Glow (Secondary) */}
-            <div className="absolute -bottom-[20%] -right-[10%] w-[50%] h-[60%] bg-secondary/10 dark:bg-secondary/15 blur-[100px] md:blur-[140px] rounded-full" />
+            <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[60%] bg-primary/20 dark:bg-primary/25 blur-[120px] md:blur-[160px] rounded-full" />
+            <div className="absolute -bottom-[20%] -right-[10%] w-[50%] h-[60%] bg-secondary/20 dark:bg-secondary/25 blur-[120px] md:blur-[160px] rounded-full" />
           </div>
 
-{/* ── 2. Grid Texture (Restricted to Center Only) ── */}
+          {/* Clean Grid Lines Pattern (Faded Edges & Strong Center Glow) */}
           <div
-            className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.05]"
+            className="absolute inset-0 pointer-events-none opacity-[0.07] dark:opacity-[0.10]"
             style={{
-              /* Masks the pattern so it only exists in the middle and completely disappears at the edges */
-              WebkitMaskImage: "radial-gradient(circle at center, black 10%, transparent 65%)",
-              maskImage: "radial-gradient(circle at center, black 10%, transparent 65%)",
+              WebkitMaskImage: "radial-gradient(circle at center, black 20%, transparent 75%)",
+              maskImage: "radial-gradient(circle at center, black 20%, transparent 75%)",
             }}
             aria-hidden="true"
           >
-            <svg className="w-full h-full text-base-content" xmlns="http://www.w3.org/2000/svg">
+            <svg className="w-full h-full text-primary" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <pattern
-                  id="doctor-cross-pattern"
-                  width="60"
-                  height="60"
+                  id="hospital-grid-primary"
+                  width="40"
+                  height="40"
                   patternUnits="userSpaceOnUse"
                 >
-                  {/* Medical Cross SVG Path */}
-                  <path
-                    d="M27 21h6v8h8v6h-8v8h-6v-8h-8v-6h8v-8z"
-                    fill="currentColor"
-                  />
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="1" />
                 </pattern>
               </defs>
-              <rect width="100%" height="100%" fill="url(#doctor-cross-pattern)" />
+              <rect width="100%" height="100%" fill="url(#hospital-grid-primary)" />
             </svg>
           </div>
 
           <div className="container-custom relative z-10 py-10 md:py-16">
-            {/* ── 3. Go Back Button ── */}
             <button
               onClick={() => window.history.back()}
-              className="btn btn-sm btn-ghost mb-8 -ml-2 text-base-content/60 hover:text-base-content hover:bg-base-content/5 transition-colors"
+              className="btn btn-sm btn-ghost mb-8 -ml-2 text-base-content/60 hover:text-base-content hover:bg-base-content/5 transition-colors cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
               Go Back
@@ -856,15 +912,14 @@ export default function HospitalsPage() {
                 Verified Care Network
               </span>
 
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black leading-tight tracking-tight mb-4 max-w-3xl">
-                {/* Text gradient using base-content and base-100 (using base-300 in light mode for readability) */}
-                <span className="bg-gradient-to-br from-base-content to-base-300 dark:to-base-100 bg-clip-text text-transparent">
-                  Find the right hospital,
-                </span>{" "}
-                <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent drop-shadow-sm">
-                  fast.
-                </span>
-              </h1>
+ <h1 className="text-4xl md:text-5xl lg:text-6xl font-black leading-tight tracking-tight mb-4 max-w-3xl">
+  <span className="bg-gradient-to-r from-base-content to-base-content/50 bg-clip-text text-transparent">
+    Discover exceptional healthcare facilities,
+  </span>{" "}
+  <span className="bg-gradient-to-br from-info to-primary bg-clip-text text-transparent drop-shadow-sm">
+    effortlessly.
+  </span>
+</h1>
 
               <p className="text-lg text-base-content/60 mb-10 max-w-2xl font-medium">
                 Search verified hospitals near you, or look up a city and book
@@ -872,7 +927,7 @@ export default function HospitalsPage() {
               </p>
             </motion.div>
 
-            {/* ── 4. Search Component ── */}
+            {/* Search Component with Autocomplete Popup */}
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
@@ -884,7 +939,6 @@ export default function HospitalsPage() {
               className="w-full"
             >
               <div className="relative group max-w-3xl">
-                {/* Search Container */}
                 <div className="relative bg-base-100/90 dark:bg-base-100/70 backdrop-blur-xl rounded-2xl ring-1 ring-base-content/5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
                   <LocationBar
                     mode={mode}
@@ -895,6 +949,7 @@ export default function HospitalsPage() {
                     onClear={handleClear}
                     gpsLoading={gpsLoading}
                     geocoding={geocoding}
+                    hospitals={hospitals}
                   />
                 </div>
               </div>
@@ -911,50 +966,16 @@ export default function HospitalsPage() {
               )}
             </motion.div>
 
-            {/* ── 5. Quick Stats ── */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="flex flex-wrap items-center gap-4 mt-12 md:mt-16 max-w-2xl"
-            >
-              <div className="flex flex-col flex-1 min-w-[120px] px-5 py-4 rounded-[1.25rem] bg-base-200/30 dark:bg-base-200/10 backdrop-blur-md border border-base-content/5 shadow-sm hover:bg-base-200/50 dark:hover:bg-base-200/20 transition-all duration-300">
-                <p className="text-2xl md:text-3xl font-black text-base-content mb-0.5">
-                  {total > 0 ? `${total}+` : "—"}
-                </p>
-                <p className="text-xs font-bold text-base-content/50 uppercase tracking-widest">
-                  Facilities
-                </p>
-              </div>
-
-              <div className="flex flex-col flex-1 min-w-[120px] px-5 py-4 rounded-[1.25rem] bg-base-200/30 dark:bg-base-200/10 backdrop-blur-md border border-base-content/5 shadow-sm hover:bg-base-200/50 dark:hover:bg-base-200/20 transition-all duration-300">
-                <p className="text-2xl md:text-3xl font-black text-base-content mb-0.5">
-                  100
-                  <span className="text-lg text-base-content/40 ml-1">km</span>
-                </p>
-                <p className="text-xs font-bold text-base-content/50 uppercase tracking-widest">
-                  Radius
-                </p>
-              </div>
-
-              <div className="flex flex-col flex-1 min-w-[120px] px-5 py-4 rounded-[1.25rem] bg-base-200/30 dark:bg-base-200/10 backdrop-blur-md border border-base-content/5 shadow-sm hover:bg-base-200/50 dark:hover:bg-base-200/20 transition-all duration-300 relative overflow-hidden">
-                <p className="text-2xl md:text-3xl font-black text-base-content mb-0.5 relative z-10">
-                  24/7
-                </p>
-                <p className="text-xs font-bold text-base-content/50 uppercase tracking-widest relative z-10">
-                  ER Access
-                </p>
-              </div>
-            </motion.div>
+              
           </div>
         </section>
 
         {/* ═══════════════════════════════ FILTER BAR ═══════════════════════════════ */}
-        <section className="sticky top-0 z-30 bg-base-100/90 backdrop-blur-soft border-b border-base-300">
+        <section className="sticky top-0 z-0 bg-base-100/90 backdrop-blur-soft border-b border-base-300">
           <div className="container-custom py-3 flex items-center gap-3 overflow-x-auto scrollbar-thin">
             <button
               onClick={() => setFiltersOpen((v) => !v)}
-              className="btn btn-ghost btn-sm shrink-0"
+              className="btn btn-ghost btn-sm shrink-0 cursor-pointer"
             >
               <SlidersHorizontal className="w-4 h-4" />
               Filters
@@ -984,7 +1005,7 @@ export default function HospitalsPage() {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value)}
-              className="input-field !w-auto py-1.5 text-sm shrink-0"
+              className="input-field !w-auto py-1.5 text-sm shrink-0 cursor-pointer"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -1011,7 +1032,7 @@ export default function HospitalsPage() {
                   </p>
                   <button
                     onClick={handleClear}
-                    className="btn btn-ghost btn-sm"
+                    className="btn btn-ghost btn-sm cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                     Clear all

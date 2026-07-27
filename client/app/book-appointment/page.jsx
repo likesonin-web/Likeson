@@ -1161,7 +1161,7 @@ export default function BookingSystem() {
     });
   }, [pendingPaymentBooking, dispatch, form]);
 
-  // ── gate Continue — idx>=1 (anything past step0) needs login ─────
+// ── gate Continue — idx>=1 (anything past step0) needs login ─────
   const goNext = useCallback(() => {
     if (!validate(currentStepId)) {
       setTimeout(() => {
@@ -1171,7 +1171,9 @@ export default function BookingSystem() {
       }, 100);
       return;
     }
-    if (!isLoggedIn && curIdx >= 1) {
+    // Clicking "Continue" from ANY step means they are trying to reach at least step 2
+    if (!isLoggedIn) {
+      toast.error("Please login to proceed with your booking.");
       router.push(`/login`);
       return;
     }
@@ -1204,12 +1206,13 @@ export default function BookingSystem() {
     setTimeout(scrollToTop, 50);
   }, [curIdx, stepIds, scrollToTop]);
 
-  // ── gate direct StepBar jumps — idx>=1 needs login (matches goNext) ─
+// ── gate direct StepBar jumps — idx>=1 needs login (matches goNext) ─
   const handleStepClick = useCallback(
     (stepId) => {
       if (!visitedIds.includes(stepId) || stepId === currentStepId) return;
       const targetIdx = stepIds.indexOf(stepId);
       if (!isLoggedIn && targetIdx >= 1) {
+        toast.error("Please login to access this step.");
         router.push(`/login`);
         return;
       }

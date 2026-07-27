@@ -32,12 +32,10 @@ import {
   AlertCircle,
   Building2,
   CheckCircle2,
-  XCircle,
   Ambulance,
   FlaskConical,
   Pill,
   Microscope,
-  Wheelchair,
   Users,
   FileText,
   CalendarCheck,
@@ -121,16 +119,8 @@ const SectionTitle = ({ icon: Icon, children }) => (
 // BOOKING HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Adjust this if the booking flow lives at a different route.
 const BOOKING_ROUTE = "/book-appointment";
 
-// Maps a doctor's consultationTypes flag → booking config.
-// bookingType mirrors the values BookingSystem.jsx reads from `type` in the URL
-// (see BOOKING_TYPES / handleSubmit's `map` object: doctor_consultation, doctor_online).
-// homeVisit doesn't have its own dedicated booking type in that file yet, so it
-// is routed through doctor_consultation with consultationType=homeVisit carried
-// in the query string for whenever that step reads it — wire it up on that end
-// if/when a dedicated home-visit doctor flow exists.
 const CONSULTATION_TYPE_CONFIG = {
   inPerson: {
     key: "inPerson",
@@ -161,20 +151,26 @@ const CONSULTATION_TYPE_CONFIG = {
   },
 };
 
-// Resolves the fee for a specific consultation type, falling back to the
-// doctor's common consultationFee when that type doesn't have its own fee set.
-const resolveDoctorFee = (doctor, config) => {
-  const fees = doctor.fees || {};
-  const specific = fees[config.feeKey];
+// HELPER: Get correct pricing (handles both doctor-level and hospital-level pricing)
+const getPricing = (doctor, hospital) => {
+  if (doctor.fees && Object.keys(doctor.fees).length > 0) return doctor.fees;
+  return (
+    hospital?.consultationPricing ||
+    hospital?.pricingInfo?.consultationPricing ||
+    {}
+  );
+};
+
+const resolveDoctorFee = (doctor, hospital, config) => {
+  const pricing = getPricing(doctor, hospital);
+  const specific = pricing[config.feeKey];
   const hasSpecific = specific !== null && specific !== undefined;
   return {
-    amount: hasSpecific ? specific : fees.consultationFee || 0,
+    amount: hasSpecific ? specific : pricing.inPersonFee || pricing.consultationFee || 0,
     isFallback: !hasSpecific,
   };
 };
 
-// Builds a book link carrying both hospital + doctor context, plus the
-// booking type so the flow lands on the right step already primed.
 const buildDoctorBookHref = (hospital, doctor, config) => {
   const params = new URLSearchParams();
   if (config.needsHospital && hospital?._id) {
@@ -188,8 +184,6 @@ const buildDoctorBookHref = (hospital, doctor, config) => {
   return `${BOOKING_ROUTE}?${params.toString()}`;
 };
 
-// Hospital-only book link — no doctor, no type. Lets the person pick the
-// service themselves once they land on the booking flow.
 const buildHospitalBookHref = (hospital) => {
   const params = new URLSearchParams();
   if (hospital?._id) params.set("hospital", hospital._id);
@@ -252,12 +246,22 @@ const DoctorCard = ({ doctor, hospital }) => {
     (c) => doctor.consultationTypes?.[c.key]
   );
 
+  const pricing = getPricing(doctor, hospital);
+  const baseFee = pricing.inPersonFee || pricing.consultationFee || 0;
+  const followUpFee = pricing.followUpFee || 0;
+  const followUpDiscountPercent = pricing.followUpDiscountPercent || 0;
+  const followUpValidDays = pricing.followUpValidDays || 0;
+
   return (
-    <div className="card p-5 hover:border-primary/30 transition-all">
+    <div className="card p-5 border border-base-200 hover:border-primary/30 transition-all bg-base-100 shadow-sm hover:shadow-md">
       <div className="flex items-start gap-4">
         <div className="avatar placeholder shrink-0">
-          <div className="w-14 h-14 rounded-xl bg-primary/10 text-primary font-bold text-base flex items-center justify-center">
-            {initials || "DR"}
+          <div className="w-14 h-14 rounded-xl bg-primary/10 text-primary font-bold text-base flex items-center justify-center overflow-hidden">
+            {doctor.user?.avatar ? (
+              <img src={doctor.user.avatar} alt={doctor.user.name} className="w-full h-full object-cover" />
+            ) : (
+              initials || "DR"
+            )}
           </div>
         </div>
         <div className="min-w-0 flex-1">
@@ -289,11 +293,11 @@ const DoctorCard = ({ doctor, hospital }) => {
         </span>
       </div>
 
-      <div className="mt-4 pt-4 border-t border-base-300 grid grid-cols-3 gap-2 text-center">
+      <div className="mt-4 pt-4 border-t border-base-200 grid grid-cols-3 gap-2 text-center bg-base-50 rounded-xl">
         <div>
           <p className="text-xs font-black text-base-content">
             {doctor.experienceYears}
-            <span className="text-[11px] font-semibold text-base-content/50">
+            <span className="text-[11px] font-semibold text-base-content/50 ml-1">
               yr
             </span>
           </p>
@@ -301,39 +305,37 @@ const DoctorCard = ({ doctor, hospital }) => {
         </div>
         <div>
           <p className="text-xs font-black text-primary">
-            ₹{doctor.fees?.consultationFee || 0}
+            ₹{baseFee}
           </p>
           <p className="text-[11px] text-base-content/50">Consult</p>
         </div>
         <div>
           <p className="text-xs font-black text-base-content">
-            ₹{doctor.fees?.followUpFee || 0}
+            ₹{followUpFee}
           </p>
           <p className="text-[11px] text-base-content/50">Follow-up</p>
         </div>
       </div>
 
-      {/* Book buttons — one per available consultation type, each showing
-          its own fee (falling back to the common consultationFee) and
-          clearly labelled so it's obvious which mode is being booked. */}
       {bookOptions.length > 0 ? (
-        <div className="mt-4 pt-4 border-t border-base-300 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="mt-4 pt-4 border-t border-base-200 grid grid-cols-1 sm:grid-cols-2 gap-2">
           {bookOptions.map((config) => {
-            const { amount, isFallback } = resolveDoctorFee(doctor, config);
+            const { amount, isFallback } = resolveDoctorFee(doctor, hospital, config);
             const Icon = config.icon;
             return (
               <SpecialButton
                 key={config.key}
                 href={buildDoctorBookHref(hospital, doctor, config)}
                 nav="doctors"
-                variant="solid"
+                variant={config.key === "inPerson" ? "solid" : "soft"}
                 size="sm"
                 animation="lift"
                 textAnimation="fade"
                 uppercase={false}
                 icon={Icon}
+                className="w-full h-10 justify-start"
               >
-                <span className="flex flex-col items-start leading-tight">
+                <span className="flex flex-col items-start  leading-tight text-left">
                   <span className="text-[11px] font-bold">
                     {config.label}
                   </span>
@@ -347,7 +349,7 @@ const DoctorCard = ({ doctor, hospital }) => {
           })}
         </div>
       ) : (
-        <div className="mt-4 pt-4 border-t border-base-300">
+        <div className="mt-4 pt-4 border-t border-base-200">
           <SpecialButton
             href={buildDoctorBookHref(
               hospital,
@@ -356,17 +358,18 @@ const DoctorCard = ({ doctor, hospital }) => {
             )}
             nav="doctor"
             variant="soft"
-            role='doctor'
+            role="doctor"
             size="sm"
             animation="lift"
             textAnimation="fade"
             uppercase={false}
             icon={CalendarCheck}
+            fullWidth
           >
             <span className="flex flex-col items-start leading-tight">
               <span className="text-[11px] font-bold">Book Consultation</span>
               <span className="text-[10px] font-semibold opacity-70">
-                ₹{doctor.fees?.consultationFee || 0} · standard fee
+                ₹{baseFee} · standard fee
               </span>
             </span>
           </SpecialButton>
@@ -375,7 +378,7 @@ const DoctorCard = ({ doctor, hospital }) => {
 
       {/* Qualifications */}
       {doctor.qualifications?.length > 0 && (
-        <div className="mt-3 space-y-1">
+        <div className="mt-4 space-y-1">
           {doctor.qualifications.map((q, i) => (
             <p key={i} className="text-[11px] text-base-content/60">
               <span className="font-semibold text-base-content/80">
@@ -388,11 +391,10 @@ const DoctorCard = ({ doctor, hospital }) => {
       )}
 
       {/* Follow-up discount badge */}
-      {doctor.fees?.followUpDiscountPercent > 0 && (
+      {followUpDiscountPercent > 0 && (
         <div className="mt-3">
-          <span className="badge badge-xs badge-success">
-            {doctor.fees.followUpDiscountPercent}% follow-up discount ·{" "}
-            {doctor.fees.followUpValidDays} days
+          <span className="badge badge-xs badge-success gap-1 border border-success/30">
+            {followUpDiscountPercent}% follow-up discount · {followUpValidDays} days
           </span>
         </div>
       )}
@@ -425,15 +427,15 @@ const OperatingHoursTable = ({ hours }) => {
               )}
             </span>
             {h.isClosed ? (
-              <span className="text-error font-semibold text-[11px] uppercase">
+              <span className="text-error font-semibold text-[11px] uppercase tracking-wider">
                 Closed
               </span>
             ) : h.is24Hours ? (
-              <span className="text-success font-semibold text-[11px] uppercase">
+              <span className="text-success font-semibold text-[11px] uppercase tracking-wider">
                 24 Hours
               </span>
             ) : (
-              <span className="text-base-content/70">
+              <span className="text-base-content/70 font-medium">
                 {formatTime(h.openTime)} – {formatTime(h.closeTime)}
               </span>
             )}
@@ -492,7 +494,7 @@ const HospitalDetails = () => {
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="max-w-md w-full card p-10"
+          className="max-w-md w-full card p-10 bg-base-100 shadow-xl border border-base-200"
         >
           <div className="w-20 h-20 bg-error/10 text-error rounded-full flex items-center justify-center mx-auto mb-6">
             <AlertCircle size={40} strokeWidth={1.5} />
@@ -506,7 +508,7 @@ const HospitalDetails = () => {
           </p>
           <button
             onClick={() => router.push("/hospitals")}
-            className="btn btn-error w-full"
+            className="btn btn-error w-full text-error-content rounded-xl"
           >
             Return to Directory
           </button>
@@ -557,12 +559,12 @@ const HospitalDetails = () => {
           <div className="flex gap-2">
             <button
               onClick={handleShare}
-              className="btn btn-ghost border border-base-300"
+              className="btn btn-ghost border border-base-300 rounded-xl"
               title="Share"
             >
               <Share2 size={16} />
             </button>
-            <button className="btn btn-ghost border border-base-300 group">
+            <button className="btn btn-ghost border border-base-300 rounded-xl group">
               <HeartPulse
                 size={16}
                 className="text-base-content/40 group-hover:text-error transition-colors"
@@ -586,7 +588,7 @@ const HospitalDetails = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="relative mb-3"
               >
-                <div className="aspect-video w-full rounded-2xl overflow-hidden border border-base-300 bg-base-200 shadow-depth">
+                <div className="aspect-video w-full rounded-2xl overflow-hidden border border-base-300 bg-base-200 shadow-sm">
                   <AnimatePresence mode="wait">
                     <motion.img
                       key={activeImage}
@@ -624,7 +626,7 @@ const HospitalDetails = () => {
                           p === 0 ? displayImages.length - 1 : p - 1
                         )
                       }
-                      className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-base-100/80 backdrop-blur-sm rounded-xl border border-base-300 hover:bg-base-100 transition-all"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-base-100/80 backdrop-blur-sm rounded-xl border border-base-300 hover:bg-base-100 transition-all cursor-pointer"
                     >
                       <ChevronLeft size={18} />
                     </button>
@@ -634,7 +636,7 @@ const HospitalDetails = () => {
                           p === displayImages.length - 1 ? 0 : p + 1
                         )
                       }
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-base-100/80 backdrop-blur-sm rounded-xl border border-base-300 hover:bg-base-100 transition-all"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-base-100/80 backdrop-blur-sm rounded-xl border border-base-300 hover:bg-base-100 transition-all cursor-pointer"
                     >
                       <ChevronRight size={18} />
                     </button>
@@ -643,7 +645,7 @@ const HospitalDetails = () => {
                         <button
                           key={i}
                           onClick={() => setActiveImage(i)}
-                          className={`h-1.5 rounded-full transition-all ${
+                          className={`h-1.5 rounded-full transition-all cursor-pointer ${
                             i === activeImage
                               ? "w-6 bg-primary"
                               : "w-1.5 bg-white/60"
@@ -662,7 +664,7 @@ const HospitalDetails = () => {
                     <button
                       key={idx}
                       onClick={() => setActiveImage(idx)}
-                      className={`shrink-0 w-20 h-14 rounded-xl overflow-hidden border-2 transition-all ${
+                      className={`shrink-0 w-20 h-14 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
                         activeImage === idx
                           ? "border-primary shadow-sm"
                           : "border-transparent opacity-55 hover:opacity-100"
@@ -682,14 +684,14 @@ const HospitalDetails = () => {
             {/* ── Identity ── */}
             <section className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="badge badge-primary">{hospital.hospitalType}</span>
-                <span className="badge badge-secondary text-[11px]">
+                <span className="badge badge-primary badge-sm py-2.5 font-bold">{hospital.hospitalType}</span>
+                <span className="badge badge-secondary badge-sm py-2.5 text-[11px] font-bold">
                   {hospital.managementModel === "hospital-manager"
                     ? "Managed Hospital"
                     : "Doctor-Owned"}
                 </span>
                 {hospital.is24x7 && (
-                  <span className="badge badge-success">24×7</span>
+                  <span className="badge badge-success badge-sm py-2.5 font-bold">24×7</span>
                 )}
               </div>
 
@@ -714,7 +716,7 @@ const HospitalDetails = () => {
               )}
 
               {/* Address */}
-              <div className="flex items-start gap-2 text-base-content/70 text-xs">
+              <div className="flex items-start gap-2 text-base-content/70 text-xs font-medium">
                 <MapPin size={15} className="text-primary shrink-0 mt-0.5" />
                 <span>
                   {hospital.address?.line1}
@@ -728,14 +730,13 @@ const HospitalDetails = () => {
 
               {/* Description */}
               {hospital.description && (
-                <p className="text-base text-base-content/70 leading-relaxed">
+                <p className="text-base text-base-content/70 leading-relaxed font-medium">
                   {hospital.description}
                 </p>
               )}
 
-              {/* Book at hospital CTA — hospital-only, no doctor/type,
-                  navigates straight to the booking page. */}
-              <div className="pt-2">
+              {/* Book at hospital CTA */}
+              <div className="pt-4">
                 <SpecialButton
                   href={hospitalBookHref}
                   nav="hospitals"
@@ -752,16 +753,16 @@ const HospitalDetails = () => {
             </section>
 
             {/* ── Tabs ── */}
-            <div>
-              <div className="flex gap-1 bg-base-200 p-1 rounded-xl border border-base-300 overflow-x-auto">
+            <div className="pt-4">
+              <div className="flex gap-1 bg-base-200 p-1.5 rounded-xl border border-base-300 overflow-x-auto">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`shrink-0 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                    className={`shrink-0 px-5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       activeTab === tab.id
-                        ? "bg-base-100 text-primary shadow-sm border border-base-300"
-                        : "text-base-content/60 hover:text-base-content"
+                        ? "bg-base-100 text-primary shadow-sm border border-base-200"
+                        : "text-base-content/60 hover:text-base-content hover:bg-base-300/50"
                     }`}
                   >
                     {tab.label}
@@ -769,7 +770,7 @@ const HospitalDetails = () => {
                 ))}
               </div>
 
-              <div className="mt-6">
+              <div className="mt-8">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeTab}
@@ -781,7 +782,7 @@ const HospitalDetails = () => {
 
                     {/* ══ TAB: OVERVIEW ══ */}
                     {activeTab === "overview" && (
-                      <div className="space-y-8">
+                      <div className="space-y-10">
 
                         {/* Specialties */}
                         {hospital.specialties?.length > 0 && (
@@ -793,7 +794,7 @@ const HospitalDetails = () => {
                               {hospital.specialties.map((s, i) => (
                                 <span
                                   key={i}
-                                  className="px-3 py-1.5 bg-primary/8 border border-primary/20 text-primary text-[11px] font-semibold rounded-lg"
+                                  className="px-3.5 py-1.5 bg-primary/8 border border-primary/20 text-primary text-[11px] font-bold rounded-lg"
                                 >
                                   {s}
                                 </span>
@@ -812,10 +813,10 @@ const HospitalDetails = () => {
                               {hospital.facilities.map((f, i) => (
                                 <div
                                   key={i}
-                                  className="flex items-center gap-3 p-3 bg-base-200/60 border border-base-300 rounded-xl text-xs font-semibold text-base-content"
+                                  className="flex items-center gap-3 p-3.5 bg-base-100 shadow-sm border border-base-200 rounded-xl text-xs font-bold text-base-content"
                                 >
                                   <CheckCircle2
-                                    size={16}
+                                    size={18}
                                     className="text-success shrink-0"
                                   />
                                   {f}
@@ -830,7 +831,7 @@ const HospitalDetails = () => {
                           <SectionTitle icon={Activity}>
                             Facility Features
                           </SectionTitle>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             <FlagChip
                               active={hospital.isEmergencyReady}
                               icon={Zap}
@@ -889,7 +890,7 @@ const HospitalDetails = () => {
                               {hospital.accreditations.map((a, i) => (
                                 <span
                                   key={i}
-                                  className="badge badge-accent"
+                                  className="badge badge-accent badge-lg font-bold px-4"
                                 >
                                   {a}
                                 </span>
@@ -908,7 +909,7 @@ const HospitalDetails = () => {
                               {hospital.acceptedSchemes.map((s, i) => (
                                 <span
                                   key={i}
-                                  className="badge badge-secondary"
+                                  className="badge badge-secondary badge-lg font-bold px-4"
                                 >
                                   {s}
                                 </span>
@@ -921,19 +922,19 @@ const HospitalDetails = () => {
                         <div>
                           <SectionTitle icon={Bed}>Bed Count</SectionTitle>
                           <div className="flex gap-4">
-                            <div className="flex-1 p-4 bg-base-200 border border-base-300 rounded-xl text-center">
-                              <p className="text-2xl font-black text-base-content">
+                            <div className="flex-1 p-5 bg-base-100 border border-base-200 shadow-sm rounded-2xl text-center">
+                              <p className="text-3xl font-black text-base-content">
                                 {hospital.bedCount?.total || 0}
                               </p>
-                              <p className="text-[11px] font-semibold text-base-content/50 uppercase tracking-wide mt-1">
+                              <p className="text-[11px] font-bold text-base-content/50 uppercase tracking-widest mt-2">
                                 Total Beds
                               </p>
                             </div>
-                            <div className="flex-1 p-4 bg-base-200 border border-base-300 rounded-xl text-center">
-                              <p className="text-2xl font-black text-base-content">
+                            <div className="flex-1 p-5 bg-base-100 border border-base-200 shadow-sm rounded-2xl text-center">
+                              <p className="text-3xl font-black text-base-content">
                                 {hospital.bedCount?.icu || 0}
                               </p>
-                              <p className="text-[11px] font-semibold text-base-content/50 uppercase tracking-wide mt-1">
+                              <p className="text-[11px] font-bold text-base-content/50 uppercase tracking-widest mt-2">
                                 ICU Beds
                               </p>
                             </div>
@@ -954,9 +955,9 @@ const HospitalDetails = () => {
                             />
                           ))
                         ) : (
-                          <div className="text-center py-16 text-base-content/40">
+                          <div className="text-center py-16 text-base-content/40 bg-base-100 border border-base-200 rounded-2xl">
                             <Users size={40} className="mx-auto mb-3 opacity-30" />
-                            <p className="font-semibold">No doctors linked yet</p>
+                            <p className="font-bold">No doctors linked yet</p>
                           </div>
                         )}
                       </div>
@@ -969,19 +970,19 @@ const HospitalDetails = () => {
                           Operating Hours
                         </SectionTitle>
                         {hospital.operatingHours?.length > 0 ? (
-                          <div className="card p-4">
+                          <div className="card p-5 bg-base-100 border border-base-200 shadow-sm">
                             <OperatingHoursTable
                               hours={hospital.operatingHours}
                             />
                           </div>
                         ) : (
-                          <p className="text-base-content/50 text-xs">
-                            No operating hours listed.
+                          <p className="text-base-content/50 text-xs font-medium bg-base-200 p-4 rounded-xl">
+                            No specific operating hours listed.
                           </p>
                         )}
                         {hospital.is24x7 && (
-                          <div className="alert alert-success mt-4 text-xs font-semibold">
-                            <CheckCircle2 size={16} />
+                          <div className="alert alert-success mt-4 text-xs font-bold border-success/20 bg-success/10 rounded-xl">
+                            <CheckCircle2 size={18} className="text-success" />
                             This facility operates 24×7
                           </div>
                         )}
@@ -990,12 +991,12 @@ const HospitalDetails = () => {
 
                     {/* ══ TAB: LEGAL ══ */}
                     {activeTab === "legal" && (
-                      <div className="space-y-4">
+                      <div className="space-y-6">
                         <SectionTitle icon={FileText}>
                           Registration Details
                         </SectionTitle>
-                        <div className="card overflow-hidden">
-                          <table className="table">
+                        <div className="card overflow-hidden border border-base-200 shadow-sm bg-base-100">
+                          <table className="table table-zebra w-full">
                             <tbody>
                               {[
                                 {
@@ -1050,11 +1051,11 @@ const HospitalDetails = () => {
                               ]
                                 .filter((r) => r.value && r.value !== "—" || r.value === "—")
                                 .map(({ label, value }) => (
-                                  <tr key={label}>
-                                    <td className="text-[11px] font-bold uppercase tracking-wider text-base-content/50 w-44">
+                                  <tr key={label} className="border-b-base-200">
+                                    <td className="text-[11px] font-black uppercase tracking-wider text-base-content/60 w-44 py-4 px-4">
                                       {label}
                                     </td>
-                                    <td className="font-semibold text-xs text-base-content">
+                                    <td className="font-semibold text-xs text-base-content py-4 px-4">
                                       {value || "—"}
                                     </td>
                                   </tr>
@@ -1068,7 +1069,7 @@ const HospitalDetails = () => {
                             href={hospital.registrationDetails.documentUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="btn btn-outline btn-sm gap-2"
+                            className="btn btn-outline btn-sm gap-2 rounded-lg"
                           >
                             <ExternalLink size={14} /> View License Document
                           </a>
@@ -1088,13 +1089,13 @@ const HospitalDetails = () => {
             <div className="sticky top-24 space-y-5">
 
               {/* ── Logo + Quick Stats ── */}
-              <div className="card p-3 md:p-4">
+              <div className="card p-4 md:p-5 bg-base-100 border border-base-200 shadow-sm">
                 <div className="flex items-center gap-4 mb-5">
                   {hospital.logo ? (
                     <img
                       src={hospital.logo}
                       alt={`${hospital.name} logo`}
-                      className="w-16 h-16 rounded-xl object-contain border border-base-300 bg-base-200 p-1 shrink-0"
+                      className="w-16 h-16 rounded-xl object-contain border border-base-300 bg-base-50 p-1 shrink-0"
                     />
                   ) : (
                     <div className="w-16 h-16 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -1105,25 +1106,25 @@ const HospitalDetails = () => {
                     <p className="font-black text-lg text-base-content leading-tight truncate">
                       {hospital.name}
                     </p>
-                    <p className="text-[11px] text-base-content/50 mt-0.5">
+                    <p className="text-[11px] font-semibold text-base-content/50 mt-1 uppercase tracking-wider">
                       {hospital.address?.city}, {hospital.address?.state}
                     </p>
-                    <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex items-center gap-2 mt-2">
                       {hospital.isVerified ? (
-                        <span className="badge badge-xs badge-success gap-1">
+                        <span className="badge badge-xs badge-success gap-1 py-2 font-bold border-success/30">
                           <BadgeCheck size={11} /> Verified
                         </span>
                       ) : (
-                        <span className="badge badge-xs badge-warning">
+                        <span className="badge badge-xs badge-warning py-2 font-bold">
                           Unverified
                         </span>
                       )}
                       {hospital.isActive ? (
-                        <span className="badge badge-xs badge-success">
+                        <span className="badge badge-xs badge-success py-2 font-bold bg-success/10 text-success border-success/30">
                           Active
                         </span>
                       ) : (
-                        <span className="badge badge-xs badge-error">
+                        <span className="badge badge-xs badge-error py-2 font-bold">
                           Inactive
                         </span>
                       )}
@@ -1133,47 +1134,48 @@ const HospitalDetails = () => {
 
                 {/* Stat chips */}
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="stat-card text-center p-3 rounded-xl">
-                    <div className="stat-card-value text-lg">
+                  <div className="stat-card text-center p-3 rounded-xl bg-base-200/50 border border-base-200">
+                    <div className="stat-card-value text-xl font-black text-base-content">
                       {hospital.bedCount?.total || 0}
                     </div>
-                    <div className="stat-card-label">Beds</div>
+                    <div className="stat-card-label text-[10px] font-bold uppercase text-base-content/50 mt-1 tracking-wider">Beds</div>
                   </div>
-                  <div className="stat-card text-center p-3 rounded-xl">
-                    <div className="stat-card-value text-lg">
+                  <div className="stat-card text-center p-3 rounded-xl bg-base-200/50 border border-base-200">
+                    <div className="stat-card-value text-xl font-black text-base-content">
                       {hospital.linkedDoctors?.length || 0}
                     </div>
-                    <div className="stat-card-label">Doctors</div>
+                    <div className="stat-card-label text-[10px] font-bold uppercase text-base-content/50 mt-1 tracking-wider">Doctors</div>
                   </div>
-                  <div className="stat-card text-center p-3 rounded-xl">
-                    <div className="stat-card-value text-lg">
+                  <div className="stat-card text-center p-3 rounded-xl bg-base-200/50 border border-base-200">
+                    <div className="stat-card-value text-xl font-black text-base-content">
                       {hospital.specialties?.length || 0}
                     </div>
-                    <div className="stat-card-label">Specialties</div>
+                    <div className="stat-card-label text-[10px] font-bold uppercase text-base-content/50 mt-1 tracking-wider">Specialties</div>
                   </div>
                 </div>
               </div>
 
               {/* ── Contact Card ── */}
-              <div className="rounded-2xl p-3 md:p-6 text-neutral-content shadow-depth relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-40 h-40 bg-primary/20 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none" />
+              <div className="rounded-2xl p-4 md:p-6 text-neutral-content shadow-lg relative overflow-hidden  ">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/30 rounded-full -mr-24 -mt-24 blur-3xl pointer-events-none" />
 
-                <SectionTitle icon={PhoneCall}>Contact & Location</SectionTitle>
+                <SectionTitle icon={PhoneCall}>
+                  <span className="font-bold">Contact & Location</span>
+                </SectionTitle>
 
-                <div className="space-y-5 relative z-10">
-
+                <div className="space-y-6 relative z-10 mt-6">
                   {/* Address */}
                   <div className="flex items-start gap-3">
-                    <div className="p-2.5 bg-white/10 rounded-xl shrink-0">
+                    <div className="px-2.5   rounded-xl shrink-0 backdrop-blur-sm">
                       <MapPin className="text-primary" size={18} />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold leading-snug">
+                      <p className="text-xs font-bold leading-snug  ">
                         {hospital.address?.line1}
                         {hospital.address?.line2 &&
                           `, ${hospital.address.line2}`}
                       </p>
-                      <p className="text-[11px] opacity-60 mt-0.5">
+                      <p className="text-[11px] font-medium opacity-70 mt-1  ">
                         {hospital.address?.city}, {hospital.address?.state}{" "}
                         {hospital.address?.pincode}
                       </p>
@@ -1183,27 +1185,27 @@ const HospitalDetails = () => {
                   {/* Phone */}
                   {hospital.contact?.phone && (
                     <div className="flex items-start gap-3">
-                      <div className="p-2.5 bg-white/10 rounded-xl shrink-0">
-                        <Phone className="text-primary" size={18} />
+                      <div className="px-2.5   rounded-xl shrink-0 backdrop-blur-sm">
+                        <Phone className="text-primary mt-3" size={18} />
                       </div>
                       <div>
                         <a
                           href={`tel:${hospital.contact.phone}`}
-                          className="text-sm font-black tracking-tight hover:text-primary transition-colors"
+                          className="text-sm font-black tracking-tight mr-2  hover:text-primary-content transition-colors"
                         >
                           {hospital.contact.phone}
                         </a>
                         {hospital.contact?.alternatePhone && (
-                          <p className="text-[11px] opacity-60 mt-0.5">
+                          <p className="text-[11px] font-medium  opacity-70 mt-0.5  ">
                             Alt: {hospital.contact.alternatePhone}
                           </p>
                         )}
                         {hospital.contact?.emergencyPhone && (
                           <a
                             href={`tel:${hospital.contact.emergencyPhone}`}
-                            className="mt-1.5 inline-flex items-center ml-2 gap-1.5 px-2.5 py-1 bg-error/25 text-error rounded-lg text-[11px] font-bold uppercase tracking-wide hover:bg-error/40 transition-colors"
+                            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-error text-error-content rounded-lg text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-sm"
                           >
-                            <Zap size={11} /> Emergency:{" "}
+                            <Zap size={12} fill="currentColor" /> Emergency:{" "}
                             {hospital.contact.emergencyPhone}
                           </a>
                         )}
@@ -1214,14 +1216,14 @@ const HospitalDetails = () => {
                   {/* WhatsApp */}
                   {hospital.contact?.whatsapp && (
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-white/10 rounded-xl shrink-0">
+                      <div className="px-2.5   rounded-xl shrink-0 backdrop-blur-sm">
                         <MessageSquare className="text-success" size={18} />
                       </div>
                       <a
                         href={`https://wa.me/${hospital.contact.whatsapp.replace(/\D/g, "")}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs font-semibold opacity-80 hover:opacity-100 hover:text-success transition-colors"
+                        className="text-xs font-bold   hover:text-success transition-colors"
                       >
                         {hospital.contact.whatsapp}
                       </a>
@@ -1231,12 +1233,12 @@ const HospitalDetails = () => {
                   {/* Email */}
                   {hospital.contact?.email && (
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-white/10 rounded-xl shrink-0">
+                      <div className="px-2.5   rounded-xl shrink-0 backdrop-blur-sm">
                         <Mail className="text-primary" size={18} />
                       </div>
                       <a
                         href={`mailto:${hospital.contact.email}`}
-                        className="text-xs font-medium opacity-80 hover:opacity-100 hover:text-primary transition-colors break-all"
+                        className="text-xs font-bold   hover:text-primary-content transition-colors break-all"
                       >
                         {hospital.contact.email}
                       </a>
@@ -1244,53 +1246,20 @@ const HospitalDetails = () => {
                   )}
                 </div>
 
-                {/* CTA buttons */}
-                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-10">
-                  {mapsUrl && (
-                    <a
-                      href={mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-primary gap-2"
-                    >
-                      <Navigation size={16} /> Directions
-                    </a>
-                  )}
-                  {hospital.contact?.website ? (
-                    <a
-                      href={
-                        hospital.contact.website.startsWith("http")
-                          ? hospital.contact.website
-                          : `https://${hospital.contact.website}`
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-outline gap-2 border-white/25 text-neutral-content hover:bg-white/10"
-                    >
-                      <Globe size={16} /> Website
-                    </a>
-                  ) : (
-                    <button
-                      disabled
-                      className="btn btn-outline gap-2 border-white/10 text-white/30 cursor-not-allowed"
-                    >
-                      <Globe size={16} /> No Website
-                    </button>
-                  )}
-                </div>
+                
 
-                {/* Book CTA — hospital-only booking link, mirrors the one
-                    up top so it's reachable from the sticky panel too. */}
+                {/* Book CTA */}
                 <div className="mt-3 relative z-10">
                   <SpecialButton
                     href={hospitalBookHref}
                     nav="hospitals"
-                    variant="pill"
+                    variant="solid"
                     size="md"
                     animation="lift"
                     textAnimation="fade"
                     icon={CalendarCheck}
                     fullWidth
+                    className="bg-white text-neutral hover:bg-base-200 border-none"
                   >
                     Book Appointment
                   </SpecialButton>
@@ -1299,25 +1268,25 @@ const HospitalDetails = () => {
 
               {/* ── Blood Bank info ── */}
               {(hospital.hasBloodBank || hospital.bloodBanks?.length > 0) && (
-                <div className="card p-5">
+                <div className="card p-5 bg-base-100 border border-base-200 shadow-sm">
                   <SectionTitle icon={Droplets}>Blood Bank</SectionTitle>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-base-content/60 font-medium">
+                  <div className="space-y-3 text-xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-base-200 last:border-0 last:pb-0">
+                      <span className="text-base-content/60 font-bold">
                         Accepts blood requests
                       </span>
                       {hospital.acceptsBloodRequests ? (
-                        <span className="badge badge-xs badge-success">Yes</span>
+                        <span className="badge badge-xs badge-success py-2 font-bold bg-success/10 text-success border-success/30">Yes</span>
                       ) : (
-                        <span className="badge badge-xs badge-error">No</span>
+                        <span className="badge badge-xs badge-error py-2 font-bold">No</span>
                       )}
                     </div>
                     {hospital.bloodBanks?.length > 0 && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-base-content/60 font-medium">
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-base-content/60 font-bold">
                           Linked blood banks
                         </span>
-                        <span className="font-bold text-base-content">
+                        <span className="font-black text-base-content bg-base-200 px-2 py-0.5 rounded-md">
                           {hospital.bloodBanks.length}
                         </span>
                       </div>
@@ -1327,19 +1296,19 @@ const HospitalDetails = () => {
               )}
 
               {/* ── Onboarding status ── */}
-              <div className="card p-5">
+              <div className="card p-5 bg-base-100 border border-base-200 shadow-sm">
                 <SectionTitle icon={CalendarCheck}>
                   Onboarding & Verification
                 </SectionTitle>
-                <div className="space-y-3 text-xs">
+                <div className="space-y-4 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-base-content/60 font-medium">
+                    <span className="text-base-content/60 font-bold">
                       Onboarding step
                     </span>
                     <div className="flex items-center gap-2">
-                      <div className="progress-bar w-20">
+                      <div className="w-24 h-2 bg-base-200 rounded-full overflow-hidden">
                         <div
-                          className="progress-bar-fill"
+                          className="h-full bg-primary rounded-full transition-all"
                           style={{
                             width: `${Math.min(
                               (hospital.onboarding?.step || 1) * 20,
@@ -1348,41 +1317,41 @@ const HospitalDetails = () => {
                           }}
                         />
                       </div>
-                      <span className="font-bold text-base-content text-[11px]">
+                      <span className="font-black text-base-content text-[11px]">
                         {hospital.onboarding?.step || 1}/5
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-base-content/60 font-medium">
+                    <span className="text-base-content/60 font-bold">
                       Status
                     </span>
                     {hospital.onboarding?.isComplete ? (
-                      <span className="badge badge-xs badge-success gap-1">
-                        <CheckCircle2 size={10} /> Complete
+                      <span className="badge badge-xs badge-success gap-1 py-2 font-bold bg-success/10 text-success border-success/30">
+                        <CheckCircle2 size={11} /> Complete
                       </span>
                     ) : (
-                      <span className="badge badge-xs badge-warning">
+                      <span className="badge badge-xs badge-warning py-2 font-bold">
                         In Progress
                       </span>
                     )}
                   </div>
                   {hospital.onboarding?.completedAt && (
                     <div className="flex items-center justify-between">
-                      <span className="text-base-content/60 font-medium">
+                      <span className="text-base-content/60 font-bold">
                         Completed
                       </span>
-                      <span className="font-semibold text-base-content">
+                      <span className="font-black text-base-content">
                         {formatDate(hospital.onboarding.completedAt)}
                       </span>
                     </div>
                   )}
                   {hospital.verifiedAt && (
                     <div className="flex items-center justify-between">
-                      <span className="text-base-content/60 font-medium">
+                      <span className="text-base-content/60 font-bold">
                         Verified on
                       </span>
-                      <span className="font-semibold text-base-content">
+                      <span className="font-black text-base-content">
                         {formatDate(hospital.verifiedAt)}
                       </span>
                     </div>

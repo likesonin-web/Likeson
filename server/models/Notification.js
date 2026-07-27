@@ -189,15 +189,17 @@ const notificationSchema = new Schema(
 );
 
 notificationSchema.add({
-  dedupeKey: { type: String, default: null, index: true },
+  dedupeKey: { type: String, default: undefined }, // not null
 });
+
+notificationSchema.index(
+  { recipient: 1, dedupeKey: 1 },
+  { unique: true, sparse: true }
+);
 
 // ── Indexes ───────────────────────────────────────────────────────────────────
  
-notificationSchema.index({ recipient: 1, isRead: 1, createdAt: -1 });
-notificationSchema.index({ scheduledAt: 1, 'channels.status': 1 });
-notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-notificationSchema.index({ recipient: 1, type: 1, createdAt: -1 });
+ 
 
 const Notification = mongoose.model('Notification', notificationSchema);
 export default Notification;

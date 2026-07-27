@@ -1,9 +1,9 @@
 'use client';
 
 import { useSelector } from 'react-redux';
-import { selectUser } from '../../store/slices/userSlice';
-import SupportShell from '../../components/support/layout/SupportShell';
-import TicketListPage from '../../components/support/pages/TicketListPage';
+import { selectUser } from '@/store/slices/userSlice';
+import SupportShell from '@/components/support/layout/SupportShell';
+import TicketListPage from '@/components/support/pages/TicketListPage';
 
 export default function PartnerSupportPage() {
   const user = useSelector(selectUser);
