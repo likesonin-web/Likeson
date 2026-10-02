@@ -694,9 +694,18 @@ const AppointmentRow = memo(({ booking, index, opByBooking, onComplete, onCancel
       </td>
       <td className="text-right">
         <div className="flex items-center justify-end gap-1">
-          {/* Confirm / Reject — pending bookings */}
-          {showConfirmReject && (
+          
+          {showConfirmReject ? (
+            /* ── PENDING ACTIONS ── */
             <>
+              <button
+                className="btn btn-ghost btn-xs gap-1 text-info hover:bg-info/10"
+                onClick={() => router.push(`/doctor/appointments/${booking._id}`)}
+                title="Booking Info"
+              >
+                <Eye size={13} aria-hidden="true" />
+                <span className="hidden lg:inline text-xs">Info</span>
+              </button>
               <button
                 className="btn btn-success btn-xs gap-1"
                 disabled={confirmLoading}
@@ -716,61 +725,62 @@ const AppointmentRow = memo(({ booking, index, opByBooking, onComplete, onCancel
                 <span className="hidden lg:inline">Reject</span>
               </button>
             </>
+          ) : (
+            /* ── ACCEPTED/NORMAL ACTIONS ── */
+            <>
+              {booking?.patientInfo?.phone && (
+                 <a href={`tel:${booking.patientInfo.phone}`}
+                  className="btn btn-ghost btn-xs btn-circle text-success"
+                  title={`Call ${getPatientName(booking)}: ${booking.patientInfo.phone}`}
+                >
+                  <Phone size={13} aria-hidden="true" />
+                </a>
+              )}
+
+              {canShowQrPay(booking) && (
+                <button
+                  className="btn btn-ghost btn-xs btn-circle text-primary"
+                  title="Pay at service / QR"
+                  onClick={() => onPayAtService({
+                    bookingId:   String(booking._id),
+                    bookingCode: booking.bookingCode,
+                    amount:      booking.fareBreakdown?.totalAmount ?? 0,
+                  })}
+                >
+                  <QrCode size={13} aria-hidden="true" />
+                </button>
+              )}
+
+              {joinable && consultId && (
+                <button
+                  className="btn btn-info btn-xs gap-1"
+                  onClick={() => router.push(`/doctor/consultation/${consultId}`)}
+                >
+                  <Video size={12} aria-hidden="true" />
+                  <span className="hidden lg:inline">Join</span>
+                </button>
+              )}
+
+              <button
+                className="btn btn-ghost btn-xs gap-1 text-accent hover:bg-accent/10"
+                onClick={() => router.push(`/doctor/prescriptions/new?bookingId=${booking._id}`)}
+              >
+                <PenLine size={13} aria-hidden="true" />
+                <span className="hidden lg:inline text-xs">Prescribe</span>
+              </button>
+
+              <ActionMenu
+                booking={booking}
+                opRecord={op}
+                onComplete={onComplete}
+                onCancel={onCancel}
+                onConfirm={onConfirm}
+                onReject={onReject}
+                confirmLoading={confirmLoading}
+                router={router}
+              />
+            </>
           )}
-
-          {/* Call patient */}
-          {booking?.patientInfo?.phone && (
-             <a href={`tel:${booking.patientInfo.phone}`}
-              className="btn btn-ghost btn-xs btn-circle text-success"
-              title={`Call ${getPatientName(booking)}: ${booking.patientInfo.phone}`}
-            >
-              <Phone size={13} aria-hidden="true" />
-            </a>
-          )}
-
-          {/* Pay-at-service */}
-          {canShowQrPay(booking) && (
-            <button
-              className="btn btn-ghost btn-xs btn-circle text-primary"
-              title="Pay at service / QR"
-              onClick={() => onPayAtService({
-                bookingId:   String(booking._id),
-                bookingCode: booking.bookingCode,
-                amount:      booking.fareBreakdown?.totalAmount ?? 0,
-              })}
-            >
-              <QrCode size={13} aria-hidden="true" />
-            </button>
-          )}
-
-          {joinable && consultId && (
-            <button
-              className="btn btn-info btn-xs gap-1"
-              onClick={() => router.push(`/doctor/consultation/${consultId}`)}
-            >
-              <Video size={12} aria-hidden="true" />
-              <span className="hidden lg:inline">Join</span>
-            </button>
-          )}
-
-          <button
-            className="btn btn-ghost btn-xs gap-1 text-accent hover:bg-accent/10"
-            onClick={() => router.push(`/doctor/prescriptions/new?bookingId=${booking._id}`)}
-          >
-            <PenLine size={13} aria-hidden="true" />
-            <span className="hidden lg:inline text-xs">Prescribe</span>
-          </button>
-
-          <ActionMenu
-            booking={booking}
-            opRecord={op}
-            onComplete={onComplete}
-            onCancel={onCancel}
-            onConfirm={onConfirm}
-            onReject={onReject}
-            confirmLoading={confirmLoading}
-            router={router}
-          />
         </div>
       </td>
     </motion.tr>
@@ -817,8 +827,15 @@ const MobileCard = memo(({ booking, index, opByBooking, onComplete, onCancel, on
         </div>
       </div>
 
-      {showConfirmReject && (
-        <div className="flex gap-2">
+      {showConfirmReject ? (
+        /* ── PENDING ACTIONS ── */
+        <div className="flex gap-2 pt-1">
+          <button
+            className="btn btn-info btn-sm flex-1 gap-1 text-xs"
+            onClick={() => router.push(`/doctor/appointments/${booking._id}`)}
+          >
+            <Eye size={12} aria-hidden="true" /> Info
+          </button>
           <button
             className="btn btn-success btn-sm flex-1 gap-1 text-xs"
             disabled={confirmLoading}
@@ -836,66 +853,67 @@ const MobileCard = memo(({ booking, index, opByBooking, onComplete, onCancel, on
             Reject
           </button>
         </div>
-      )}
-
-      <div className="flex flex-wrap gap-2 pt-1">
-        {joinable && consultId && (
+      ) : (
+        /* ── ACCEPTED/NORMAL ACTIONS ── */
+        <div className="flex flex-wrap gap-2 pt-1">
+          {joinable && consultId && (
+            <button
+              onClick={() => router.push(`/doctor/consultation/${consultId}`)}
+              className="btn btn-info btn-sm flex-1 gap-1 text-xs"
+            >
+              <Video size={12} aria-hidden="true" /> Join Call
+            </button>
+          )}
           <button
-            onClick={() => router.push(`/doctor/consultation/${consultId}`)}
-            className="btn btn-info btn-sm flex-1 gap-1 text-xs"
+            className="btn btn-primary btn-sm flex-1 gap-1 text-xs"
+            onClick={() => router.push(`/doctor/prescriptions/new?bookingId=${booking._id}`)}
           >
-            <Video size={12} aria-hidden="true" /> Join Call
+            <PenLine size={12} aria-hidden="true" /> Prescribe
           </button>
-        )}
-        <button
-          className="btn btn-primary btn-sm flex-1 gap-1 text-xs"
-          onClick={() => router.push(`/doctor/prescriptions/new?bookingId=${booking._id}`)}
-        >
-          <PenLine size={12} aria-hidden="true" /> Prescribe
-        </button>
 
-        {booking?.patientInfo?.phone && (
-          <a href={`tel:${booking.patientInfo.phone}`}
-            className="btn btn-success btn-sm gap-1 text-xs"
-          >
-            <Phone size={12} /> Call
-          </a>
-        )}
+          {booking?.patientInfo?.phone && (
+            <a href={`tel:${booking.patientInfo.phone}`}
+              className="btn btn-success btn-sm gap-1 text-xs"
+            >
+              <Phone size={12} /> Call
+            </a>
+          )}
 
-        {canShowQrPay(booking) && (
-          <button
-            className="btn btn-outline btn-sm gap-1 text-xs"
-            onClick={() => onPayAtService({
-              bookingId:   String(booking._id),
-              bookingCode: booking.bookingCode,
-              amount:      booking.fareBreakdown?.totalAmount ?? 0,
-            })}
-          >
-            <QrCode size={12} /> QR Pay
-          </button>
-        )}
+          {canShowQrPay(booking) && (
+            <button
+              className="btn btn-outline btn-sm gap-1 text-xs"
+              onClick={() => onPayAtService({
+                bookingId:   String(booking._id),
+                bookingCode: booking.bookingCode,
+                amount:      booking.fareBreakdown?.totalAmount ?? 0,
+              })}
+            >
+              <QrCode size={12} /> QR Pay
+            </button>
+          )}
 
-        {op && (
-          <button
-            className="btn btn-outline btn-sm gap-1 text-xs"
-            onClick={() => router.push(`/doctor/op-records/${op._id}`)}
-          >
-            <FileText size={12} aria-hidden="true" /> OP
-          </button>
-        )}
-        <div className="flex-none">
-          <ActionMenu
-            booking={booking}
-            opRecord={op}
-            onComplete={onComplete}
-            onCancel={onCancel}
-            onConfirm={onConfirm}
-            onReject={onReject}
-            confirmLoading={confirmLoading}
-            router={router}
-          />
+          {op && (
+            <button
+              className="btn btn-outline btn-sm gap-1 text-xs"
+              onClick={() => router.push(`/doctor/op-records/${op._id}`)}
+            >
+              <FileText size={12} aria-hidden="true" /> OP
+            </button>
+          )}
+          <div className="flex-none">
+            <ActionMenu
+              booking={booking}
+              opRecord={op}
+              onComplete={onComplete}
+              onCancel={onCancel}
+              onConfirm={onConfirm}
+              onReject={onReject}
+              confirmLoading={confirmLoading}
+              router={router}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </motion.div>
   );
 });
@@ -1156,7 +1174,7 @@ const FilterBar = memo(({
     <div className="relative flex-1 min-w-[200px]">
       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" />
       <input
-        className="input input-sm input-bordered w-full pl-9"
+        className="input-field input-sm input-bordered w-full pl-9"
         placeholder="Search patient, booking code, phone…"
         value={searchRaw}
         onChange={(e) => setSearchRaw(e.target.value)}
@@ -1758,7 +1776,7 @@ export default function AppointmentsManagement() {
             <motion.div key="schedule" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
               <div className="bg-base-100 border border-base-300 rounded-2xl overflow-hidden shadow-sm">
                 <div className="px-6 py-4 border-b border-base-200">
-                  <h2 className="font-bold text-base-content">Upcoming Schedule</h2>
+                  <h2 className="font-bold text-2xl font-family-poppins text-base-content">Upcoming Schedule</h2>
                 </div>
                 <ScheduleTab router={router} />
               </div>
@@ -1769,7 +1787,7 @@ export default function AppointmentsManagement() {
             <motion.div key="history" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
               <div className="bg-base-100 border border-base-300 rounded-2xl overflow-hidden shadow-sm">
                 <div className="px-6 py-4 border-b border-base-200">
-                  <h2 className="font-bold text-base-content">Consultation History</h2>
+                  <h2 className="font-bold text-2xl font-family-poppins text-base-content">Consultation History</h2>
                 </div>
                 <HistoryTab router={router} />
               </div>
@@ -1781,7 +1799,7 @@ export default function AppointmentsManagement() {
               <div className="bg-base-100 border border-base-300 rounded-2xl overflow-hidden shadow-sm">
                 <div className="px-6 py-4 border-b border-base-200 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-                  <h2 className="font-bold text-base-content">Active Sessions</h2>
+                  <h2 className="font-bold text-2xl font-family-poppins text-base-content">Active Sessions</h2>
                 </div>
                 <ActiveTab router={router} />
               </div>

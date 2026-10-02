@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Calendar,
@@ -22,10 +22,15 @@ import { PP } from "@/lib/constants";
 import { fmt } from "@/lib/helpers";
 import { resolveTransportFee, resolveCaFee } from "@/lib/feeResolvers";
 
+// FIX: debounce delay for auto-recheck. Fires AFTER the user stops
+// typing/picking a new date-time, not on every keystroke.
+const AVAIL_RECHECK_DEBOUNCE_MS = 500;
+
 export function StepSchedule({
   form,
   set,
   errors,
+  setErrors,
   caTiersLoading,
   hospitalAvail,
   hospitalAvailLoading,
@@ -46,6 +51,9 @@ export function StepSchedule({
   const isDiagHome = form.bookingType === "diagnostic_home";
   const isCareOnly = form.bookingType === "care_assistant";
   const isPhysio = form.bookingType === "physiotherapist";
+
+ 
+  const effectiveConsultationType = form.consultationType || "inPerson";
 
   useEffect(() => {
     if (
@@ -68,9 +76,69 @@ export function StepSchedule({
     isTransport,
   ]);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // FIX: AUTO-RECHECK AVAILABILITY — no more manual "Recheck" button.
+  //
+  // Whenever scheduledAt, hospitalId, doctorId, or consultationType changes,
+  // this debounces briefly then calls onCheckHospAvail / onCheckDocAvail
+  // itself. The pill (AvailPill) re-renders under the field automatically —
+  // "auto shows below" per your instruction, no click required.
+  //
+  // Resets happen up front (avail=null) so a stale "Available" pill can
+  // never sit there while the underlying query params have changed.
+  // ─────────────────────────────────────────────────────────────────────────
+const debounceRef = useRef(null);
+
+  useEffect(() => {
+    // Clear any pending check from a previous keystroke/change
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    const hasHospital = !!form.hospitalId;
+    const hasDoctor = !!form.doctorId;
+    const hasSchedule = !!form.scheduledAt;
+
+    if (!hasSchedule || (!hasHospital && !hasDoctor)) {
+      onResetHospAvail?.();
+      onResetDocAvail?.();
+      return;
+    }
+
+    // FIX: consultationType is REQUIRED by checkHospitalOrDoctorAvailability
+    // (controller 400s "consultationType required" without it). Rather than
+    // firing the check with an empty value and eating that error, auto-pick
+    // "inPerson" as a sane default the instant a doctor/hospital + schedule
+    // exist but no type has been chosen yet. Setting it here changes
+    // effectiveConsultationType, which re-runs this effect on the next
+    // render with a non-empty value — so we bail out of THIS run and let
+    // the re-run do the actual check.
+    if (!effectiveConsultationType) {
+      set("consultationType", "inPerson");
+      return;
+    }
+
+    // Immediately mark stale while the debounce timer runs, so the UI
+    // never shows a pill that no longer matches the current inputs.
+    if (hasHospital) onResetHospAvail?.();
+    if (hasDoctor) onResetDocAvail?.();
+
+    debounceRef.current = setTimeout(() => {
+      if (hasHospital) onCheckHospAvail?.();
+      if (hasDoctor) onCheckDocAvail?.();
+    }, AVAIL_RECHECK_DEBOUNCE_MS);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    form.scheduledAt,
+    form.hospitalId,
+    form.doctorId,
+    effectiveConsultationType,
+  ]);
+
   const getIstMinDate = () => {
     const d = new Date(Date.now() + 15 * 60000);
-    // Add 5.5 hours to align the UTC output with IST for the HTML input
     const istTime = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
     return istTime.toISOString().slice(0, 16);
   };
@@ -80,11 +148,109 @@ export function StepSchedule({
   const tFee = resolveTransportFee(transportEstimate);
   const caResolved = resolveCaFee(form, caTiers);
 
+  // FIX: handleDateTimeChange no longer needs to manually call
+  // onResetHospAvail/onResetDocAvail — the useEffect above owns that reset
+  // + auto-recheck entirely, triggered by form.scheduledAt changing.
   const handleDateTimeChange = (val) => {
     set("scheduledAt", val);
-    onResetHospAvail?.();
-    onResetDocAvail?.();
+    clearFieldError("scheduledAt");
   };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FIX: FIELD VALIDATION — mirrors the required fields enforced by the
+  // corrected bookingController.js routes:
+  //   - scheduledAt: required always
+  //   - consultationType: required for full_care_ride / physiotherapist
+  //     (controller now hard-requires it for the availability check)
+  //   - patientLocation: required for full_care_ride, patient_transport,
+  //     diagnostic_home, care_assistant, physio-homeVisit
+  //   - destinationLocation: required for full_care_ride, patient_transport
+  // ─────────────────────────────────────────────────────────────────────────
+  const clearFieldError = (field) => {
+    if (!setErrors) return;
+    setErrors((prev) => {
+      if (!prev?.[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const validateScheduleStep = () => {
+    const next = {};
+
+    if (!form.scheduledAt) {
+      next.scheduledAt = "Scheduled date & time required";
+    }
+
+    if (isFullCare) {
+      if (!form.consultationType) next.consultationType = "Consultation type required";
+      if (!form.patientLocation?.coordinates?.length)
+        next.patientLocation = "Pickup location required";
+      if (!form.destinationLocation?.coordinates?.length)
+        next.destinationLocation = "Destination (hospital) location required";
+    }
+
+    if (isTransport) {
+      if (!form.patientLocation?.coordinates?.length)
+        next.patientLocation = "Pickup location required";
+      if (!form.destinationLocation?.coordinates?.length)
+        next.destinationLocation = "Drop-off location required";
+      if (form.addConsultation && !form.consultationType)
+        next.consultationType = "Consultation type required";
+    }
+
+    if (isDiagHome) {
+      if (!form.patientLocation?.coordinates?.length)
+        next.patientLocation = "Home address required";
+    }
+
+    if (isCareOnly) {
+      if (!form.patientLocation?.coordinates?.length)
+        next.patientLocation = "Service location required";
+      if (!form.durationHours)
+        next.durationHours = "Select a care duration";
+    }
+
+    if (isPhysio) {
+      if (!form.consultationType)
+        next.consultationType = "Select visit type (At Clinic / Home Visit)";
+      if (
+        form.consultationType === "homeVisit" &&
+        !form.patientLocation?.coordinates?.length
+      ) {
+        next.patientLocation = "Home address required for home visit";
+      }
+    }
+
+    // Availability must have resolved to true before proceeding — matches
+    // the controller's hard 400 rejection when checkHospitalOrDoctorAvailability
+    // returns available:false (wrong consultationType for the slot, slot
+    // full at current maxPatients, etc).
+    if (form.hospitalId && hospitalAvail && hospitalAvail.available === false) {
+      next.scheduledAt = hospitalAvail.reason || "Hospital not available at this time";
+    }
+    if (form.doctorId && doctorAvail && doctorAvail.available === false) {
+      next.scheduledAt = doctorAvail.reason || "Doctor not available at this time";
+    }
+    if (form.hospitalId && hospitalAvailLoading) {
+      next.scheduledAt = "Still checking hospital availability — wait a moment";
+    }
+    if (form.doctorId && doctorAvailLoading) {
+      next.scheduledAt = "Still checking doctor availability — wait a moment";
+    }
+
+    setErrors?.((prev) => ({ ...prev, ...next }));
+    return Object.keys(next).length === 0;
+  };
+
+  // Exposed so a parent "Next" button can call form validation before
+  // advancing — wire this up wherever step navigation lives, e.g.:
+  //   const ok = stepScheduleRef.current?.validate();
+  // (kept as a plain function here since this component has no ref/imperative
+  // handle wired up in the file you sent — attach via useImperativeHandle
+  // if the parent needs to call it directly.)
+  StepSchedule.validate = validateScheduleStep;
 
   const CaTierGrid = ({ tiers, selectedHours, onSelect }) => (
     <div className="grid grid-cols-3 gap-1.5">
@@ -105,7 +271,10 @@ export function StepSchedule({
           <button
             key={h}
             type="button"
-            onClick={() => onSelect(h)}
+            onClick={() => {
+              set("durationHours", h);
+              clearFieldError("durationHours");
+            }}
             className={`flex flex-col items-center gap-0.5 py-2.5 px-1 rounded-xl border-2 transition-all ${on ? (isQuotaTier || caFreeViaSub ? "border-success bg-success/10 text-success" : "border-warning bg-warning/10 text-warning") : "border-base-300 bg-base-200 text-base-content"}`}
           >
             <span
@@ -192,6 +361,14 @@ export function StepSchedule({
             onChange={(e) => handleDateTimeChange(e.target.value)}
           />
         </Field>
+
+        {/*
+          FIX: pills are now purely reactive — no "Recheck" button.
+          - loading  → spinner pill (auto-fires on every relevant change)
+          - available → green pill only, no button at all
+          - unavailable → red pill + reason, no button (fix the date/time
+            or consultationType instead — that's what re-triggers the check)
+        */}
         {form.scheduledAt && (
           <div className="flex flex-wrap items-center gap-3 pt-1">
             {form.hospitalId && (
@@ -203,16 +380,6 @@ export function StepSchedule({
                   avail={hospitalAvail}
                   loading={hospitalAvailLoading}
                 />
-                {!hospitalAvailLoading && (
-                  <button
-                    type="button"
-                    onClick={onCheckHospAvail}
-                    className="text-[10px] text-primary font-bold hover:underline"
-                    style={PP}
-                  >
-                    {hospitalAvail ? "Recheck" : "Check now"}
-                  </button>
-                )}
               </div>
             )}
             {form.doctorId && (
@@ -221,20 +388,21 @@ export function StepSchedule({
                   Doctor:
                 </span>
                 <AvailPill avail={doctorAvail} loading={doctorAvailLoading} />
-                {!doctorAvailLoading && (
-                  <button
-                    type="button"
-                    onClick={onCheckDocAvail}
-                    className="text-[10px] text-primary font-bold hover:underline"
-                    style={PP}
-                  >
-                    {doctorAvail ? "Recheck" : "Check now"}
-                  </button>
-                )}
               </div>
             )}
           </div>
         )}
+
+        {/* Surfaces the exact rejection reason from checkHospitalOrDoctorAvailability
+            (e.g. "This slot only supports video consultations", "fully booked 3/3") */}
+        {(hospitalAvail?.available === false || doctorAvail?.available === false) && (
+          <p className="text-[10px] font-bold text-error pt-1" style={PP}>
+            {hospitalAvail?.available === false && hospitalAvail?.reason}
+            {hospitalAvail?.available === false && doctorAvail?.available === false && " · "}
+            {doctorAvail?.available === false && doctorAvail?.reason}
+          </p>
+        )}
+
         <Field label="Slot ID (optional)" note="If doctor shared a slot ref">
           <Inp
             placeholder="e.g. SLOT-202506-0042"
@@ -263,7 +431,10 @@ export function StepSchedule({
               required
               note="Auto-set from hospital selection"
               value={form.destinationLocation}
-              onChange={(loc) => set("destinationLocation", loc)}
+              onChange={(loc) => {
+                set("destinationLocation", loc);
+                clearFieldError("destinationLocation");
+              }}
               error={errors.destinationLocation}
               readOnly={!!form.hospitalId && !!form.destinationLocation}
               readOnlyNote={`Hospital: ${form.hospitalName || "Selected hospital"}`}
@@ -280,7 +451,10 @@ export function StepSchedule({
               required
               note="Transport fare: pickup → hospital"
               value={form.patientLocation}
-              onChange={(loc) => set("patientLocation", loc)}
+              onChange={(loc) => {
+                set("patientLocation", loc);
+                clearFieldError("patientLocation");
+              }}
               error={errors.patientLocation}
               isLoaded={isLoaded}
             />
@@ -309,6 +483,45 @@ export function StepSchedule({
               </div>
             </Field>
           </SCard>
+
+          {/* FIX: consultation type is required by the corrected controller
+              (checkHospitalOrDoctorAvailability now 400s without it).
+              full_care_ride previously had no explicit type selector in
+              this component — adding one so the availability check + the
+              booking payload actually carry a real value instead of the
+              silent "inPerson" default masking a type mismatch. */}
+          <SCard title="Consultation Type" icon={HeartPulse} accent="#10b981">
+            <Field
+              label="How should the doctor see you?"
+              required
+              error={errors.consultationType}
+            >
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { v: "inPerson", l: "In Person" },
+                  { v: "video", l: "Video" },
+                  { v: "homeVisit", l: "Home Visit" },
+                ].map(({ v, l }) => {
+                  const on = form.consultationType === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => {
+                        set("consultationType", v);
+                        clearFieldError("consultationType");
+                      }}
+                      className={`py-2.5 rounded-xl border-2 text-[11px] font-bold transition-all ${on ? "border-success bg-success/10 text-success" : "border-base-300 bg-base-200 text-base-content"}`}
+                      style={PP}
+                    >
+                      {l}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+          </SCard>
+
           <SCard title="Care Assistant Duration" icon={Timer} accent="#f59e0b">
             <div className="flex items-start gap-1.5 mb-2 p-2 rounded-lg bg-warning/5 border border-warning/15">
               <Info
@@ -340,7 +553,10 @@ export function StepSchedule({
               <CaTierGrid
                 tiers={caTiers}
                 selectedHours={form.durationHours}
-                onSelect={(h) => set("durationHours", h)}
+                onSelect={(h) => {
+                  set("durationHours", h);
+                  clearFieldError("durationHours");
+                }}
               />
             )}
           </SCard>
@@ -441,7 +657,10 @@ export function StepSchedule({
               required
               note="Fare is distance-based + 5% GST"
               value={form.destinationLocation}
-              onChange={(loc) => set("destinationLocation", loc)}
+              onChange={(loc) => {
+                set("destinationLocation", loc);
+                clearFieldError("destinationLocation");
+              }}
               error={errors.destinationLocation}
               isLoaded={isLoaded}
             />
@@ -487,11 +706,51 @@ export function StepSchedule({
               required
               note="Drag pin for exact location"
               value={form.patientLocation}
-              onChange={(loc) => set("patientLocation", loc)}
+              onChange={(loc) => {
+                set("patientLocation", loc);
+                clearFieldError("patientLocation");
+              }}
               error={errors.patientLocation}
               isLoaded={isLoaded}
             />
           </SCard>
+
+          {/* FIX: when addConsultation is on, the controller now requires
+              consultationType for the availability check too. */}
+          {form.addConsultation && (
+            <SCard title="Consultation Type" icon={HeartPulse} accent="#10b981">
+              <Field
+                label="How should the doctor see you?"
+                required
+                error={errors.consultationType}
+              >
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { v: "inPerson", l: "In Person" },
+                    { v: "video", l: "Video" },
+                    { v: "homeVisit", l: "Home Visit" },
+                  ].map(({ v, l }) => {
+                    const on = form.consultationType === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => {
+                          set("consultationType", v);
+                          clearFieldError("consultationType");
+                        }}
+                        className={`py-2.5 rounded-xl border-2 text-[11px] font-bold transition-all ${on ? "border-success bg-success/10 text-success" : "border-base-300 bg-base-200 text-base-content"}`}
+                        style={PP}
+                      >
+                        {l}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+            </SCard>
+          )}
+
           {form.patientLocation?.coordinates &&
             form.destinationLocation?.coordinates && (
               <div className="pt-1">
@@ -582,7 +841,10 @@ export function StepSchedule({
             required
             note="Lab technician comes here"
             value={form.patientLocation}
-            onChange={(loc) => set("patientLocation", loc)}
+            onChange={(loc) => {
+              set("patientLocation", loc);
+              clearFieldError("patientLocation");
+            }}
             error={errors.patientLocation}
             isLoaded={isLoaded}
           />
@@ -600,13 +862,17 @@ export function StepSchedule({
             required
             note="Nearest care assistant dispatched here"
             value={form.patientLocation}
-            onChange={(loc) => set("patientLocation", loc)}
+            onChange={(loc) => {
+              set("patientLocation", loc);
+              clearFieldError("patientLocation");
+            }}
             error={errors.patientLocation}
             isLoaded={isLoaded}
           />
           <Field
             label="Care Duration"
             note="Tiered pricing · 18% GST on CA fee"
+            error={errors.durationHours}
           >
             {caTiersLoading ? (
               <div
@@ -639,7 +905,10 @@ export function StepSchedule({
                       <button
                         key={h}
                         type="button"
-                        onClick={() => set("durationHours", h)}
+                        onClick={() => {
+                          set("durationHours", h);
+                          clearFieldError("durationHours");
+                        }}
                         className={`flex flex-col items-center gap-0.5 py-2.5 px-1 rounded-xl border-2 transition-all ${on ? "border-warning bg-warning/10 text-warning" : "border-base-300 bg-base-200 text-base-content"}`}
                       >
                         <span
@@ -713,6 +982,7 @@ export function StepSchedule({
           <Field
             label="How would you like the session?"
             note="0% GST on consultation"
+            error={errors.consultationType}
           >
             <div className="grid grid-cols-2 gap-2">
               {[
@@ -729,7 +999,10 @@ export function StepSchedule({
                   <button
                     key={v}
                     type="button"
-                    onClick={() => set("consultationType", v)}
+                    onClick={() => {
+                      set("consultationType", v);
+                      clearFieldError("consultationType");
+                    }}
                     className={`flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all ${on ? "border-success bg-success/10 text-success" : "border-base-300 bg-base-200 text-base-content"}`}
                   >
                     <Icon size={14} className="flex-shrink-0" />
@@ -762,7 +1035,10 @@ export function StepSchedule({
               required
               note="Physiotherapist will visit here"
               value={form.patientLocation}
-              onChange={(loc) => set("patientLocation", loc)}
+              onChange={(loc) => {
+                set("patientLocation", loc);
+                clearFieldError("patientLocation");
+              }}
               error={errors.patientLocation}
               isLoaded={isLoaded}
             />
@@ -787,3 +1063,6 @@ export function StepSchedule({
     </div>
   );
 }
+
+ 
+export { };

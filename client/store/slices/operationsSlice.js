@@ -415,8 +415,10 @@ export const fetchCareTrackingSnapshot = mkThunk(
 
 export const fetchHospitalUpcoming = mkThunk(
   "operations/fetchHospitalUpcoming",
-  async () => {
-    const { data } = await API.get(`${BASE}/hospital/upcoming`);
+  async ({ hospitalId } = {}) => {
+    const { data } = await API.get(`${BASE}/hospital/upcoming`, {
+      params: { hospitalId },
+    });
     return data.data;
   }
 );

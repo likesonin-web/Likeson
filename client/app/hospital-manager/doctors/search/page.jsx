@@ -493,7 +493,7 @@ export default function FindAndLink() {
       <div className="mb-7 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-[var(--r-field)] bg-[var(--primary)] flex items-center justify-center">
+            <div className="w-8 h-8 cursor-pointer rounded-[var(--r-field)] bg-[var(--primary)] flex items-center justify-center">
               <Search size={15} className="text-[var(--primary-content)]" />
             </div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--primary)]">
@@ -519,10 +519,10 @@ export default function FindAndLink() {
       <div className="glass-card p-5 mb-6">
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Query input */}
-          <div className="relative flex-1">
+          <div className="relative  flex-1">
             <Search
               size={15}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--base-content)]/40"
+              className="absolute left-3.5 top-1/3 -translate-y-1/2 text-[var(--base-content)]/40"
             />
             <input
               type="text"
@@ -539,7 +539,7 @@ export default function FindAndLink() {
           {/* Filter toggle */}
           <button
             onClick={() => setShowFilters(p => !p)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-[var(--r-field)] border text-sm font-semibold transition-colors h-[42px] self-start ${
+            className={`flex items-center cursor-pointer gap-2 px-4 py-2.5 rounded-[var(--r-field)] border text-sm font-semibold transition-colors h-[42px] self-start ${
               showFilters
                 ? "bg-[var(--primary)] text-[var(--primary-content)] border-[var(--primary)]"
                 : "border-[var(--base-300)] text-[var(--base-content)] hover:border-[var(--primary)]"

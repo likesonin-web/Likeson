@@ -6,7 +6,7 @@ import {
   RideTracking,
   OutPatientRecord,
   UserSubscription,
- 
+
   Hospital,
   protect,
   authorize,
@@ -64,12 +64,48 @@ import {
   buildRefundEmail,
   buildInvoiceHtml,
 } from "../utils/emailTemplates.js";
- 
+
 import { applyBookingRating } from "../services/partnerStatsService.js";
 import {
   validateMinimumLeadTime,
   cancelBookingFully,
-} from "../services/partnerAssignmentEngine.service.js";  
+} from "../services/partnerAssignmentEngine.service.js";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FIX: InsufficientWalletBalanceError — dedicated error type so route
+// handlers can tell "wallet ran short" apart from any other failure and
+// answer with 400 + a clean message, instead of falling through to the
+// generic catch-all 500 handler.
+// ─────────────────────────────────────────────────────────────────────────────
+class InsufficientWalletBalanceError extends Error {
+  constructor(available, required) {
+    super(`Insufficient wallet balance. Available: ₹${available}, Required: ₹${required}`);
+    this.name = "InsufficientWalletBalanceError";
+    this.available = available;
+    this.required = required;
+    this.statusCode = 400;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FIX: assertWalletSufficient — MUST be called BEFORE Booking.create() on
+// every route that accepts paymentMethod === "Wallet". Uses Wallet's own
+// `availableBalance` virtual (balance − lockedBalance), matching exactly
+// what Wallet.debit() itself checks, so this pre-check can never be more
+// lenient than the actual debit. Throws InsufficientWalletBalanceError —
+// caller catches it and responds 400 WITHOUT ever creating the booking.
+// ─────────────────────────────────────────────────────────────────────────────
+const assertWalletSufficient = async (userId, amount) => {
+  if (amount <= 0) return; // free bookings never touch the wallet
+  const { default: Wallet } = await import("../models/Wallet.js");
+  const wallet = await Wallet.findOne({ user: userId });
+  const available = wallet
+    ? Math.max(0, +(wallet.balance - (wallet.lockedBalance || 0)).toFixed(2))
+    : 0;
+  if (available < amount) {
+    throw new InsufficientWalletBalanceError(available, amount);
+  }
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER: processHomeCollectionUsage
@@ -121,89 +157,44 @@ const resolveBookingEmails = async (booking) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HELPER: wallet payment with auto Razorpay top-up for shortfall
+// HELPER: wallet payment — FULL AMOUNT ONLY, no partial/Razorpay top-up.
+//
+// FIX (behavior change requested): the old version silently split payment
+// across wallet + auto-created Razorpay order when the wallet fell short.
+// That's gone. This is now called ONLY after assertWalletSufficient() has
+// already confirmed the funds exist, so it should never throw in practice —
+// it still re-checks defensively (race condition: two requests debiting the
+// same wallet concurrently) and throws InsufficientWalletBalanceError if so,
+// which the caller must NOT swallow into a 500.
 // ─────────────────────────────────────────────────────────────────────────────
-const processWalletOrPartialPayment = async ({
-  userId,
-  amount,
-  bookingId,
-  bookingCode,
-}) => {
+const processWalletFullPayment = async ({ userId, amount, bookingId, bookingCode }) => {
   if (amount <= 0) {
     return {
       paymentStatus: "paid",
       payments: [],
       walletApplied: 0,
       amountPaid: 0,
-      razorpayOrder: null,
-      needsRazorpay: false,
     };
   }
+
   const { default: Wallet } = await import("../models/Wallet.js");
   const wallet = await Wallet.findOne({ user: userId });
   const available = wallet
     ? Math.max(0, +(wallet.balance - (wallet.lockedBalance || 0)).toFixed(2))
     : 0;
 
-  if (available >= amount) {
-    const wp = await processWalletPayment({
-      userId,
-      amount,
-      bookingId,
-      bookingCode,
-    });
-    return {
-      paymentStatus: "paid",
-      payments: [wp],
-      walletApplied: amount,
-      amountPaid: amount,
-      razorpayOrder: null,
-      needsRazorpay: false,
-    };
+  if (available < amount) {
+    // Defensive re-check — funds moved between assertWalletSufficient()
+    // and now (concurrent request). Do NOT fall back to Razorpay.
+    throw new InsufficientWalletBalanceError(available, amount);
   }
 
-  if (available > 0) {
-    const walletPortion = available;
-    const razorpayPortion = +(amount - walletPortion).toFixed(2);
-    const wp = await processWalletPayment({
-      userId,
-      amount: walletPortion,
-      bookingId,
-      bookingCode,
-    });
-    const razorpayOrder = await createRazorpayOrder(
-      razorpayPortion,
-      bookingCode,
-      {
-        customerId: userId.toString(),
-        notes: {
-          walletApplied: walletPortion,
-          remainingAmount: razorpayPortion,
-        },
-      },
-    );
-    return {
-      paymentStatus: "payment_pending",
-      payments: [wp],
-      walletApplied: walletPortion,
-      amountPaid: walletPortion,
-      razorpayOrder,
-      needsRazorpay: true,
-      razorpayPortion,
-    };
-  }
-
-  const razorpayOrder = await createRazorpayOrder(amount, bookingCode, {
-    customerId: userId.toString(),
-  });
+  const wp = await processWalletPayment({ userId, amount, bookingId, bookingCode });
   return {
-    paymentStatus: "payment_pending",
-    payments: [],
-    walletApplied: 0,
-    amountPaid: 0,
-    razorpayOrder,
-    needsRazorpay: true,
-    razorpayPortion: amount,
+    paymentStatus: "paid",
+    payments: [wp],
+    walletApplied: amount,
+    amountPaid: amount,
   };
 };
 
@@ -715,38 +706,25 @@ export const getDoctors = asyncHandler(async (req, res) => {
       limit = "20",
     } = req.query;
 
-    // 1. Base Filter: Ensure the doctor is active, verified, and approved
     const filter = {
       partnershipStatus: "Active",
       isActive: true,
       isVerified: true,
     };
 
-// 2. Apply Standard Filters
     if (specialization) filter.specialization = specialization;
 
-    // FIX: isOnline used to hard-require doctor.isOnline===true, but no
-    // doctor doc has that flag set → always 0 results. For video-consult
-    // discovery, "online-capable" = consultationTypes.video===true.
-    // isOnline (live/available-now) becomes optional extra filter only if
-    // explicitly true AND doctor actually has it set — never blocks listing.
     if (consultationType === "video" || isOnline === "true") {
       filter["consultationTypes.video"] = true;
     }
     if (consultationType === "inPerson") filter["consultationTypes.inPerson"] = true;
     if (consultationType === "homeVisit") filter["consultationTypes.homeVisit"] = true;
 
-    // 3. City filter — resolve to hospital IDs FIRST so it applies inside
-    // the Mongo query, before pagination. (FIX: previously city was
-    // filtered on the already skip()/limit()'d page in-memory, so total
-    // and the returned page count/data silently diverged — some doctors
-    // vanished from a page while total still counted them.)
     if (city) {
       const matchingHospitals = await Hospital.find({
         "address.city": { $regex: city, $options: "i" },
       }).select("_id");
       const hospitalIds = matchingHospitals.map((h) => h._id);
-      // No hospital in that city → no doctors possible, short-circuit.
       if (hospitalIds.length === 0) {
         return res.json({
           success: true,
@@ -760,7 +738,6 @@ export const getDoctors = asyncHandler(async (req, res) => {
       filter.primaryHospital = { $in: hospitalIds };
     }
 
-    // 4. Search — match doctor name (via User) OR specialization
     if (search) {
       const matchingUsers = await User.find({
         name: { $regex: search, $options: "i" },
@@ -774,11 +751,9 @@ export const getDoctors = asyncHandler(async (req, res) => {
       ];
     }
 
-    // 5. Pagination — total now matches the exact filter used for the page
     const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
     const total = await DoctorProfile.countDocuments(filter);
 
-    // 6. Fetch Doctors & Populate Relationships
     const doctors = await DoctorProfile.find(filter)
       .populate("user", "name email phone")
       .populate(
@@ -793,7 +768,6 @@ export const getDoctors = asyncHandler(async (req, res) => {
       .sort({ "rating.averageRating": -1, isOnline: -1 })
       .lean();
 
-    // 7. Resolve Effective Pricing based on Management Model
     const doctorsWithPricing = doctors.map((d) => {
       const isHospitalManaged = d.primaryHospital?.managementModel === "hospital-manager";
       const hp = d.primaryHospital?.consultationPricing;
@@ -823,7 +797,6 @@ export const getDoctors = asyncHandler(async (req, res) => {
       };
     });
 
-    // 8. Return Response
     res.json({
       success: true,
       total,
@@ -852,7 +825,7 @@ export const getHospitalsByHospitalIdDoctors = asyncHandler(async (req, res) => 
 // GET "/hospitals/:hospitalId/availability"
 export const getHospitalsByHospitalIdAvailability = asyncHandler(async (req, res) => {
   try {
-    const { scheduledAt } = req.query;
+    const { scheduledAt, consultationType } = req.query;
     if (!scheduledAt)
       return res
         .status(400)
@@ -860,6 +833,7 @@ export const getHospitalsByHospitalIdAvailability = asyncHandler(async (req, res
     const result = await checkHospitalOrDoctorAvailability({
       hospitalId: req.params.hospitalId,
       scheduledAt: new Date(scheduledAt),
+      consultationType,
     });
     res.json({ success: true, data: result });
   } catch (err) {
@@ -867,15 +841,50 @@ export const getHospitalsByHospitalIdAvailability = asyncHandler(async (req, res
   }
 });
 
+// FIX: booking-type-aware slot validity. Different bookingTypes only
+// accept certain slot.consultationType values, REGARDLESS of what the
+// caller passes as consultationType:
+//   doctor_consultation, full_care_ride → slot must be 'any' | 'inPerson'
+//   doctor_online                       → slot must be 'any' | 'video'
+// A doctor's video-only slot must never surface as available for a
+// doctor_consultation booking, and vice versa.
+const BOOKING_TYPE_ALLOWED_SLOT_TYPES = {
+  doctor_consultation: ["any", "inPerson"],
+  full_care_ride: ["any", "inPerson"],
+  doctor_online: ["any", "video"],
+};
+
 // GET "/doctors/:doctorId/availability"
+// FIX: consultationType now read from query and passed through — without
+// it, checkHospitalOrDoctorAvailability had no way to enforce "this slot is
+// video-only" against an inPerson booking attempt. Also now accepts
+// bookingType, which locks down which slot.consultationType values count
+// as valid for that booking flow (see BOOKING_TYPE_ALLOWED_SLOT_TYPES).
 export const getDoctorsByDoctorIdAvailability = asyncHandler(async (req, res) => {
   try {
-    const { scheduledAt, hospitalId } = req.query;
+    const { scheduledAt, hospitalId, consultationType, bookingType } = req.query;
 
     if (!scheduledAt) {
       return res
         .status(400)
         .json({ success: false, message: "scheduledAt required" });
+    }
+
+    // Resolve the set of slot.consultationType values that are acceptable.
+    // bookingType (when known) takes precedence over a raw consultationType
+    // param — it's the source of truth for "what kind of slot does this
+    // flow even make sense for."
+    let allowedSlotTypes;
+    if (bookingType && BOOKING_TYPE_ALLOWED_SLOT_TYPES[bookingType]) {
+      allowedSlotTypes = BOOKING_TYPE_ALLOWED_SLOT_TYPES[bookingType];
+    } else if (consultationType) {
+      allowedSlotTypes = ["any", consultationType];
+    } else {
+      return res.status(400).json({
+        success: false,
+        message:
+          "consultationType required (inPerson | video | homeVisit), or bookingType (doctor_consultation | full_care_ride | doctor_online)",
+      });
     }
 
     const scheduledDate = parseFrontendDateTime(scheduledAt);
@@ -884,6 +893,8 @@ export const getDoctorsByDoctorIdAvailability = asyncHandler(async (req, res) =>
       hospitalId,
       doctorId: req.params.doctorId,
       scheduledAt: scheduledDate,
+      consultationType,
+      allowedSlotTypes,
     });
 
     res.json({ success: true, data: result });
@@ -1039,7 +1050,6 @@ export const getFollowUpCheck = asyncHandler(async (req, res) => {
         .status(400)
         .json({ success: false, message: "doctorId required" });
 
-    // eligibility (existing logic via shared helper)
     const result = await checkFollowUpEligibility({
       customerId: req.user._id,
       doctorId,
@@ -1050,11 +1060,7 @@ export const getFollowUpCheck = asyncHandler(async (req, res) => {
       return res.json({ success: true, data: result });
     }
 
-    // ── Patient identity validation ───────────────────────────────────────────
-    // Only enforce when caller provides patientName / patientPhone for validation.
-    // If neither provided → return eligible + warn client to validate before booking.
     if (patientName || patientPhone) {
-      // Fetch original booking's patientInfo via the parentOp's booking ref
       const parentOp = await OutPatientRecord.findById(result.parentOp)
         .select("patientName booking")
         .lean();
@@ -1084,7 +1090,7 @@ export const getFollowUpCheck = asyncHandler(async (req, res) => {
       const phoneMatch =
         patientPhone && originalPhone
           ? normPhone(patientPhone) === normPhone(originalPhone)
-          : true; // no phone on file → skip phone check
+          : true;
 
       if (!nameMatch || !phoneMatch) {
         return res.json({
@@ -1102,7 +1108,6 @@ export const getFollowUpCheck = asyncHandler(async (req, res) => {
       }
     }
 
-    // All checks pass
     return res.json({ success: true, data: result });
   } catch (err) {
     console.error("[GET /follow-up/check]", err);
@@ -1149,7 +1154,7 @@ export const postFullCareRide = asyncHandler(async (req, res) => {
         });
       }
 
-let scheduledDate;
+      let scheduledDate;
       try {
         scheduledDate = validateMinimumLeadTime(scheduledAt);
       } catch (leadErr) {
@@ -1159,6 +1164,7 @@ let scheduledDate;
         hospitalId,
         doctorId,
         scheduledAt: scheduledDate,
+        consultationType,
       });
       if (!avail.available)
         return res.status(400).json({ success: false, message: avail.reason });
@@ -1222,7 +1228,7 @@ let scheduledDate;
         includeReturn: includeReturnHome,
       });
 
-const config = await PlatformPricingConfig.getGlobal();
+      const config = await PlatformPricingConfig.getGlobal();
       const caDurationHours = parseInt(req.body.durationHours, 10) || 1;
       const careResult = await resolveCareAssistantFee({
         userId: req.user._id,
@@ -1260,12 +1266,25 @@ const config = await PlatformPricingConfig.getGlobal();
       ).toFixed(2);
       fareBreakdown.amountPaid = fareBreakdown.totalAmount;
 
+      // FIX: wallet check happens BEFORE Booking.create. No dangling
+      // "unpaid" bookings created when the wallet can't cover it.
+      if (paymentMethod === "Wallet") {
+        try {
+          await assertWalletSufficient(req.user._id, fareBreakdown.totalAmount);
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
+      }
+
       const initialStatus =
         paymentMethod === "Razorpay" && fareBreakdown.totalAmount > 0
           ? "payment_pending"
           : "pending";
 
-const booking = await Booking.create({
+      const booking = await Booking.create({
         bookingType: "full_care_ride",
         customer: req.user._id,
         patientInfo,
@@ -1333,24 +1352,30 @@ const booking = await Booking.create({
       let razorpayOrder = null;
       let walletResult = null;
 
+      // FIX: wallet payment is now full-amount-only (already verified above).
+      // No more auto Razorpay top-up on shortfall.
       if (paymentMethod === "Wallet") {
-        walletResult = await processWalletOrPartialPayment({
-          userId: req.user._id,
-          amount: fareBreakdown.totalAmount,
-          bookingId: booking._id,
-          bookingCode: booking.bookingCode,
-        });
+        try {
+          walletResult = await processWalletFullPayment({
+            userId: req.user._id,
+            amount: fareBreakdown.totalAmount,
+            bookingId: booking._id,
+            bookingCode: booking.bookingCode,
+          });
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            await deleteBookingHard(booking._id, 0, req.user._id);
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
         booking.paymentStatus = walletResult.paymentStatus;
         booking.payments = walletResult.payments;
         booking.fareBreakdown.walletApplied = walletResult.walletApplied;
         booking.fareBreakdown.amountPaid = walletResult.amountPaid;
         await booking.save();
-        if (!walletResult.needsRazorpay) {
-          await flushAndRecord(booking);
-
-          sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
-        }
-        razorpayOrder = walletResult.razorpayOrder;
+        await flushAndRecord(booking);
+        sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
       }
 
       if (fareBreakdown.totalAmount === 0 && paymentMethod === "Razorpay") {
@@ -1534,13 +1559,7 @@ const booking = await Booking.create({
           status: booking.status,
           scheduledAt: booking.scheduledAt,
           fareBreakdown,
-          walletSplit: walletResult?.needsRazorpay
-            ? {
-                walletApplied: walletResult.walletApplied,
-                razorpayPortion: walletResult.razorpayPortion,
-                message: `₹${walletResult.walletApplied} deducted from wallet. Pay remaining ₹${walletResult.razorpayPortion} via Razorpay.`,
-              }
-            : null,
+          walletApplied: walletResult?.walletApplied ?? 0,
           subscriptionCoverage: {
             consultationFree: isCoveredBySubscription,
             consultationQuota: subCheck.reason,
@@ -1590,7 +1609,8 @@ const booking = await Booking.create({
       });
     } catch (err) {
       console.error("[POST /full-care-ride]", err);
-      return res.status(500).json({ success: false, message: err.message });
+      const status = err instanceof InsufficientWalletBalanceError ? 400 : 500;
+      return res.status(status).json({ success: false, message: err.message });
     }
   });
 
@@ -1615,7 +1635,7 @@ export const postDoctorConsultation = asyncHandler(async (req, res) => {
           success: false,
           message: "doctorId, scheduledAt, patientInfo required",
         });
-let scheduledDate;
+      let scheduledDate;
       try {
         scheduledDate = validateMinimumLeadTime(scheduledAt);
       } catch (leadErr) {
@@ -1625,6 +1645,7 @@ let scheduledDate;
         hospitalId,
         doctorId,
         scheduledAt: scheduledDate,
+        consultationType,
       });
       if (!avail.available)
         return res.status(400).json({ success: false, message: avail.reason });
@@ -1666,6 +1687,18 @@ let scheduledDate;
         taxPercent:
           pricingSource === "subscription" ? 0 : Math.round(gstRate * 100),
       });
+
+      // FIX: wallet sufficiency check BEFORE Booking.create.
+      if (paymentMethod === "Wallet") {
+        try {
+          await assertWalletSufficient(req.user._id, fareBreakdown.totalAmount);
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
+      }
 
       const initialStatus =
         paymentMethod === "Razorpay" && fareBreakdown.totalAmount > 0
@@ -1711,22 +1744,27 @@ let scheduledDate;
       let walletResult = null;
 
       if (paymentMethod === "Wallet") {
-        walletResult = await processWalletOrPartialPayment({
-          userId: req.user._id,
-          amount: fareBreakdown.totalAmount,
-          bookingId: booking._id,
-          bookingCode: booking.bookingCode,
-        });
+        try {
+          walletResult = await processWalletFullPayment({
+            userId: req.user._id,
+            amount: fareBreakdown.totalAmount,
+            bookingId: booking._id,
+            bookingCode: booking.bookingCode,
+          });
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            await deleteBookingHard(booking._id, 0, req.user._id);
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
         booking.paymentStatus = walletResult.paymentStatus;
         booking.payments = walletResult.payments;
         booking.fareBreakdown.walletApplied = walletResult.walletApplied;
         booking.fareBreakdown.amountPaid = walletResult.amountPaid;
         await booking.save();
-        if (!walletResult.needsRazorpay) {
-          await flushAndRecord(booking);
-          sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
-        }
-        razorpayOrder = walletResult.razorpayOrder;
+        await flushAndRecord(booking);
+        sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
       }
       if (fareBreakdown.totalAmount === 0 && paymentMethod === "Razorpay") {
         booking.paymentStatus = "paid";
@@ -1805,13 +1843,7 @@ let scheduledDate;
           bookingCode: booking.bookingCode,
           opNumber,
           fareBreakdown,
-          walletSplit: walletResult?.needsRazorpay
-            ? {
-                walletApplied: walletResult.walletApplied,
-                razorpayPortion: walletResult.razorpayPortion,
-                message: `₹${walletResult.walletApplied} deducted from wallet. Pay remaining ₹${walletResult.razorpayPortion} via Razorpay.`,
-              }
-            : null,
+          walletApplied: walletResult?.walletApplied ?? 0,
           subscriptionCoverage: {
             consultationFree: isCoveredBySubscription,
             quotaInfo: subCheck.reason,
@@ -1821,7 +1853,8 @@ let scheduledDate;
       });
     } catch (err) {
       console.error("[POST /doctor-consultation]", err);
-      return res.status(500).json({ success: false, message: err.message });
+      const status = err instanceof InsufficientWalletBalanceError ? 400 : 500;
+      return res.status(status).json({ success: false, message: err.message });
     }
   });
 
@@ -1845,7 +1878,7 @@ export const postDoctorOnline = asyncHandler(async (req, res) => {
         });
       }
 
-const scheduledDate = parseFrontendDateTime(scheduledAt);
+      const scheduledDate = parseFrontendDateTime(scheduledAt);
       if (isNaN(scheduledDate.getTime())) {
         return res.status(400).json({
           success: false,
@@ -1853,17 +1886,19 @@ const scheduledDate = parseFrontendDateTime(scheduledAt);
             'Invalid scheduledAt — use ISO 8601 e.g. "2026-06-15T10:30:00+05:30"',
         });
       }
-      // CHANGE (Point 4): replaces the old 10-minute-grace-period-in-the-past
-      // check with the platform-wide 12-hour minimum advance booking rule.
       try {
         validateMinimumLeadTime(scheduledDate);
       } catch (leadErr) {
         return res.status(400).json({ success: false, message: leadErr.message });
       }
 
+      // FIX: doctor-online is ALWAYS video — pass consultationType: 'video'
+      // so a doctor with an inPerson-only slot at this time correctly
+      // rejects this booking instead of silently letting it through.
       const avail = await checkHospitalOrDoctorAvailability({
         doctorId,
         scheduledAt: scheduledDate,
+        consultationType: "video",
       });
       if (!avail.available)
         return res.status(400).json({ success: false, message: avail.reason });
@@ -1904,6 +1939,18 @@ const scheduledDate = parseFrontendDateTime(scheduledAt);
         taxPercent: isCoveredBySubscription ? 0 : Math.round(gstRate * 100),
       });
 
+      // FIX: wallet check BEFORE Booking.create.
+      if (paymentMethod === "Wallet") {
+        try {
+          await assertWalletSufficient(req.user._id, fareBreakdown.totalAmount);
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
+      }
+
       const initialStatus =
         paymentMethod === "Razorpay" && fareBreakdown.totalAmount > 0
           ? "payment_pending"
@@ -1943,22 +1990,27 @@ const scheduledDate = parseFrontendDateTime(scheduledAt);
       let walletResult = null;
 
       if (paymentMethod === "Wallet") {
-        walletResult = await processWalletOrPartialPayment({
-          userId: req.user._id,
-          amount: fareBreakdown.totalAmount,
-          bookingId: booking._id,
-          bookingCode: booking.bookingCode,
-        });
+        try {
+          walletResult = await processWalletFullPayment({
+            userId: req.user._id,
+            amount: fareBreakdown.totalAmount,
+            bookingId: booking._id,
+            bookingCode: booking.bookingCode,
+          });
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            await deleteBookingHard(booking._id, 0, req.user._id);
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
         booking.paymentStatus = walletResult.paymentStatus;
         booking.payments = walletResult.payments;
         booking.fareBreakdown.walletApplied = walletResult.walletApplied;
         booking.fareBreakdown.amountPaid = walletResult.amountPaid;
         await booking.save();
-        if (!walletResult.needsRazorpay) {
-          await flushAndRecord(booking);
-          sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
-        }
-        razorpayOrder = walletResult.razorpayOrder;
+        await flushAndRecord(booking);
+        sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
       }
       if (fareBreakdown.totalAmount === 0 && paymentMethod === "Razorpay") {
         booking.paymentStatus = "paid";
@@ -2040,13 +2092,7 @@ const scheduledDate = parseFrontendDateTime(scheduledAt);
           status: booking.status,
           scheduledAt: booking.scheduledAt,
           fareBreakdown,
-          walletSplit: walletResult?.needsRazorpay
-            ? {
-                walletApplied: walletResult.walletApplied,
-                razorpayPortion: walletResult.razorpayPortion,
-                message: `₹${walletResult.walletApplied} deducted from wallet. Pay remaining ₹${walletResult.razorpayPortion} via Razorpay.`,
-              }
-            : null,
+          walletApplied: walletResult?.walletApplied ?? 0,
           subscriptionCoverage: {
             consultationFree: isCoveredBySubscription,
             quotaInfo: subCheck.reason,
@@ -2078,7 +2124,8 @@ const scheduledDate = parseFrontendDateTime(scheduledAt);
       });
     } catch (err) {
       console.error("[POST /doctor-online]", err);
-      return res.status(500).json({ success: false, message: err.message });
+      const status = err instanceof InsufficientWalletBalanceError ? 400 : 500;
+      return res.status(status).json({ success: false, message: err.message });
     }
   });
 
@@ -2116,7 +2163,7 @@ export const postPatientTransport = asyncHandler(async (req, res) => {
         });
       }
 
-let scheduledDate;
+      let scheduledDate;
       try {
         scheduledDate = validateMinimumLeadTime(scheduledAt);
       } catch (leadErr) {
@@ -2161,6 +2208,7 @@ let scheduledDate;
           hospitalId,
           doctorId,
           scheduledAt: scheduledDate,
+          consultationType,
         });
         if (!consultationAvail.available)
           return res
@@ -2202,6 +2250,18 @@ let scheduledDate;
         transportFee: transportCalc.totalTransportFee,
         taxPercent: config?.tax?.transportGstPercent ?? 5,
       });
+
+      // FIX: wallet check BEFORE Booking.create.
+      if (paymentMethod === "Wallet") {
+        try {
+          await assertWalletSufficient(req.user._id, fareBreakdown.totalAmount);
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
+      }
 
       const initialStatus =
         paymentMethod === "Razorpay" && fareBreakdown.totalAmount > 0
@@ -2263,22 +2323,27 @@ let scheduledDate;
       let walletResult = null;
 
       if (paymentMethod === "Wallet") {
-        walletResult = await processWalletOrPartialPayment({
-          userId: req.user._id,
-          amount: fareBreakdown.totalAmount,
-          bookingId: booking._id,
-          bookingCode: booking.bookingCode,
-        });
+        try {
+          walletResult = await processWalletFullPayment({
+            userId: req.user._id,
+            amount: fareBreakdown.totalAmount,
+            bookingId: booking._id,
+            bookingCode: booking.bookingCode,
+          });
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            await deleteBookingHard(booking._id, 0, req.user._id);
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
         booking.paymentStatus = walletResult.paymentStatus;
         booking.payments = walletResult.payments;
         booking.fareBreakdown.walletApplied = walletResult.walletApplied;
         booking.fareBreakdown.amountPaid = walletResult.amountPaid;
         await booking.save();
-        if (!walletResult.needsRazorpay) {
-          await flushAndRecord(booking);
-          sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
-        }
-        razorpayOrder = walletResult.razorpayOrder;
+        await flushAndRecord(booking);
+        sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
       }
       if (fareBreakdown.totalAmount === 0 && paymentMethod === "Razorpay") {
         booking.paymentStatus = "paid";
@@ -2411,13 +2476,7 @@ let scheduledDate;
           bookingId: booking._id,
           bookingCode: booking.bookingCode,
           fareBreakdown,
-          walletSplit: walletResult?.needsRazorpay
-            ? {
-                walletApplied: walletResult.walletApplied,
-                razorpayPortion: walletResult.razorpayPortion,
-                message: `₹${walletResult.walletApplied} deducted from wallet. Pay remaining ₹${walletResult.razorpayPortion} via Razorpay.`,
-              }
-            : null,
+          walletApplied: walletResult?.walletApplied ?? 0,
           transportSummary: {
             distanceKm: outDistKm,
             ratePerKm,
@@ -2460,7 +2519,8 @@ let scheduledDate;
       });
     } catch (err) {
       console.error("[POST /patient-transport]", err);
-      return res.status(500).json({ success: false, message: err.message });
+      const status = err instanceof InsufficientWalletBalanceError ? 400 : 500;
+      return res.status(status).json({ success: false, message: err.message });
     }
   });
 
@@ -2482,7 +2542,7 @@ export const postPhysiotherapist = asyncHandler(async (req, res) => {
           message: "doctorId, scheduledAt, patientInfo required",
         });
 
-let scheduledDate;
+      let scheduledDate;
       try {
         scheduledDate = validateMinimumLeadTime(scheduledAt);
       } catch (leadErr) {
@@ -2491,6 +2551,7 @@ let scheduledDate;
       const avail = await checkHospitalOrDoctorAvailability({
         doctorId,
         scheduledAt: scheduledDate,
+        consultationType: visitType === "homeVisit" ? "homeVisit" : "inPerson",
       });
       if (!avail.available)
         return res.status(400).json({ success: false, message: avail.reason });
@@ -2516,6 +2577,18 @@ let scheduledDate;
         hospitalShare,
         taxPercent: config?.tax?.consultationGstPercent ?? 0,
       });
+
+      // FIX: wallet check BEFORE Booking.create.
+      if (paymentMethod === "Wallet") {
+        try {
+          await assertWalletSufficient(req.user._id, fareBreakdown.totalAmount);
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
+      }
 
       const initialStatus =
         paymentMethod === "Razorpay" && fareBreakdown.totalAmount > 0
@@ -2545,22 +2618,27 @@ let scheduledDate;
       let walletResult = null;
 
       if (paymentMethod === "Wallet" && fareBreakdown.totalAmount > 0) {
-        walletResult = await processWalletOrPartialPayment({
-          userId: req.user._id,
-          amount: fareBreakdown.totalAmount,
-          bookingId: booking._id,
-          bookingCode: booking.bookingCode,
-        });
+        try {
+          walletResult = await processWalletFullPayment({
+            userId: req.user._id,
+            amount: fareBreakdown.totalAmount,
+            bookingId: booking._id,
+            bookingCode: booking.bookingCode,
+          });
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            await deleteBookingHard(booking._id, 0, req.user._id);
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
         booking.paymentStatus = walletResult.paymentStatus;
         booking.payments = walletResult.payments;
         booking.fareBreakdown.walletApplied = walletResult.walletApplied;
         booking.fareBreakdown.amountPaid = walletResult.amountPaid;
         await booking.save();
-        if (!walletResult.needsRazorpay) {
-          await flushAndRecord(booking);
-          sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
-        }
-        razorpayOrder = walletResult.razorpayOrder;
+        await flushAndRecord(booking);
+        sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
       }
       if (fareBreakdown.totalAmount === 0 && paymentMethod === "Razorpay") {
         booking.paymentStatus = "paid";
@@ -2596,19 +2674,14 @@ let scheduledDate;
           bookingCode: booking.bookingCode,
           visitType,
           fareBreakdown,
-          walletSplit: walletResult?.needsRazorpay
-            ? {
-                walletApplied: walletResult.walletApplied,
-                razorpayPortion: walletResult.razorpayPortion,
-                message: `₹${walletResult.walletApplied} deducted from wallet. Pay remaining ₹${walletResult.razorpayPortion} via Razorpay.`,
-              }
-            : null,
+          walletApplied: walletResult?.walletApplied ?? 0,
           razorpayOrder,
         },
       });
     } catch (err) {
       console.error("[POST /physiotherapist]", err);
-      return res.status(500).json({ success: false, message: err.message });
+      const status = err instanceof InsufficientWalletBalanceError ? 400 : 500;
+      return res.status(status).json({ success: false, message: err.message });
     }
   });
 
@@ -2619,7 +2692,7 @@ export const postFollowUp = asyncHandler(async (req, res) => {
       doctorId,
       hospitalId,
       scheduledAt,
-      patientInfo, // required — name + phone used for identity check
+      patientInfo,
       consultationType = "inPerson",
       slotId,
       paymentMethod = "Razorpay",
@@ -2631,7 +2704,6 @@ export const postFollowUp = asyncHandler(async (req, res) => {
         message: "doctorId, scheduledAt, patientInfo required",
       });
 
-    // ── Follow-up eligibility ─────────────────────────────────────────────────
     const followUpCheck = await checkFollowUpEligibility({
       customerId: req.user._id,
       doctorId,
@@ -2642,8 +2714,6 @@ export const postFollowUp = asyncHandler(async (req, res) => {
         .status(400)
         .json({ success: false, message: followUpCheck.reason });
 
-    // ── Patient identity validation ───────────────────────────────────────────
-    // Fetch original OP + its booking to compare patientName + phone.
     const parentOp = await OutPatientRecord.findById(followUpCheck.parentOp)
       .select("patientName booking")
       .lean();
@@ -2671,7 +2741,7 @@ export const postFollowUp = asyncHandler(async (req, res) => {
     const phoneMatch =
       patientInfo.phone && originalPhone
         ? normPhone(patientInfo.phone) === normPhone(originalPhone)
-        : true; // original had no phone recorded → skip
+        : true;
 
     if (!nameMatch || !phoneMatch) {
       return res.status(400).json({
@@ -2682,7 +2752,6 @@ export const postFollowUp = asyncHandler(async (req, res) => {
       });
     }
 
-// ── Doctor availability ───────────────────────────────────────────────────
     let scheduledDate;
     try {
       scheduledDate = validateMinimumLeadTime(parseFrontendDateTime(scheduledAt));
@@ -2693,11 +2762,11 @@ export const postFollowUp = asyncHandler(async (req, res) => {
       hospitalId,
       doctorId,
       scheduledAt: scheduledDate,
+      consultationType,
     });
     if (!avail.available)
       return res.status(400).json({ success: false, message: avail.reason });
 
-    // ── Fee resolution ────────────────────────────────────────────────────────
     const {
       fee: consultationFee,
       doctorShare,
@@ -2719,16 +2788,27 @@ export const postFollowUp = asyncHandler(async (req, res) => {
       taxPercent: config?.tax?.consultationGstPercent ?? 0,
     });
 
+    // FIX: wallet check BEFORE Booking.create.
+    if (paymentMethod === "Wallet") {
+      try {
+        await assertWalletSufficient(req.user._id, fareBreakdown.totalAmount);
+      } catch (walletErr) {
+        if (walletErr instanceof InsufficientWalletBalanceError) {
+          return res.status(400).json({ success: false, message: walletErr.message });
+        }
+        throw walletErr;
+      }
+    }
+
     const initialStatus =
       paymentMethod === "Razorpay" && fareBreakdown.totalAmount > 0
         ? "payment_pending"
         : "pending";
 
-    // ── Create booking ────────────────────────────────────────────────────────
     const booking = await Booking.create({
       bookingType: "follow_up",
       customer: req.user._id,
-      patientInfo, // validated — same patient as original
+      patientInfo,
       doctor: doctorId,
       hospital: hospitalId || null,
       consultationType,
@@ -2746,27 +2826,31 @@ export const postFollowUp = asyncHandler(async (req, res) => {
       confirmedSubscriptionUsage: [],
     });
 
-    // ── Payment handling ──────────────────────────────────────────────────────
     let razorpayOrder = null;
     let walletResult = null;
 
     if (paymentMethod === "Wallet" && fareBreakdown.totalAmount > 0) {
-      walletResult = await processWalletOrPartialPayment({
-        userId: req.user._id,
-        amount: fareBreakdown.totalAmount,
-        bookingId: booking._id,
-        bookingCode: booking.bookingCode,
-      });
+      try {
+        walletResult = await processWalletFullPayment({
+          userId: req.user._id,
+          amount: fareBreakdown.totalAmount,
+          bookingId: booking._id,
+          bookingCode: booking.bookingCode,
+        });
+      } catch (walletErr) {
+        if (walletErr instanceof InsufficientWalletBalanceError) {
+          await deleteBookingHard(booking._id, 0, req.user._id);
+          return res.status(400).json({ success: false, message: walletErr.message });
+        }
+        throw walletErr;
+      }
       booking.paymentStatus = walletResult.paymentStatus;
       booking.payments = walletResult.payments;
       booking.fareBreakdown.walletApplied = walletResult.walletApplied;
       booking.fareBreakdown.amountPaid = walletResult.amountPaid;
       await booking.save();
-      if (!walletResult.needsRazorpay) {
-        await flushAndRecord(booking);
-        sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
-      }
-      razorpayOrder = walletResult.razorpayOrder;
+      await flushAndRecord(booking);
+      sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
     }
 
     if (fareBreakdown.totalAmount === 0 && paymentMethod === "Razorpay") {
@@ -2782,14 +2866,13 @@ export const postFollowUp = asyncHandler(async (req, res) => {
       await booking.save();
     }
 
-    // ── OP Record ─────────────────────────────────────────────────────────────
     const opNumber = await generateOpNumber(hospitalId);
     await OutPatientRecord.create({
       opNumber,
       booking: booking._id,
       bookingNumber: booking.bookingCode,
       patient: req.user._id,
-      patientName: patientInfo.name, // validated match
+      patientName: patientInfo.name,
       doctor: doctorId,
       hospital: hospitalId || null,
       consultationType: "follow_up",
@@ -2823,13 +2906,7 @@ export const postFollowUp = asyncHandler(async (req, res) => {
         bookingCode: booking.bookingCode,
         opNumber,
         fareBreakdown,
-        walletSplit: walletResult?.needsRazorpay
-          ? {
-              walletApplied: walletResult.walletApplied,
-              razorpayPortion: walletResult.razorpayPortion,
-              message: `₹${walletResult.walletApplied} deducted from wallet. Pay remaining ₹${walletResult.razorpayPortion} via Razorpay.`,
-            }
-          : null,
+        walletApplied: walletResult?.walletApplied ?? 0,
         followUpDetails: {
           parentOpNumber: followUpCheck.parentOpNumber,
           expiryWas: followUpCheck.followUpExpiry,
@@ -2843,7 +2920,8 @@ export const postFollowUp = asyncHandler(async (req, res) => {
     });
   } catch (err) {
     console.error("[POST /follow-up]", err);
-    return res.status(500).json({ success: false, message: err.message });
+    const status = err instanceof InsufficientWalletBalanceError ? 400 : 500;
+    return res.status(status).json({ success: false, message: err.message });
   }
 });
 
@@ -2875,17 +2953,12 @@ export const postDiagnosticCenter = asyncHandler(async (req, res) => {
 
       const lab = await getLabWithTests(labId);
 
-const resolvedTests = [];
+      const resolvedTests = [];
       const resolvedPackages = [];
       const testNames = [];
       const packageNames = [];
       let diagnosticFee = 0;
 
-      // NOTE: tests/packages now store {slug, partnerPrice, chargedPrice}
-      // snapshots instead of bare slug strings — settlementEngine's lab
-      // payout (charged − platform margin = partnerPrice) reads this
-      // directly at settlement time. A bare slug string gave it nothing to
-      // read, silently overpaying the lab the full charged amount.
       for (const rawSlug of tests) {
         const slug = String(rawSlug ?? "").trim();
         if (!slug) continue;
@@ -2949,12 +3022,25 @@ const resolvedTests = [];
         discount,
         taxPercent: config?.tax?.diagnosticsGstPercent ?? 5,
       });
+
+      // FIX: wallet check BEFORE Booking.create.
+      if (paymentMethod === "Wallet") {
+        try {
+          await assertWalletSufficient(req.user._id, fareBreakdown.totalAmount);
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
+      }
+
       const initialStatus =
         paymentMethod === "Razorpay" && fareBreakdown.totalAmount > 0
           ? "payment_pending"
           : "pending";
 
-let scheduledDateDC;
+      let scheduledDateDC;
       try {
         scheduledDateDC = validateMinimumLeadTime(scheduledAt);
       } catch (leadErr) {
@@ -2988,22 +3074,27 @@ let scheduledDateDC;
       let walletResult = null;
 
       if (paymentMethod === "Wallet") {
-        walletResult = await processWalletOrPartialPayment({
-          userId: req.user._id,
-          amount: fareBreakdown.totalAmount,
-          bookingId: booking._id,
-          bookingCode: booking.bookingCode,
-        });
+        try {
+          walletResult = await processWalletFullPayment({
+            userId: req.user._id,
+            amount: fareBreakdown.totalAmount,
+            bookingId: booking._id,
+            bookingCode: booking.bookingCode,
+          });
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            await deleteBookingHard(booking._id, 0, req.user._id);
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
         booking.paymentStatus = walletResult.paymentStatus;
         booking.payments = walletResult.payments;
         booking.fareBreakdown.walletApplied = walletResult.walletApplied;
         booking.fareBreakdown.amountPaid = walletResult.amountPaid;
         await booking.save();
-        if (!walletResult.needsRazorpay) {
-          await flushAndRecord(booking);
-          sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
-        }
-        razorpayOrder = walletResult.razorpayOrder;
+        await flushAndRecord(booking);
+        sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
       }
       if (fareBreakdown.totalAmount === 0 && paymentMethod === "Razorpay") {
         booking.paymentStatus = "paid";
@@ -3033,20 +3124,15 @@ let scheduledDateDC;
           fareBreakdown,
           testNames,
           packageNames,
-          walletSplit: walletResult?.needsRazorpay
-            ? {
-                walletApplied: walletResult.walletApplied,
-                razorpayPortion: walletResult.razorpayPortion,
-                message: `₹${walletResult.walletApplied} deducted from wallet. Pay remaining ₹${walletResult.razorpayPortion} via Razorpay.`,
-              }
-            : null,
+          walletApplied: walletResult?.walletApplied ?? 0,
           diagnosticDiscount: { percent: discountPercent, amount: discount },
           razorpayOrder,
         },
       });
     } catch (err) {
       console.error("[POST /diagnostic-center]", err);
-      return res.status(500).json({ success: false, message: err.message });
+      const status = err instanceof InsufficientWalletBalanceError ? 400 : 500;
+      return res.status(status).json({ success: false, message: err.message });
     }
   });
 
@@ -3096,15 +3182,13 @@ export const postDiagnosticHome = asyncHandler(async (req, res) => {
         hasHomeSampleCollectionInPlan === true &&
         homeCollectionUsedOnce === false;
 
-const resolvedTests = [];
+      const resolvedTests = [];
       const resolvedPackages = [];
       const testNames = [];
       const packageNames = [];
       let diagnosticFee = 0;
       const skippedTests = [];
 
-      // NOTE: see /diagnostic-center — same fix, snapshot {slug, partnerPrice}
-      // instead of bare slug so lab settlement payout math has data to read.
       for (const rawSlug of tests) {
         const slug = String(rawSlug ?? "").trim();
         if (!slug) continue;
@@ -3198,7 +3282,19 @@ const resolvedTests = [];
       ).toFixed(2);
       fareBreakdown.amountPaid = fareBreakdown.totalAmount;
 
-let scheduledDate;
+      // FIX: wallet check BEFORE Booking.create.
+      if (paymentMethod === "Wallet") {
+        try {
+          await assertWalletSufficient(req.user._id, fareBreakdown.totalAmount);
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
+      }
+
+      let scheduledDate;
       try {
         scheduledDate = validateMinimumLeadTime(scheduledAt);
       } catch (leadErr) {
@@ -3249,24 +3345,29 @@ let scheduledDate;
       let walletResult = null;
 
       if (paymentMethod === "Wallet") {
-        walletResult = await processWalletOrPartialPayment({
-          userId: req.user._id,
-          amount: fareBreakdown.totalAmount,
-          bookingId: booking._id,
-          bookingCode: booking.bookingCode,
-        });
+        try {
+          walletResult = await processWalletFullPayment({
+            userId: req.user._id,
+            amount: fareBreakdown.totalAmount,
+            bookingId: booking._id,
+            bookingCode: booking.bookingCode,
+          });
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            await deleteBookingHard(booking._id, 0, req.user._id);
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
         booking.paymentStatus = walletResult.paymentStatus;
         booking.payments = walletResult.payments;
         booking.fareBreakdown.walletApplied = walletResult.walletApplied;
         booking.fareBreakdown.amountPaid = walletResult.amountPaid;
         await booking.save();
 
-        if (!walletResult.needsRazorpay) {
-          await flushAndRecord(booking);
-          await processHomeCollectionUsage(booking);
-          sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
-        }
-        razorpayOrder = walletResult.razorpayOrder;
+        await flushAndRecord(booking);
+        await processHomeCollectionUsage(booking);
+        sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
       }
 
       if (fareBreakdown.totalAmount === 0 && paymentMethod === "Razorpay") {
@@ -3340,13 +3441,7 @@ let scheduledDate;
           packageNames,
           homeCollectionFeeWaived: homeCollectionFreeNow,
           skippedTests: skippedTests.length ? skippedTests : undefined,
-          walletSplit: walletResult?.needsRazorpay
-            ? {
-                walletApplied: walletResult.walletApplied,
-                razorpayPortion: walletResult.razorpayPortion,
-                message: `₹${walletResult.walletApplied} deducted from wallet. Pay remaining ₹${walletResult.razorpayPortion} via Razorpay.`,
-              }
-            : null,
+          walletApplied: walletResult?.walletApplied ?? 0,
           diagnosticDiscount: { percent: discountPercent, amount: discount },
           mapRoute: {
             polyline: techPolyline,
@@ -3361,7 +3456,8 @@ let scheduledDate;
       });
     } catch (err) {
       console.error("[POST /diagnostic-home]", err);
-      return res.status(500).json({ success: false, message: err.message });
+      const status = err instanceof InsufficientWalletBalanceError ? 400 : 500;
+      return res.status(status).json({ success: false, message: err.message });
     }
   });
 
@@ -3406,19 +3502,31 @@ export const postCareAssistant = asyncHandler(async (req, res) => {
         homeCollectionGst: 0,
       };
 
+      // FIX: wallet check BEFORE Booking.create.
+      if (paymentMethod === "Wallet") {
+        try {
+          await assertWalletSufficient(req.user._id, fareBreakdown.totalAmount);
+        } catch (walletErr) {
+          if (walletErr instanceof InsufficientWalletBalanceError) {
+            return res.status(400).json({ success: false, message: walletErr.message });
+          }
+          throw walletErr;
+        }
+      }
+
       const initialStatus =
         paymentMethod === "Razorpay" && fareBreakdown.totalAmount > 0
           ? "payment_pending"
           : "pending";
 
-let scheduledDateCA;
+      let scheduledDateCA;
       try {
         scheduledDateCA = validateMinimumLeadTime(scheduledAt);
       } catch (leadErr) {
         return res.status(400).json({ success: false, message: leadErr.message });
       }
 
-const booking = await Booking.create({
+      const booking = await Booking.create({
         bookingType: "care_assistant",
         customer: req.user._id,
         patientInfo,
@@ -3463,12 +3571,20 @@ const booking = await Booking.create({
 
       if (paymentMethod === "Wallet") {
         if (fareBreakdown.totalAmount > 0) {
-          walletResult = await processWalletOrPartialPayment({
-            userId: req.user._id,
-            amount: fareBreakdown.totalAmount,
-            bookingId: booking._id,
-            bookingCode: booking.bookingCode,
-          });
+          try {
+            walletResult = await processWalletFullPayment({
+              userId: req.user._id,
+              amount: fareBreakdown.totalAmount,
+              bookingId: booking._id,
+              bookingCode: booking.bookingCode,
+            });
+          } catch (walletErr) {
+            if (walletErr instanceof InsufficientWalletBalanceError) {
+              await deleteBookingHard(booking._id, 0, req.user._id);
+              return res.status(400).json({ success: false, message: walletErr.message });
+            }
+            throw walletErr;
+          }
           booking.paymentStatus = walletResult.paymentStatus;
           booking.payments = walletResult.payments;
           booking.fareBreakdown.walletApplied = walletResult.walletApplied;
@@ -3477,13 +3593,8 @@ const booking = await Booking.create({
           booking.paymentStatus = "paid";
         }
         await booking.save();
-        if (!walletResult?.needsRazorpay) {
-          await flushAndRecord(booking);
-
-          sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
-        }
-        if (walletResult?.razorpayOrder)
-          razorpayOrder = walletResult.razorpayOrder;
+        await flushAndRecord(booking);
+        sendPaymentConfirmedEmails({ booking, paymentMethod: "Wallet" });
       }
       if (fareBreakdown.totalAmount === 0 && paymentMethod === "Razorpay") {
         booking.paymentStatus = "paid";
@@ -3524,13 +3635,7 @@ const booking = await Booking.create({
           status: booking.status,
           scheduledAt: booking.scheduledAt,
           fareBreakdown,
-          walletSplit: walletResult?.needsRazorpay
-            ? {
-                walletApplied: walletResult.walletApplied,
-                razorpayPortion: walletResult.razorpayPortion,
-                message: `₹${walletResult.walletApplied} deducted from wallet. Pay remaining ₹${walletResult.razorpayPortion} via Razorpay.`,
-              }
-            : null,
+          walletApplied: walletResult?.walletApplied ?? 0,
           subscriptionCoverage: {
             careAssistantFree: careResult.isCoveredBySubscription,
             quotaInfo: careResult.subQuotaInfo?.reason,
@@ -3561,7 +3666,8 @@ const booking = await Booking.create({
       });
     } catch (err) {
       console.error("[POST /care-assistant]", err);
-      return res.status(500).json({ success: false, message: err.message });
+      const status = err instanceof InsufficientWalletBalanceError ? 400 : 500;
+      return res.status(status).json({ success: false, message: err.message });
     }
   });
 
@@ -3886,10 +3992,6 @@ export const postMyBookingsByBookingIdCancel = asyncHandler(async (req, res) => 
         });
       }
 
-      // CHANGE (Point 3 + Point 4): now uses the shared cancelBookingFully()
-      // engine — same refund rule as doctor-cancel (12h cutoff: 100%/50%),
-      // AND consistently cancels every linked Ride/RideStop/Consultation/OP,
-      // notifying customer + hospital + doctor + any assigned partner.
       const { refundPercent, refundAmount, subscriptionRecovery } = await cancelBookingFully(
         booking._id,
         {
@@ -3994,8 +4096,6 @@ export const postMyBookingsByBookingIdRate = asyncHandler(async (req, res) => {
           .status(400)
           .json({ success: false, message: "overallRating (1-5) required" });
 
-// Only set sub-ratings when a real 1-5 value given — 0/null/undefined
-      // would otherwise get written and fail schema's min:1 validator.
       const validRating = (v) => Number.isFinite(v) && v >= 1 && v <= 5;
 
       const ratingDoc = {
@@ -4026,8 +4126,6 @@ export const postMyBookingsByBookingIdRate = asyncHandler(async (req, res) => {
       booking.updatedBy = req.user._id;
       await booking.save();
 
-      // Push rating into each involved partner's own rating aggregate
-      // (+ review subdoc for labs). Non-fatal — booking save already done.
       applyBookingRating(booking).catch(e => console.error("[rate] applyBookingRating failed:", e.message));
 
       res.json({ success: true, message: "Rating submitted successfully" });
@@ -4198,9 +4296,6 @@ export const getSubscriptionBenefitsCareAssistant = asyncHandler(async (req, res
           .status(404)
           .json({ success: false, message: "No active subscription found." });
 
-      // CA benefit exists ONLY for custom plans where the customer
-      // explicitly added the careAssistant option block. Fixed plans NEVER
-      // resolve a quota — plan.careAssistant.* is display-only reference data.
       let visitsPerMonth = null;
       if (sub.planType === "custom") {
         visitsPerMonth = sub.limits?.careAssistantVisitsPerMonth ?? null;
@@ -4244,8 +4339,6 @@ export const getSubscriptionBenefitsCareAssistant = asyncHandler(async (req, res
       let allTiers = [];
       const config = await PlatformPricingConfig.getGlobal();
 
-      // Only custom plans can reach this point (fixed plans already returned
-      // "not included" above) — no fixed-plan tier branch needed.
       activeTier =
         sub.limits?.careAssistantTierIndex != null
           ? {
@@ -4449,7 +4542,7 @@ export const getPreviousPatientInfo = asyncHandler(async (req, res) => {
       return res.json({
         success: true,
         data: {
-          patientInfo: last.patientInfo, // name, age, gender, phone, bloodGroup, weight, isSelf
+          patientInfo: last.patientInfo,
           fromBooking: last.bookingCode,
           bookingType: last.bookingType,
           bookedAt: last.createdAt,

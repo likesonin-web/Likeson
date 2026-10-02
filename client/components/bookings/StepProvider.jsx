@@ -545,18 +545,35 @@ export function StepProvider({
             >
               <Sel
                 value={form.doctorId || ""}
-                onChange={(e) => {
+onChange={(e) => {
                   const d = doctorList.find((d) => d._id === e.target.value);
+                  const fees = d?.effectiveFees || d?.fees || null;
                   set("doctorId", e.target.value);
                   set("doctorName", d?.user?.name || d?.name || "");
                   set("doctorSpec", d?.specialization || "");
-                  set("doctorFees", d?.effectiveFees || d?.fees || null);
+                  set("doctorFees", fees);
                   if (isOnline && d) {
                     set("hospitalId", d.hospitalId || d.hospital?._id || "");
                     set(
                       "hospitalName",
                       d.hospitalName || d.hospital?.name || "",
                     );
+                  }
+                  // reset consultationType if current pick invalid for new doctor
+                  if (fees) {
+                    const feeKeyMap = {
+                      in_person: "inPersonFee",
+                      video: "videoFee",
+                      home_visit: "homeVisitFee",
+                    };
+                    const currKey = feeKeyMap[form.consultationType];
+                    const currValid = currKey && fees[currKey] > 0;
+                    if (!currValid) {
+                      const firstValid = Object.keys(feeKeyMap).find(
+                        (k) => fees[feeKeyMap[k]] > 0,
+                      );
+                      if (firstValid) set("consultationType", firstValid);
+                    }
                   }
                   onResetDocAvail?.();
                 }}

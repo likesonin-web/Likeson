@@ -41,9 +41,40 @@ const upload = multer({
   },
 });
 
-// ── Middleware stack applied to every route in this router ────────────────────
-
 import asyncHandler from '../utils/asyncHandler.js';
+
+// ── shared helper: fetch hospital owned by logged-in manager ─────────────────
+async function resolveHospital(userId, selectFields) {
+  const query = Hospital.findOne({
+    managedBy:       userId,
+    managementModel: 'hospital-manager',
+  });
+  if (selectFields) query.select(selectFields);
+
+  const hospital = await query;
+  if (!hospital) {
+    const err = new Error('Hospital profile not found for this account.');
+    err.statusCode = 404;
+    throw err;
+  }
+  return hospital;
+}
+
+// ── shared helper: upload buffer to ImageKit, return { url, fileId } ─────────
+async function uploadToImageKit(buffer, originalname, folder) {
+  const safeName = originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const result = await imagekit.upload({
+    file: buffer.toString('base64'),
+    fileName: `${Date.now()}_${safeName}`,
+    folder,
+    useUniqueFileName: true,
+  });
+  return { url: result.url, fileId: result.fileId };
+}
+
+ 
+
+ 
 
 // GET '/profile'
 export const getProfile = asyncHandler(async (req, res) => {
@@ -717,6 +748,121 @@ export const postSettingsAvatar = asyncHandler(async (req, res) => {
 // GET '/imagekit-auth'
 export const getImagekitAuth = asyncHandler(async (_req, res) => {
   res.json({ success: true, data: imagekit.getAuthenticationParameters() });
+});
+
+// ── DOCTOR: accept/reject an assigned booking ─────────────────────────────────
+// PUT '/doctors/bookings/:bookingId/respond'
+export const putDoctorsBookingsByBookingIdRespond = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  const { action, reason } = req.body; // action: 'accept' | 'reject'
+
+  if (!mongoose.isValidObjectId(bookingId)) {
+    return res.status(400).json({ success: false, message: 'Invalid booking ID.' });
+  }
+  if (!['accept', 'reject'].includes(action)) {
+    return res.status(400).json({ success: false, message: "action must be 'accept' or 'reject'." });
+  }
+
+  const doctorProfile = await DoctorProfile.findOne({ user: req.user._id }).select('_id');
+  if (!doctorProfile) {
+    return res.status(404).json({ success: false, message: 'Doctor profile not found for this account.' });
+  }
+
+  const booking = await Booking.findOne({ _id: bookingId, doctor: doctorProfile._id });
+  if (!booking) {
+    return res.status(404).json({ success: false, message: 'Booking not found or not assigned to you.' });
+  }
+
+  if (!['pending', 'payment_pending'].includes(booking.status)) {
+    return res.status(400).json({
+      success: false,
+      message: `Booking is already "${booking.status}" — cannot ${action} it now.`,
+    });
+  }
+
+  if (action === 'accept') {
+    booking.status = 'confirmed';
+  } else {
+    if (!reason?.trim()) {
+      return res.status(400).json({ success: false, message: 'reason is required when rejecting a booking.' });
+    }
+    booking.status = 'cancelled';
+    booking.cancellation = {
+      cancelledBy:       'doctor',
+      cancelledByUserId: req.user._id,
+      reason:            reason.trim(),
+      refundEligible:    true,
+      refundPercent:     100,
+      cancelledAt:       new Date(),
+    };
+  }
+
+  booking.updatedBy = req.user._id;
+  await booking.save();
+
+  await SystemLog.createLog({
+    level:    action === 'accept' ? 'success' : 'warning',
+    category: 'user',
+    message:  `Doctor ${action}ed booking ${booking.bookingCode}`,
+    actor:    { userId: req.user._id, name: req.user.name, role: req.user.role },
+    relatedEntity: { model: 'Booking', entityId: booking._id, label: booking.bookingCode },
+    request:  { method: 'PUT', path: req.originalUrl, statusCode: 200 },
+  });
+
+  res.json({
+    success: true,
+    message: action === 'accept' ? 'Booking accepted.' : 'Booking rejected.',
+    data: { bookingId: booking._id, status: booking.status },
+  });
+});
+
+// ── HOSPITAL MANAGER: all linked doctors' consultations, price + follow-up ────
+// GET '/consultations'
+export const getConsultations = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20, doctorId = '', status = '' } = req.query;
+  const hospital = await resolveHospital(req.user._id, 'linkedDoctors consultationPricing name');
+
+  const filter = { hospital: hospital._id };
+  if (doctorId && mongoose.isValidObjectId(doctorId)) filter.doctor = doctorId;
+  if (status) filter.status = status;
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const [bookings, total] = await Promise.all([
+    Booking.find(filter)
+      .populate({
+        path: 'doctor',
+        select: 'user specialization',
+        populate: { path: 'user', select: 'name' },
+      })
+      .select('bookingCode bookingType consultationType status scheduledAt patientInfo fareBreakdown paymentStatus doctorSnapshot')
+      .sort({ scheduledAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean(),
+    Booking.countDocuments(filter),
+  ]);
+
+  // Follow-up window per booking, via its OutPatientRecord (if generated)
+  const opRecords = await OutPatientRecord.find({ booking: { $in: bookings.map((b) => b._id) } })
+    .select('booking opNumber followUpExpiry followUpFee isFollowUp status')
+    .lean();
+  const opByBooking = new Map(opRecords.map((op) => [op.booking.toString(), op]));
+
+  const data = bookings.map((b) => ({
+    ...b,
+    consultationPrice: b.fareBreakdown?.consultationFee ?? null,
+    doctorShare:        b.fareBreakdown?.doctorShare ?? null,
+    hospitalShare:       b.fareBreakdown?.hospitalShare ?? null,
+    outPatientRecord: opByBooking.get(b._id.toString()) || null,
+  }));
+
+  res.json({
+    success: true,
+    hospitalConsultationPricing: hospital.consultationPricing, // current rate card, for reference alongside actuals
+    data,
+    pagination: { total, page: Number(page), limit: Number(limit), pages: Math.ceil(total / Number(limit)) },
+  });
 });
 
 // Centralised error handler (register last on the router)

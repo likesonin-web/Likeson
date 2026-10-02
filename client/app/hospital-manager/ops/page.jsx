@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -133,14 +134,15 @@ const OPDetailDrawer = ({ op, onClose, onStatusChange, loading }) => {
     setReason('');
   };
 
-  const ALLOWED_STATUSES = ['scheduled', 'in_progress', 'completed', 'cancelled', 'no_show'];
+const ALLOWED_STATUSES = ['scheduled', 'in_progress', 'completed', 'cancelled', 'no_show'];
 
-  return (
+  // Wrap the drawer in a constant to pass it to the portal
+  const drawerContent = (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex"
+      className="fixed inset-0 z-[9999] flex"
     >
       {/* Overlay */}
       <motion.div
@@ -337,13 +339,20 @@ const OPDetailDrawer = ({ op, onClose, onStatusChange, loading }) => {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
+</div>
 
           </div>
         </div>
       </motion.div>
     </motion.div>
   );
+
+  // Render outside the dashboard's DOM hierarchy to prevent layout clipping
+  if (typeof document !== "undefined") {
+    return createPortal(drawerContent, document.body);
+  }
+  
+  return null;
 };
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -455,7 +464,7 @@ export default function OPsManagement() {
     <div className="min-h-screen bg-base-100 font-inter" data-theme="hospital">
 
       {/* ── Page Header ────────────────────────────────────────────────────── */}
-      <div className="border-b border-base-300 bg-base-100 sticky top-0 z-30 backdrop-blur-strong">
+      <div className="border-b border-base-300 bg-base-100 sticky top-0 z-50 backdrop-blur-strong">
         <div className="container-custom py-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">

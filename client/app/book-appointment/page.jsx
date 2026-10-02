@@ -281,7 +281,12 @@ export default function BookingSystem() {
       dispatch(fetchSubscriptionBenefitLabs());
       benefitFetchedRef.current.labs = true;
     }
-  }, [dispatch, form.bookingType, form.consultationType, hasReachedPatientStep]);
+  }, [
+    dispatch,
+    form.bookingType,
+    form.consultationType,
+    hasReachedPatientStep,
+  ]);
 
   // reset guards whenever bookingType changes so switching type re-fetches
   // fresh benefits for the new type once patient step is reached again
@@ -301,7 +306,12 @@ export default function BookingSystem() {
     dispatch(
       checkConsultationCoverage({ consultationType: form.consultationType }),
     );
-  }, [dispatch, form.consultationType, form.bookingType, hasReachedPatientStep]);
+  }, [
+    dispatch,
+    form.consultationType,
+    form.bookingType,
+    hasReachedPatientStep,
+  ]);
 
   const onSelectBookingType = useCallback(
     (btValue) => {
@@ -696,26 +706,39 @@ export default function BookingSystem() {
     [dispatch, set],
   );
 
+  // FIX: consultationType was never sent — backend now hard-requires it
+  // (checkHospitalOrDoctorAvailability 400s without it). Guard added so we
+  // don't even fire the request until a type is chosen — avoids a
+  // guaranteed-to-fail call, and avoids the pill flashing red before the
+  // user has picked inPerson/video/homeVisit.
   const onCheckHospAvail = useCallback(() => {
-    if (form.hospitalId && form.scheduledAt)
+    if (form.hospitalId && form.scheduledAt && form.consultationType)
       dispatch(
         checkHospitalAvailability({
           hospitalId: form.hospitalId,
           scheduledAt: toISOSafe(form.scheduledAt),
+          consultationType: form.consultationType,
         }),
       );
-  }, [dispatch, form.hospitalId, form.scheduledAt]);
+  }, [dispatch, form.hospitalId, form.scheduledAt, form.consultationType]);
 
   const onCheckDocAvail = useCallback(() => {
-    if (form.doctorId && form.scheduledAt)
+    if (form.doctorId && form.scheduledAt && form.consultationType)
       dispatch(
         checkDoctorAvailability({
           doctorId: form.doctorId,
           scheduledAt: toISOSafe(form.scheduledAt),
           hospitalId: form.hospitalId,
+          consultationType: form.consultationType,
         }),
       );
-  }, [dispatch, form.doctorId, form.scheduledAt, form.hospitalId]);
+  }, [
+    dispatch,
+    form.doctorId,
+    form.scheduledAt,
+    form.hospitalId,
+    form.consultationType,
+  ]);
 
   const onCheckFollowUp = useCallback(
     (doctorId, hospitalId) => {
@@ -1161,7 +1184,7 @@ export default function BookingSystem() {
     });
   }, [pendingPaymentBooking, dispatch, form]);
 
-// ── gate Continue — idx>=1 (anything past step0) needs login ─────
+  // ── gate Continue — idx>=1 (anything past step0) needs login ─────
   const goNext = useCallback(() => {
     if (!validate(currentStepId)) {
       setTimeout(() => {
@@ -1206,7 +1229,7 @@ export default function BookingSystem() {
     setTimeout(scrollToTop, 50);
   }, [curIdx, stepIds, scrollToTop]);
 
-// ── gate direct StepBar jumps — idx>=1 needs login (matches goNext) ─
+  // ── gate direct StepBar jumps — idx>=1 needs login (matches goNext) ─
   const handleStepClick = useCallback(
     (stepId) => {
       if (!visitedIds.includes(stepId) || stepId === currentStepId) return;

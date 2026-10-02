@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-  memo,
-} from "react";
+import React, { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -51,13 +45,16 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { logout } from "@/store/slices/userSlice";
-import { fetchNotifications, selectUnreadCount } from "@/store/slices/notificationSlice";
+import {
+  fetchNotifications,
+  selectUnreadCount,
+} from "@/store/slices/notificationSlice";
 import {
   HOSPITAL_MANAGER_DASHBOARD_LINKS,
   HOSPITAL_MANAGER_TOP_RIGHT_LINKS,
   HOSPITAL_MANAGER_PROFILE_LINKS,
 } from "../../constants/hospitalmangerlinks";
-import WelcomeHospitalPage from "@/app/hospital-manager/WelcomeHospitalPage"; 
+import WelcomeHospitalPage from "@/app/hospital-manager/WelcomeHospitalPage";
 import { fetchPartnerWallet } from "@/store/slices/partnerWalletSlice";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,31 +63,99 @@ import { fetchPartnerWallet } from "@/store/slices/partnerWalletSlice";
 // ─────────────────────────────────────────────────────────────────────────────
 const HOSPITAL_SEARCH_INDEX = {
   "Command Centre": [
-    { name: "Overview",      href: "/hospital-manager/dashboard",      icon: <LayoutDashboard size={16} /> },
-    { name: "Onboarding",    href: "/hospital-manager/onboarding",     icon: <CheckCircle2 size={16} /> },
-    { name: "Notifications", href: "/hospital-manager/notifications",  icon: <Bell size={16} /> },
+    {
+      name: "Overview",
+      href: "/hospital-manager/dashboard",
+      icon: <LayoutDashboard size={16} />,
+    },
+    {
+      name: "Onboarding",
+      href: "/hospital-manager/onboarding",
+      icon: <CheckCircle2 size={16} />,
+    },
+    {
+      name: "Notifications",
+      href: "/hospital-manager/notifications",
+      icon: <Bell size={16} />,
+    },
   ],
   "Facility Management": [
-    { name: "Hospital Profile",  href: "/hospital-manager/profile",          icon: <Hospital size={16} /> },
-    { name: "Location & GPS",    href: "/hospital-manager/location",         icon: <MapPin size={16} /> },
-    { name: "Operating Hours",   href: "/hospital-manager/operating-hours",  icon: <Clock size={16} /> },
-    { name: "Gallery & Logo",    href: "/hospital-manager/gallery",          icon: <ImageIcon size={16} /> },
-    { name: "Legal & Licenses",  href: "/hospital-manager/registration",     icon: <FileText size={16} /> },
+    {
+      name: "Hospital Profile",
+      href: "/hospital-manager/profile",
+      icon: <Hospital size={16} />,
+    },
+    {
+      name: "Location & GPS",
+      href: "/hospital-manager/location",
+      icon: <MapPin size={16} />,
+    },
+    {
+      name: "Operating Hours",
+      href: "/hospital-manager/operating-hours",
+      icon: <Clock size={16} />,
+    },
+    {
+      name: "Gallery & Logo",
+      href: "/hospital-manager/gallery",
+      icon: <ImageIcon size={16} />,
+    },
+    {
+      name: "Legal & Licenses",
+      href: "/hospital-manager/registration",
+      icon: <FileText size={16} />,
+    },
   ],
   "Medical Staff": [
-    { name: "Linked Doctors",  href: "/hospital-manager/doctors",            icon: <Users size={16} /> },
-    { name: "Find & Link",     href: "/hospital-manager/doctors/search",     icon: <SearchIcon size={16} /> },
-    { name: "Staff Statistics", href: "/hospital-manager/doctors/stats",     icon: <UserCog size={16} /> },
-    { name: "Availability",    href: "/hospital-manager/doctors/availability", icon: <CalendarDays size={16} /> },
+    {
+      name: "Linked Doctors",
+      href: "/hospital-manager/doctors",
+      icon: <Users size={16} />,
+    },
+    {
+      name: "Find & Link",
+      href: "/hospital-manager/doctors/search",
+      icon: <SearchIcon size={16} />,
+    },
+    {
+      name: "Staff Statistics",
+      href: "/hospital-manager/doctors/stats",
+      icon: <UserCog size={16} />,
+    },
+    {
+      name: "Availability",
+      href: "/hospital-manager/doctors/availability",
+      icon: <CalendarDays size={16} />,
+    },
   ],
-  "Commercials": [
-    { name: "Consultation Pricing", href: "/hospital-manager/pricing", icon: <CircleDollarSign size={16} /> },
+  Commercials: [
+    {
+      name: "Consultation Pricing",
+      href: "/hospital-manager/pricing",
+      icon: <CircleDollarSign size={16} />,
+    },
   ],
   "Settings & Security": [
-    { name: "Account Details",     href: "/hospital-manager/settings/account",  icon: <UserRound size={16} /> },
-    { name: "Active Sessions",     href: "/hospital-manager/security/sessions", icon: <Smartphone size={16} /> },
-    { name: "Security & Password", href: "/hospital-manager/security/password", icon: <KeyRound size={16} /> },
-    { name: "System Logs",         href: "/hospital-manager/logs",              icon: <History size={16} /> },
+    {
+      name: "Account Details",
+      href: "/hospital-manager/settings/account",
+      icon: <UserRound size={16} />,
+    },
+    {
+      name: "Active Sessions",
+      href: "/hospital-manager/security/sessions",
+      icon: <Smartphone size={16} />,
+    },
+    {
+      name: "Security & Password",
+      href: "/hospital-manager/security/password",
+      icon: <KeyRound size={16} />,
+    },
+    {
+      name: "System Logs",
+      href: "/hospital-manager/logs",
+      icon: <History size={16} />,
+    },
   ],
 };
 
@@ -161,10 +226,15 @@ const NavItem = memo(function NavItem({ link, isActive }) {
         "flex items-center gap-3 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 rounded-lg",
         isActive
           ? "text-primary bg-primary/8 shadow-sm border-l-2 border-primary"
-          : "text-base-content/40 hover:text-primary hover:bg-base-200/80 border-l-2 border-transparent"
+          : "text-base-content/40 hover:text-primary hover:bg-base-200/80 border-l-2 border-transparent",
       )}
     >
-      <span className={cn("shrink-0 transition-transform duration-200", isActive && "scale-110 text-primary")}>
+      <span
+        className={cn(
+          "shrink-0 transition-transform duration-200",
+          isActive && "scale-110 text-primary",
+        )}
+      >
         {link.icon}
       </span>
       <span className="truncate">{link.name}</span>
@@ -184,7 +254,7 @@ const SidebarSection = memo(function SidebarSection({
 }) {
   const isParentActive = useMemo(
     () => section.links.some((link) => pathname === link.href),
-    [section.links, pathname]
+    [section.links, pathname],
   );
 
   useEffect(() => {
@@ -202,14 +272,14 @@ const SidebarSection = memo(function SidebarSection({
           "w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group",
           isOpen || isParentActive
             ? "bg-primary/10 text-primary"
-            : "text-base-content/45 hover:bg-base-300/60 hover:text-base-content"
+            : "text-base-content/45 hover:bg-base-300/60 hover:text-base-content",
         )}
       >
         <div className="flex items-center gap-3">
           <span
             className={cn(
               "shrink-0 transition-transform duration-200 group-hover:scale-110",
-              (isOpen || isParentActive) && "text-primary"
+              (isOpen || isParentActive) && "text-primary",
             )}
           >
             {section.icons}
@@ -223,7 +293,10 @@ const SidebarSection = memo(function SidebarSection({
         {isSidebarOpen && (
           <ChevronDown
             size={13}
-            className={cn("opacity-60 transition-transform duration-300", isOpen && "rotate-180")}
+            className={cn(
+              "opacity-60 transition-transform duration-300",
+              isOpen && "rotate-180",
+            )}
           />
         )}
       </button>
@@ -238,7 +311,11 @@ const SidebarSection = memo(function SidebarSection({
             className="overflow-hidden ml-5 mt-0.5  "
           >
             {section.links.map((link, idx) => (
-              <NavItem key={idx} link={link} isActive={pathname === link.href} />
+              <NavItem
+                key={idx}
+                link={link}
+                isActive={pathname === link.href}
+              />
             ))}
           </motion.div>
         )}
@@ -251,29 +328,29 @@ const SidebarSection = memo(function SidebarSection({
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 const HospitalManagerDashboard = ({ children }) => {
-  const dispatch  = useDispatch();
-  const router    = useRouter();
-  const pathname  = usePathname();
+  const dispatch = useDispatch();
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const { user }       = useSelector((state) => state.user);
-  const unreadCount    = useSelector(selectUnreadCount);
-  const { wallet }     = useSelector((state) => state.partnerWallet);
+  const { user } = useSelector((state) => state.user);
+  const unreadCount = useSelector(selectUnreadCount);
+  const { wallet } = useSelector((state) => state.partnerWallet);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [openMenus,     setOpenMenus]     = useState({});
-  const [searchQuery,   setSearchQuery]   = useState("");
-  const [isSearchOpen,  setIsSearchOpen]  = useState(false);
+  const [openMenus, setOpenMenus] = useState({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // ── Route checks ───────────────────────────────────────────────────────────
   const isWelcomeRoute = useMemo(
     () => ["/", "/hospital-manager", "/hospital-manager/"].includes(pathname),
-    [pathname]
+    [pathname],
   );
 
   // NEW: Check if the current route is the support page
   const isSupportRoute = useMemo(
     () => pathname === "/hospital-manager/support",
-    [pathname]
+    [pathname],
   );
 
   // Collapse sidebar on mobile; fetch notifications on mount
@@ -314,12 +391,9 @@ const HospitalManagerDashboard = ({ children }) => {
     () =>
       isWelcomeRoute
         ? "Welcome"
-        : pathname
-            .split("/")
-            .filter(Boolean)
-            .pop()
-            ?.replace(/-/g, " ") || "Dashboard",
-    [pathname, isWelcomeRoute]
+        : pathname.split("/").filter(Boolean).pop()?.replace(/-/g, " ") ||
+          "Dashboard",
+    [pathname, isWelcomeRoute],
   );
 
   // Auth guard
@@ -378,7 +452,7 @@ const HospitalManagerDashboard = ({ children }) => {
           "fixed left-0 top-0 z-50 h-screen bg-base-200 border-r border-base-300 flex flex-col transition-all duration-300 ease-in-out overflow-hidden",
           isSidebarOpen
             ? "w-64 translate-x-0"
-            : "w-0 -translate-x-full lg:w-[72px] lg:translate-x-0"
+            : "w-0 -translate-x-full lg:w-[72px] lg:translate-x-0",
         )}
       >
         {/* Sidebar header */}
@@ -454,8 +528,8 @@ const HospitalManagerDashboard = ({ children }) => {
           <button
             onClick={handleLogout}
             className={cn(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider",
-              "text-error/70 hover:bg-error/8 hover:text-error transition-all duration-200"
+              "w-full flex  items-center cursor-pointer h-12 gap-3 px-3 py-3.5 rounded-xl justify-center text-[13px] font-bold uppercase tracking-wider",
+              "text-error/70 bg-error/10 hover:bg-error hover:text-error-content transition-all duration-200",
             )}
           >
             <LogOut size={16} className="shrink-0" />
@@ -468,13 +542,12 @@ const HospitalManagerDashboard = ({ children }) => {
       <main
         className={cn(
           "flex flex-col min-h-screen transition-all duration-300",
-          isSidebarOpen ? "lg:ml-64" : "lg:ml-[72px]"
+          isSidebarOpen ? "lg:ml-64" : "lg:ml-[72px]",
         )}
       >
         {/* ── Global header conditionally hidden on support page ───────── */}
         {!isSupportRoute && (
           <header className="sticky top-0 z-40 flex h-[68px] w-full items-center justify-between border-b border-base-300 bg-base-100/80 backdrop-blur-xl shrink-0">
-
             {/* Left */}
             <div className="flex items-center gap-4">
               {!isSidebarOpen && (
@@ -494,7 +567,9 @@ const HospitalManagerDashboard = ({ children }) => {
                     <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider text-base-content/40 hover:text-primary hover:bg-primary/6 transition-all">
                       {item.icon}
                       {item.name}
-                      {item.links && <ChevronDown size={11} className="opacity-50" />}
+                      {item.links && (
+                        <ChevronDown size={11} className="opacity-50" />
+                      )}
                     </button>
                     {item.links && (
                       <div className="absolute left-0 top-full pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
@@ -519,7 +594,6 @@ const HospitalManagerDashboard = ({ children }) => {
 
             {/* Right */}
             <div className="flex items-center gap-2 sm:gap-3">
-
               {/* Command palette trigger */}
               <button
                 onClick={() => setIsSearchOpen(true)}
@@ -529,7 +603,9 @@ const HospitalManagerDashboard = ({ children }) => {
                 <span className="text-[9px] font-black uppercase tracking-widest hidden md:inline">
                   Quick Search
                 </span>
-                <span className="hidden md:inline text-[9px] opacity-30 ml-1">⌘K</span>
+                <span className="hidden md:inline text-[9px] opacity-30 ml-1">
+                  ⌘K
+                </span>
               </button>
 
               {/* Mobile search icon */}
@@ -645,7 +721,6 @@ const HospitalManagerDashboard = ({ children }) => {
 
         {/* ── Page body ────────────────────────────────────────────────── */}
         <section className="flex-1 w-full max-w-[1680px] mx-auto p-4 ">
-
           {/* Breadcrumbs - Conditionally rendering based on header visibility as well just in case, but left default here */}
           {!isSupportRoute && (
             <div className="mb-5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-base-content/25">
@@ -669,7 +744,7 @@ const HospitalManagerDashboard = ({ children }) => {
           >
             {/* Decorative tint */}
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/4 blur-[130px] rounded-full pointer-events-none" />
-            
+
             <div className="relative z-10">
               {/* Render Welcome Page for root paths, otherwise render children */}
               {isWelcomeRoute ? <WelcomeHospitalPage /> : children}
@@ -698,10 +773,26 @@ const HospitalManagerDashboard = ({ children }) => {
             {/* Quick shortcuts */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full xl:w-auto">
               {[
-                { name: "Doctors",    icon: <Stethoscope size={16} />, href: "/hospital-manager/doctors" },
-                { name: "Pricing",    icon: <CircleDollarSign size={16} />, href: "/hospital-manager/pricing" },
-                { name: "Security",   icon: <Shield size={16} />,      href: "/hospital-manager/security/password" },
-                { name: "System Logs",icon: <History size={16} />,     href: "/hospital-manager/logs" },
+                {
+                  name: "Doctors",
+                  icon: <Stethoscope size={16} />,
+                  href: "/hospital-manager/doctors",
+                },
+                {
+                  name: "Pricing",
+                  icon: <CircleDollarSign size={16} />,
+                  href: "/hospital-manager/pricing",
+                },
+                {
+                  name: "Security",
+                  icon: <Shield size={16} />,
+                  href: "/hospital-manager/security/password",
+                },
+                {
+                  name: "System Logs",
+                  icon: <History size={16} />,
+                  href: "/hospital-manager/logs",
+                },
               ].map((sc, idx) => (
                 <Link
                   key={idx}
@@ -724,7 +815,7 @@ const HospitalManagerDashboard = ({ children }) => {
       {/* ── Command Palette ───────────────────────────────────────────────── */}
       <AnimatePresence>
         {isSearchOpen && (
-          <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh] px-4">
+          <div className="fixed inset-0 z-[70] flex items-start justify-center pt-[12vh] px-4">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -761,54 +852,60 @@ const HospitalManagerDashboard = ({ children }) => {
 
               {/* Results */}
               <div className="max-h-[55vh] overflow-y-auto px-3 py-3 space-y-4 custom-scrollbar">
-                {Object.entries(HOSPITAL_SEARCH_INDEX).map(([sectionKey, items]) => {
-                  const filtered = items.filter((item) =>
-                    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-                  );
-                  if (!filtered.length) return null;
+                {Object.entries(HOSPITAL_SEARCH_INDEX).map(
+                  ([sectionKey, items]) => {
+                    const filtered = items.filter((item) =>
+                      item.name
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase()),
+                    );
+                    if (!filtered.length) return null;
 
-                  return (
-                    <div key={sectionKey}>
-                      <h3 className="text-[9px] font-black text-primary/70 tracking-[0.3em] mb-2 uppercase px-3">
-                        {sectionKey}
-                      </h3>
-                      <div className="space-y-0.5">
-                        {filtered.map((item, iIdx) => (
-                          <Link
-                            key={iIdx}
-                            href={item.href}
-                            onClick={() => setIsSearchOpen(false)}
-                            className="flex items-center justify-between px-3 py-3 rounded-xl hover:bg-primary/8 group transition-all"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-base-content/30 group-hover:text-primary transition-colors">
-                                {item.icon}
-                              </span>
-                              <span className="text-xs font-semibold text-base-content/65 group-hover:text-base-content capitalize">
-                                {item.name}
-                              </span>
-                            </div>
-                            <ExternalLink
-                              size={12}
-                              className="opacity-0 group-hover:opacity-100 text-primary transition-all"
-                            />
-                          </Link>
-                        ))}
+                    return (
+                      <div key={sectionKey}>
+                        <h3 className="text-[9px] font-black text-primary/70 tracking-[0.3em] mb-2 uppercase px-3">
+                          {sectionKey}
+                        </h3>
+                        <div className="space-y-0.5">
+                          {filtered.map((item, iIdx) => (
+                            <Link
+                              key={iIdx}
+                              href={item.href}
+                              onClick={() => setIsSearchOpen(false)}
+                              className="flex items-center justify-between px-3 py-3 rounded-xl hover:bg-primary/8 group transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-base-content/30 group-hover:text-primary transition-colors">
+                                  {item.icon}
+                                </span>
+                                <span className="text-xs font-semibold text-base-content/65 group-hover:text-base-content capitalize">
+                                  {item.name}
+                                </span>
+                              </div>
+                              <ExternalLink
+                                size={12}
+                                className="opacity-0 group-hover:opacity-100 text-primary transition-all"
+                              />
+                            </Link>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  },
+                )}
 
                 {/* Empty state */}
                 {Object.entries(HOSPITAL_SEARCH_INDEX).every(
                   ([, items]) =>
                     !items.some((i) =>
-                      i.name.toLowerCase().includes(searchQuery.toLowerCase())
-                    )
+                      i.name.toLowerCase().includes(searchQuery.toLowerCase()),
+                    ),
                 ) && (
                   <div className="text-center py-10 text-base-content/25">
                     <Search size={28} className="mx-auto mb-3 opacity-30" />
-                    <p className="text-xs font-bold uppercase tracking-wider">No results found</p>
+                    <p className="text-xs font-bold uppercase tracking-wider">
+                      No results found
+                    </p>
                   </div>
                 )}
               </div>

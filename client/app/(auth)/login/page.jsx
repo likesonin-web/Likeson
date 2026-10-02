@@ -147,7 +147,7 @@ const GoogleLoginButton = memo(function GoogleLoginButton({ onClick }) {
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="https://www.svgrepo.com/show/355037/google.svg"
+        src="https://img.icons8.com/color/1200/google-logo.jpg"
         className="w-5 h-5"
         alt=""
         aria-hidden="true"

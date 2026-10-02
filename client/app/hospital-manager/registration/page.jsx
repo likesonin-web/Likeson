@@ -852,6 +852,13 @@ const HoursSection = ({ dispatch }) => {
     );
   };
 
+  const handle24x7Toggle = (val) => {
+    setIs24x7(val);
+    if (val) {
+      setHours(h => h.map(d => ({ ...d, is24Hours: true, isClosed: false })));
+    }
+  };
+
   const handleSave = async () => {
     const result = await dispatch(updateOperatingHours({ operatingHours: hours, is24x7 }));
     if (!result.error) setToast({ msg: "Operating hours saved.", type: "success" });
@@ -863,11 +870,14 @@ const HoursSection = ({ dispatch }) => {
       <SectionHeader title="Operating Hours" subtitle="Define when your hospital is open. Patients see these before booking." icon={Clock} />
 
       <Card>
-        <div className="p-6 border-b border-[var(--base-300)] flex items-center justify-between gap-4">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50">Weekly Schedule</h3>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-[var(--base-content)]/60">24×7 Hospital</span>
-            <Toggle checked={is24x7} onChange={setIs24x7} />
+        <div className="p-6 border-b border-[var(--base-300)] flex items-start justify-between gap-4">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--base-content)]/50 mt-1">Weekly Schedule</h3>
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-[var(--base-content)]/80">24×7 Hospital</span>
+              <Toggle checked={is24x7} onChange={handle24x7Toggle} />
+            </div>
+            <span className="text-[10px] font-semibold text-[var(--primary)] mt-1.5 opacity-90">Auto-applies 24H to all days</span>
           </div>
         </div>
         <div className="p-6">

@@ -1,12 +1,20 @@
 import { createClient } from 'redis';
 import dotenv from 'dotenv';
+
 dotenv.config();
 
+// Ensure string is cleaned in case extra spaces exist
+const redisUrl = process.env.REDIS_URL?.trim() || 'redis://127.0.0.1:6379';
+
 const redisClient = createClient({
-  url: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
+  url: redisUrl,
   socket: {
     reconnectStrategy(retries) {
-      return Math.min(retries * 50, 5000);
+      if (retries > 10) {
+        console.error('❌ Redis: Maximum reconnection attempts reached.');
+        return new Error('Redis reconnect limit reached');
+      }
+      return Math.min(retries * 100, 3000);
     },
   },
   disableOfflineQueue: false,
@@ -36,7 +44,9 @@ export const redisHealthCheck = async () => {
   try {
     await redisClient.ping();
     return true;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 };
 
 export default redisClient;

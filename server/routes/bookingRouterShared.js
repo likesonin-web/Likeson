@@ -850,7 +850,17 @@ export const parseFrontendDateTime = (dateInput) => {
 };
 
 // Replace your existing checkDoctorAvailability with this optimized version:
-export const checkDoctorAvailability = async (doctorProfileId, scheduledAt) => {
+// FIX: consultationType / allowedSlotTypes were never checked here at all —
+// this function only ever validated day/time/capacity, so a video-only slot
+// would silently accept an inPerson booking. allowedSlotTypes (booking-type
+// driven, e.g. ['any','inPerson']) now filters which slots even qualify as
+// a match for this request. 'any' on the slot always qualifies.
+export const checkDoctorAvailability = async (
+  doctorProfileId,
+  scheduledAt,
+  consultationType = null,
+  allowedSlotTypes = null,
+) => {
   const doctor = await DoctorProfile.findById(doctorProfileId)
     .select("weeklyAvailability primaryHospital partnershipStatus isActive")
     .lean();
@@ -879,15 +889,39 @@ export const checkDoctorAvailability = async (doctorProfileId, scheduledAt) => {
   if (!dayEntry?.isAvailable)
     return { available: false, reason: `Unavailable on ${dayName}` };
 
-  const matchedSlot = dayEntry.slots?.find((s) => {
+  // FIX: resolve the set of acceptable slot.consultationType values.
+  // allowedSlotTypes (booking-type driven) wins when provided; otherwise
+  // fall back to ['any', consultationType] when only consultationType was
+  // given; otherwise accept only 'any' slots (no type filter possible).
+  const slotTypesAllowed =
+    allowedSlotTypes ?? (consultationType ? ["any", consultationType] : ["any"]);
+
+  const slotsAtTime = dayEntry.slots?.filter((s) => {
     if (!s.isActive) return false;
     const [sh, sm] = s.startTime.split(":").map(Number);
     const [eh, em] = s.endTime.split(":").map(Number);
     return reqMins >= sh * 60 + sm && reqMins < eh * 60 + em;
-  });
+  }) ?? [];
 
-  if (!matchedSlot)
+  if (!slotsAtTime.length)
     return { available: false, reason: `No slot at that time on ${dayName}` };
+
+  // FIX: among slots at this time, only ones whose type is 'any' or in
+  // slotTypesAllowed count. A video-only slot at the right time must NOT
+  // satisfy an inPerson (or unspecified) request, and vice versa.
+  const matchedSlot = slotsAtTime.find(
+    (s) => s.consultationType === "any" || slotTypesAllowed.includes(s.consultationType),
+  );
+
+  if (!matchedSlot) {
+    // There IS a slot at this time, just not the right type — give a
+    // precise reason instead of "no slot at that time".
+    const availableTypes = [...new Set(slotsAtTime.map((s) => s.consultationType))].join(", ");
+    return {
+      available: false,
+      reason: `No matching slot type at that time on ${dayName} (available: ${availableTypes})`,
+    };
+  }
 
   const [slotSh, slotSm] = matchedSlot.startTime.split(":").map(Number);
   const [slotEh, slotEm] = matchedSlot.endTime.split(":").map(Number);
@@ -982,6 +1016,8 @@ export const checkHospitalOrDoctorAvailability = async ({
   hospitalId,
   doctorId,
   scheduledAt,
+  consultationType = null,
+  allowedSlotTypes = null, // FIX: booking-type-driven slot-type filter, threaded through
 }) => {
   if (hospitalId) {
     const hospital = await Hospital.findById(hospitalId)
@@ -993,7 +1029,8 @@ export const checkHospitalOrDoctorAvailability = async ({
     const check = checkHospitalHours(hospital, scheduledAt);
     if (!check.available) return check;
   }
-  if (doctorId) return checkDoctorAvailability(doctorId, scheduledAt);
+  if (doctorId)
+    return checkDoctorAvailability(doctorId, scheduledAt, consultationType, allowedSlotTypes);
   return { available: true };
 };
 

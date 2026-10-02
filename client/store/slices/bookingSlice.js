@@ -122,9 +122,12 @@ export const fetchHospitalDoctors = mkThunk(
 
 export const checkHospitalAvailability = mkThunk(
   'booking/checkHospitalAvailability',
-  async ({ hospitalId, scheduledAt }) => {
+  // FIX: consultationType was never destructured or sent — the corrected
+  // backend controller hard-requires it now ("consultationType required"
+  // 400). Added to destructure + params.
+  async ({ hospitalId, scheduledAt, consultationType }) => {
     const { data } = await API.get(`${BASE}/hospitals/${hospitalId}/availability`, {
-      params: { scheduledAt },
+      params: { scheduledAt, consultationType },
     });
     return data.data;
   }
@@ -132,9 +135,11 @@ export const checkHospitalAvailability = mkThunk(
 
 export const checkDoctorAvailability = mkThunk(
   'booking/checkDoctorAvailability',
-  async ({ doctorId, scheduledAt, hospitalId }) => {
+  // FIX: same bug — consultationType arrived from the component but was
+  // dropped here since it wasn't in the destructured arg or params object.
+  async ({ doctorId, scheduledAt, hospitalId, consultationType }) => {
     const { data } = await API.get(`${BASE}/doctors/${doctorId}/availability`, {
-      params: { scheduledAt, hospitalId },
+      params: { scheduledAt, hospitalId, consultationType },
     });
     return data.data;
   }

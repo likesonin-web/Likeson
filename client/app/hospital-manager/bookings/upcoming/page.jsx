@@ -1,32 +1,17 @@
 'use client';
 
-/**
- * BookingsManagement.jsx — Likeson.in
- * Role: Hospital
- * Routes consumed:
- *   GET  /hospital/upcoming          → fetchHospitalUpcoming
- *   PATCH /:id/hospital/confirm      → hospitalConfirmBooking
- *   GET  /hospital/:id/ops           → fetchHospitalOps
- *   GET  /hospital/:id/valid-ops     → fetchHospitalValidOps
- *
- * Stack: Next.js · Redux (operationsSlice) · Tailwind (custom CSS vars)
- *        Lucide Icons · Framer Motion · Recharts
- */
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, AreaChart, Area,
+  PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import {
   CalendarDays, ClipboardList, CheckCircle2, Clock, ChevronRight,
-  Search, SlidersHorizontal, RefreshCw, Building2, UserCheck,
-  Stethoscope, ArrowUpRight, AlertCircle, X, ChevronDown,
-  ChevronLeft, TrendingUp, Activity, Users, FileText,
-  CheckCheck, Eye, Download, Loader2, MoreHorizontal,
-  Calendar, Phone, Badge, Star, Filter, XCircle,
+  Search, RefreshCw, Building2, UserCheck, Stethoscope, ArrowUpRight,
+  AlertCircle, X, ChevronLeft, TrendingUp, Activity, Users, FileText,
+  CheckCheck, Eye, Loader2, Badge, XCircle, BarChart2, PieChart as PieIcon,
 } from 'lucide-react';
 
 import {
@@ -40,26 +25,30 @@ import {
   selectHospitalValidOps,
   selectHospitalValidOpsMeta,
   selectLoading,
-  selectError,
 } from '@/store/slices/operationsSlice';
+import {
+  fetchHospitalProfile,
+  selectHospital,
+} from '@/store/slices/hospitalManagerSlice';
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'upcoming',   label: 'Upcoming',    icon: CalendarDays },
-  { id: 'ops',        label: 'All OPs',     icon: ClipboardList },
-  { id: 'valid-ops',  label: 'Follow-Up Eligible', icon: CheckCircle2 },
-  { id: 'analytics',  label: 'Analytics',   icon: TrendingUp },
+  { id: 'upcoming',   label: 'Upcoming',           icon: CalendarDays },
+  { id: 'ops',        label: 'All OPs',             icon: ClipboardList },
+  { id: 'valid-ops',  label: 'Follow-Up Eligible',  icon: CheckCircle2 },
+  { id: 'analytics',  label: 'Analytics',           icon: TrendingUp },
 ];
 
+// color key must match a `bg-{color}` / `text-{color}` utility already defined in global.css
 const STATUS_CONFIG = {
-  pending:     { label: 'Pending',     color: 'warning',  dot: '#f59e0b' },
-  confirmed:   { label: 'Confirmed',   color: 'success',  dot: '#10b981' },
-  in_progress: { label: 'In Progress', color: 'info',     dot: '#3b82f6' },
-  completed:   { label: 'Completed',   color: 'success',  dot: '#059669' },
-  cancelled:   { label: 'Cancelled',   color: 'error',    dot: '#ef4444' },
-  no_show:     { label: 'No Show',     color: 'error',    dot: '#dc2626' },
-  scheduled:   { label: 'Scheduled',   color: 'primary',  dot: 'var(--primary)' },
+  pending:     { label: 'Pending',     color: 'warning' },
+  confirmed:   { label: 'Confirmed',   color: 'success' },
+  in_progress: { label: 'In Progress', color: 'info' },
+  completed:   { label: 'Completed',   color: 'success' },
+  cancelled:   { label: 'Cancelled',   color: 'error' },
+  no_show:     { label: 'No Show',     color: 'error' },
+  scheduled:   { label: 'Scheduled',   color: 'primary' },
 };
 
 const BOOKING_TYPE_LABELS = {
@@ -77,6 +66,11 @@ const CONSULTATION_LABELS = {
 };
 
 const OP_STATUS_OPTIONS = ['', 'scheduled', 'in_progress', 'completed', 'cancelled', 'no_show'];
+
+const CHART_COLORS = [
+  'var(--primary)', 'var(--success)', 'var(--warning)',
+  'var(--error)', 'var(--info)', 'var(--accent)',
+];
 
 // ─── animation variants ───────────────────────────────────────────────────────
 
@@ -106,13 +100,25 @@ const daysLeft = (expiry) => {
   return Math.max(0, Math.ceil((new Date(expiry) - new Date()) / 86400000));
 };
 
+const chartTooltipStyle = {
+  contentStyle: {
+    backgroundColor: 'var(--base-200)',
+    border: '1px solid var(--base-300)',
+    borderRadius: '0.75rem',
+    color: 'var(--base-content)',
+    fontSize: '12px',
+    boxShadow: 'var(--shadow-depth)',
+  },
+  cursor: { fill: 'color-mix(in srgb, var(--primary), transparent 92%)' },
+};
+
 // ─── sub-components ───────────────────────────────────────────────────────────
 
 function StatusBadge({ status }) {
-  const cfg = STATUS_CONFIG[status] || { label: status, color: 'neutral', dot: '#888' };
+  const cfg = STATUS_CONFIG[status] || { label: status, color: 'info' };
   return (
     <span className={`badge badge-${cfg.color} gap-1.5`}>
-      <span className="status-dot" style={{ backgroundColor: cfg.dot }} />
+      <span className={`status-dot bg-${cfg.color}`} />
       {cfg.label}
     </span>
   );
@@ -145,18 +151,25 @@ function StatCard({ icon: Icon, label, value, sub, color = 'primary', index = 0 
       className="stat-card group cursor-default"
     >
       <div className="flex items-start justify-between mb-3">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: `color-mix(in srgb, var(--${color}), transparent 88%)` }}
-        >
-          <Icon size={18} style={{ color: `var(--${color})` }} />
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-${color}/10`}>
+          <Icon size={18} className={`text-${color}`} />
         </div>
         <ArrowUpRight size={14} className="text-base-content/30 group-hover:text-primary transition-colors" />
       </div>
-      <div className="stat-card-value" style={{ color: `var(--${color})` }}>{value}</div>
+      <div className={`stat-card-value text-${color}`}>{value}</div>
       <div className="stat-card-label">{label}</div>
       {sub && <p className="text-xs text-base-content/40 mt-1">{sub}</p>}
     </motion.div>
+  );
+}
+
+function SectionHeader({ icon: Icon, title, subtitle }) {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <Icon size={16} className="text-primary" />
+      <h3 className="font-bold text-sm text-base-content/70 uppercase tracking-wider">{title}</h3>
+      {subtitle && <span className="text-xs text-base-content/40 ml-1">{subtitle}</span>}
+    </div>
   );
 }
 
@@ -227,9 +240,8 @@ function BookingDetailModal({ booking, onClose, onConfirm, confirming }) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
       >
-        {/* backdrop */}
         <motion.div
-          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          className="absolute inset-0 bg-base-content/20 backdrop-blur-soft"
           onClick={onClose}
         />
         <motion.div
@@ -239,8 +251,7 @@ function BookingDetailModal({ booking, onClose, onConfirm, confirming }) {
           exit={{ scale: 0.92, opacity: 0, y: 24 }}
           transition={{ type: 'spring', stiffness: 300, damping: 28 }}
         >
-          {/* header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-base-300">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-base-300 bg-base-200">
             <div>
               <h2 className="text-lg font-bold text-base-content">{booking.bookingCode}</h2>
               <div className="flex gap-2 mt-1">
@@ -253,23 +264,19 @@ function BookingDetailModal({ booking, onClose, onConfirm, confirming }) {
             </button>
           </div>
 
-          {/* body */}
           <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin">
-            {/* patient */}
             <Section title="Patient" icon={Users}>
-              <Row label="Name"   value={booking.patientInfo?.name} />
-              <Row label="Age / Gender" value={`${booking.patientInfo?.age ?? '—'} · ${booking.patientInfo?.gender ?? '—'}`} />
-              <Row label="Phone"  value={booking.patientInfo?.phone || booking.customer?.phone} />
-              <Row label="Blood"  value={booking.patientInfo?.bloodGroup} />
+              <Row label="Name"          value={booking.patientInfo?.name} />
+              <Row label="Age / Gender"  value={`${booking.patientInfo?.age ?? '—'} · ${booking.patientInfo?.gender ?? '—'}`} />
+              <Row label="Phone"         value={booking.patientInfo?.phone || booking.customer?.phone} />
+              <Row label="Blood"         value={booking.patientInfo?.bloodGroup} />
             </Section>
 
-            {/* appointment */}
             <Section title="Appointment" icon={CalendarDays}>
               <Row label="Scheduled" value={fmt(booking.scheduledAt)} />
               <Row label="Type"      value={CONSULTATION_LABELS[booking.consultationType] || '—'} />
             </Section>
 
-            {/* doctor */}
             {(booking.doctor || booking.doctorSnapshot) && (
               <Section title="Doctor" icon={Stethoscope}>
                 <Row label="Name"  value={booking.doctorSnapshot?.name || booking.doctor?.user?.name} />
@@ -277,7 +284,6 @@ function BookingDetailModal({ booking, onClose, onConfirm, confirming }) {
               </Section>
             )}
 
-            {/* care assistant */}
             {booking.careAssistant && (
               <Section title="Care Assistant" icon={UserCheck}>
                 <Row label="Name"  value={booking.careAssistant?.fullName || booking.careAssistantSnapshot?.name} />
@@ -285,7 +291,6 @@ function BookingDetailModal({ booking, onClose, onConfirm, confirming }) {
               </Section>
             )}
 
-            {/* fare */}
             <Section title="Fare" icon={Badge}>
               <Row label="Consult Fee"   value={`₹${booking.fareBreakdown?.consultationFee ?? 0}`} />
               <Row label="Transport Fee" value={`₹${booking.fareBreakdown?.transportFee ?? 0}`} />
@@ -294,7 +299,6 @@ function BookingDetailModal({ booking, onClose, onConfirm, confirming }) {
             </Section>
           </div>
 
-          {/* footer */}
           <div className="px-6 py-4 border-t border-base-300 flex justify-end gap-3">
             <button className="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
             {booking.status === 'pending' && (
@@ -348,8 +352,9 @@ function UpcomingTab({ hospitalId }) {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    dispatch(fetchHospitalUpcoming());
-  }, [dispatch]);
+    if (!hospitalId) return;
+    dispatch(fetchHospitalUpcoming({ hospitalId }));
+  }, [dispatch, hospitalId]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return bookings;
@@ -363,15 +368,14 @@ function UpcomingTab({ hospitalId }) {
 
   const handleConfirm = async (bookingId) => {
     setConfirming(true);
-    await dispatch(hospitalConfirmBooking({ bookingId }));
+    await dispatch(hospitalConfirmBooking({ hospitalId, bookingId }));
     setConfirming(false);
     setSelected(null);
-    dispatch(fetchHospitalUpcoming());
+    if (hospitalId) dispatch(fetchHospitalUpcoming({ hospitalId }));
   };
 
   return (
     <div className="space-y-4">
-      {/* search bar */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" />
@@ -382,14 +386,17 @@ function UpcomingTab({ hospitalId }) {
             onChange={e => setSearch(e.target.value)}
           />
           {search && (
-            <button className="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content" onClick={() => setSearch('')}>
+            <button
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content"
+              onClick={() => setSearch('')}
+            >
               <X size={12} />
             </button>
           )}
         </div>
         <button
           className="btn btn-ghost btn-sm"
-          onClick={() => dispatch(fetchHospitalUpcoming())}
+          onClick={() => hospitalId && dispatch(fetchHospitalUpcoming({ hospitalId }))}
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
@@ -412,7 +419,6 @@ function UpcomingTab({ hospitalId }) {
               onClick={() => setSelected(booking)}
             >
               <div className="flex items-start justify-between gap-4">
-                {/* left */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1.5">
                     <span className="font-bold text-sm text-base-content font-mono">{booking.bookingCode}</span>
@@ -439,7 +445,6 @@ function UpcomingTab({ hospitalId }) {
                   </div>
                 </div>
 
-                {/* right */}
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   <span className="text-sm font-bold text-primary">
                     ₹{booking.fareBreakdown?.totalAmount ?? 0}
@@ -504,7 +509,6 @@ function OpsTab({ hospitalId }) {
 
   return (
     <div className="space-y-4">
-      {/* filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" />
@@ -547,7 +551,7 @@ function OpsTab({ hospitalId }) {
       ) : (
         <>
           <div className="overflow-x-auto rounded-xl border border-base-300">
-            <table className="table text-sm">
+            <table className="table">
               <thead>
                 <tr>
                   <th>OP #</th>
@@ -596,14 +600,13 @@ function OpsTab({ hospitalId }) {
         </>
       )}
 
-      {/* OP detail mini-modal */}
       <AnimatePresence>
         {selected && (
           <motion.div
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           >
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSelected(null)} />
+            <div className="absolute inset-0 bg-base-content/20 backdrop-blur-soft" onClick={() => setSelected(null)} />
             <motion.div
               className="relative w-full max-w-md bg-base-100 rounded-2xl shadow-depth-lg overflow-hidden"
               initial={{ scale: 0.92, y: 24, opacity: 0 }}
@@ -611,7 +614,7 @@ function OpsTab({ hospitalId }) {
               exit={{ scale: 0.92, y: 24, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 28 }}
             >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-base-300">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-base-300 bg-base-200">
                 <div>
                   <span className="font-bold font-mono text-primary">{selected.opNumber}</span>
                   <div className="flex gap-2 mt-1">
@@ -738,10 +741,7 @@ function ValidOpsTab({ hospitalId }) {
 
 // ─── ANALYTICS TAB ───────────────────────────────────────────────────────────
 
-const COLORS = ['var(--primary)', 'var(--success)', 'var(--warning)', 'var(--error)', 'var(--info)', 'var(--accent)'];
-
 function AnalyticsTab({ upcoming, ops }) {
-  // derive charts from real data
   const statusDist = useMemo(() => {
     const map = {};
     [...upcoming, ...ops].forEach(b => {
@@ -772,7 +772,7 @@ function AnalyticsTab({ upcoming, ops }) {
   const revenueByType = useMemo(() => {
     const map = {};
     ops.forEach(op => {
-      const t = BOOKING_TYPE_LABELS[op.booking?.bookingType] || 'Other';
+      const t = CONSULTATION_LABELS[op.consultationType] || 'Other';
       map[t] = (map[t] || 0) + (op.consultationFee || 0);
     });
     return Object.entries(map).map(([name, revenue]) => ({ name, revenue }));
@@ -784,41 +784,28 @@ function AnalyticsTab({ upcoming, ops }) {
   const completedOps  = useMemo(() => ops.filter(o => o.status === 'completed').length, [ops]);
   const followUpReady = useMemo(() => upcoming.filter(b => b.status === 'pending').length, [upcoming]);
 
-  const tooltipStyle = {
-    contentStyle: {
-      backgroundColor: 'var(--base-200)',
-      border: '1px solid var(--base-300)',
-      borderRadius: '0.75rem',
-      color: 'var(--base-content)',
-      fontSize: '12px',
-    },
-  };
-
   return (
     <div className="space-y-6">
-      {/* stat row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={CalendarDays} label="Upcoming" value={upcoming.length} color="primary" index={0} />
-        <StatCard icon={CheckCircle2} label="Completed OPs" value={completedOps} color="success" index={1} />
-        <StatCard icon={Clock}        label="Pending Confirm" value={followUpReady} color="warning" index={2} />
-        <StatCard icon={Activity}     label="Total Revenue" value={`₹${totalRevenue.toLocaleString('en-IN')}`} color="accent" index={3} />
+        <StatCard icon={CalendarDays} label="Upcoming"        value={upcoming.length} color="primary" index={0} />
+        <StatCard icon={CheckCircle2} label="Completed OPs"   value={completedOps}    color="success" index={1} />
+        <StatCard icon={Clock}        label="Pending Confirm" value={followUpReady}   color="warning" index={2} />
+        <StatCard icon={Activity}     label="Total Revenue"   value={`₹${totalRevenue.toLocaleString('en-IN')}`} color="accent" index={3} />
       </div>
 
-      {/* charts row 1 */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* status pie */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={0} className="card p-5">
-          <h3 className="font-bold text-sm text-base-content/70 mb-4 uppercase tracking-wider">Status Distribution</h3>
+          <SectionHeader icon={PieIcon} title="Status Distribution" />
           {statusDist.length ? (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie data={statusDist} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value">
                   {statusDist.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} strokeWidth={0} />
+                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={0} />
                   ))}
                 </Pie>
-                <Tooltip {...tooltipStyle} />
-                <Legend wrapperStyle={{ fontSize: '11px', color: 'var(--base-content)' }} />
+                <Tooltip {...chartTooltipStyle} />
+                <Legend iconSize={8} wrapperStyle={{ fontSize: '11px', color: 'var(--base-content)' }} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -826,39 +813,41 @@ function AnalyticsTab({ upcoming, ops }) {
           )}
         </motion.div>
 
-        {/* type bar */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={1} className="card p-5">
-          <h3 className="font-bold text-sm text-base-content/70 mb-4 uppercase tracking-wider">Upcoming by Type</h3>
+          <SectionHeader icon={BarChart2} title="Upcoming by Type" />
           {typeDist.length ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={typeDist} barCategoryGap="30%">
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--base-300)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--base-content)', opacity: 0.55 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: 'var(--base-content)', opacity: 0.55 }} axisLine={false} tickLine={false} />
-                <Tooltip {...tooltipStyle} />
+                <Tooltip {...chartTooltipStyle} />
                 <Bar dataKey="value" name="Count" radius={[6, 6, 0, 0]}>
-                  {typeDist.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  {typeDist.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <EmptyState icon={BarChart} title="No data" sub="Upcoming bookings will appear here." />
+            <EmptyState icon={BarChart2} title="No data" sub="Upcoming bookings will appear here." />
           )}
         </motion.div>
       </div>
 
-      {/* charts row 2 */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* consult type */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={2} className="card p-5">
-          <h3 className="font-bold text-sm text-base-content/70 mb-4 uppercase tracking-wider">By Consultation Mode</h3>
+          <SectionHeader icon={PieIcon} title="By Consultation Mode" />
           {consultDist.length ? (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={consultDist} cx="50%" cy="50%" outerRadius={80} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
-                  {consultDist.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} strokeWidth={0} />)}
+                <Pie
+                  data={consultDist}
+                  cx="50%" cy="50%" outerRadius={80} paddingAngle={4} dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
+                >
+                  {consultDist.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={0} />)}
                 </Pie>
-                <Tooltip {...tooltipStyle} />
+                <Tooltip {...chartTooltipStyle} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -866,16 +855,15 @@ function AnalyticsTab({ upcoming, ops }) {
           )}
         </motion.div>
 
-        {/* revenue */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={3} className="card p-5">
-          <h3 className="font-bold text-sm text-base-content/70 mb-4 uppercase tracking-wider">Revenue by Booking Type</h3>
+          <SectionHeader icon={TrendingUp} title="Revenue by Consultation Mode" />
           {revenueByType.length ? (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={revenueByType} barCategoryGap="30%">
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--base-300)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--base-content)', opacity: 0.55 }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={v => `₹${v}`} tick={{ fontSize: 10, fill: 'var(--base-content)', opacity: 0.55 }} axisLine={false} tickLine={false} />
-                <Tooltip {...tooltipStyle} formatter={v => [`₹${v}`, 'Revenue']} />
+                <Tooltip {...chartTooltipStyle} formatter={v => [`₹${v}`, 'Revenue']} />
                 <Bar dataKey="revenue" radius={[6, 6, 0, 0]} fill="var(--primary)" />
               </BarChart>
             </ResponsiveContainer>
@@ -891,34 +879,37 @@ function AnalyticsTab({ upcoming, ops }) {
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function BookingsManagement() {
-  const dispatch   = useDispatch();
+  const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState('upcoming');
 
-// hospital id from auth — adapt to your auth selector
   const [hospitalId, setHospitalId] = useState(null);
+  const hospital = useSelector(selectHospital);
+
   useEffect(() => {
-    // real impl: const id = useSelector(selectCurrentHospitalId)
-    // mocking so page doesn't crash without auth
-    // FIX: Replaced 'demo-hospital-id' with a valid 24-character hex string 
-    // to pass MongoDB ObjectId validation on the backend.
-    if (typeof window !== 'undefined') {
-      setHospitalId(localStorage.getItem('hospitalId') || '507f1f77bcf86cd799439011');
-    }
-  }, []);
+    dispatch(fetchHospitalProfile());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (hospital?._id) setHospitalId(hospital._id);
+  }, [hospital]);
 
   const upcoming = useSelector(selectHospitalUpcoming);
   const ops      = useSelector(selectHospitalOps);
 
-  // summary counts
-  const pendingCount   = useMemo(() => upcoming.filter(b => b.status === 'pending').length, [upcoming]);
-  const confirmedCount = useMemo(() => upcoming.filter(b => b.status === 'confirmed').length, [upcoming]);
+  const pendingCount    = useMemo(() => upcoming.filter(b => b.status === 'pending').length, [upcoming]);
+  const confirmedCount  = useMemo(() => upcoming.filter(b => b.status === 'confirmed').length, [upcoming]);
   const inProgressCount = useMemo(() => upcoming.filter(b => b.status === 'in_progress').length, [upcoming]);
+
+  const quickCounts = [
+    { label: 'Pending',     count: pendingCount,    color: 'warning' },
+    { label: 'Confirmed',   count: confirmedCount,  color: 'success' },
+    { label: 'In Progress', count: inProgressCount, color: 'info' },
+  ];
 
   return (
     <div data-theme="hospital" className="min-h-screen bg-base-100">
-      <div className="max-w-7xl mx-auto px-4  py-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-        {/* ── Page header ── */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-black text-base-content tracking-tight flex items-center gap-2">
@@ -928,23 +919,17 @@ export default function BookingsManagement() {
             <p className="text-sm text-base-content/50 mt-0.5">Hospital operations · appointments · OP records</p>
           </div>
 
-          {/* quick counts */}
           <div className="flex items-center gap-3">
-            {[
-              { label: 'Pending',     count: pendingCount,   color: 'warning' },
-              { label: 'Confirmed',   count: confirmedCount, color: 'success' },
-              { label: 'In Progress', count: inProgressCount, color: 'info' },
-            ].map(({ label, count, color }) => (
+            {quickCounts.map(({ label, count, color }) => (
               <div key={label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-base-300 bg-base-200">
-                <span className="status-dot" style={{ backgroundColor: `var(--${color})` }} />
+                <span className={`status-dot bg-${color}`} />
                 <span className="text-xs font-bold text-base-content/70">{label}</span>
-                <span className="text-xs font-black" style={{ color: `var(--${color})` }}>{count}</span>
+                <span className={`text-xs font-black text-${color}`}>{count}</span>
               </div>
             ))}
           </div>
         </motion.div>
 
-        {/* ── Tabs ── */}
         <motion.div variants={slideIn} initial="hidden" animate="visible">
           <div className="flex gap-1 p-1 bg-base-200 rounded-xl w-fit overflow-x-auto">
             {TABS.map(({ id, label, icon: Icon }) => (
@@ -954,7 +939,7 @@ export default function BookingsManagement() {
                 className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
                   activeTab === id
                     ? 'bg-base-100 text-primary shadow-sm'
-                    : 'text-base-content/60 hover:text-base-content hover:bg-base-300/50'
+                    : 'text-base-content/60 hover:text-base-content hover:bg-base-300/60'
                 }`}
               >
                 <Icon size={14} />
@@ -969,7 +954,6 @@ export default function BookingsManagement() {
           </div>
         </motion.div>
 
-        {/* ── Tab content ── */}
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}

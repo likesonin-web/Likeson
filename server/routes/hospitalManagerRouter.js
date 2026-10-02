@@ -7,7 +7,7 @@
 import express from 'express';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 import * as ctrl from '../controllers/hospitalManager.controller.js';
-import upload from '../middleware/upload.js';
+import upload from '../middleware/imagekitupload.js';
 
 const router = express.Router();
 
@@ -50,6 +50,12 @@ router.get('/settings/account', ctrl.getSettingsAccount);
 router.patch('/settings/account', ctrl.patchSettingsAccount);
 router.post('/settings/avatar', upload.single('avatar'), ctrl.postSettingsAvatar);
 router.get('/imagekit-auth', ctrl.getImagekitAuth);
+
+// Doctor: respond to a booking request
+router.put('/doctors/bookings/:bookingId/respond', ctrl.putDoctorsBookingsByBookingIdRespond);
+
+// Hospital manager: all linked doctors' consultations (price + follow-up)
+router.get('/consultations', ctrl.getConsultations);
 
 // Centralised error handler — must be last
 router.use(ctrl.errorHandler);

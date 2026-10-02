@@ -304,6 +304,49 @@ export const fetchDoctorStats = createAsyncThunk(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// §5b  DOCTOR: ACCEPT / REJECT BOOKING
+// (doctor-facing route, lives on hospital-manager router but not gated
+// by hospital-only auth in practice — see backend note on router split)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** PUT /hospital-manager/doctors/bookings/:bookingId/respond  Body: { action: 'accept'|'reject', reason? } */
+export const respondToBooking = createAsyncThunk(
+  'hospitalManager/respondToBooking',
+  async ({ bookingId, action, reason }, { rejectWithValue }) => {
+    try {
+      const { data } = await API.put(
+        `/hospital-manager/doctors/bookings/${bookingId}/respond`,
+        { action, reason }
+      );
+      return data.data; // { bookingId, status }
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §13  CONSULTATIONS (all linked doctors — price + follow-up)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** GET /hospital-manager/consultations  params: { page?, limit?, doctorId?, status? } */
+export const fetchConsultations = createAsyncThunk(
+  'hospitalManager/fetchConsultations',
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { data } = await API.get('/hospital-manager/consultations', { params });
+      return {
+        consultations: data.data,
+        hospitalConsultationPricing: data.hospitalConsultationPricing,
+        pagination: data.pagination,
+      };
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // §6  REGISTRATION / LEGAL
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -573,7 +616,15 @@ const initialState = {
   selectedDoctor:     null,
   searchResults:      [],
   doctorStats:        null,
-  doctorAvailability: null,
+doctorAvailability: null,
+
+  // §5b Booking response
+  respondingBookingId: null,
+
+  // §13 Consultations
+  consultations:           [],
+  consultationsPagination: {},
+  consultationsPricing:    null, // hospitalConsultationPricing snapshot
 
   // §7 Onboarding
   onboarding: null,
@@ -879,7 +930,7 @@ const hospitalManagerSlice = createSlice({
         state.doctorAvailability = action.payload;
       });
 
-    builder
+builder
       .addCase(fetchDoctorStats.pending,   setPending)
       .addCase(fetchDoctorStats.rejected,  (state, action) => {
         setRejected(state, action);
@@ -888,6 +939,43 @@ const hospitalManagerSlice = createSlice({
       .addCase(fetchDoctorStats.fulfilled, (state, action) => {
         clearLoad(state, action);
         state.doctorStats = action.payload;
+      });
+
+    // ── §5b Doctor: respond to booking ─────────────────────────────────────
+
+    builder
+      .addCase(respondToBooking.pending, (state, action) => {
+        state.respondingBookingId = action.meta.arg.bookingId;
+        setPending(state, action);
+      })
+      .addCase(respondToBooking.rejected, (state, action) => {
+        state.respondingBookingId = null;
+        setRejected(state, action);
+        toast.error(action.payload);
+      })
+      .addCase(respondToBooking.fulfilled, (state, action) => {
+        state.respondingBookingId = null;
+        clearLoad(state, action);
+        const { bookingId, status } = action.payload;
+        state.consultations = state.consultations.map((c) =>
+          c._id === bookingId ? { ...c, status } : c
+        );
+        toast.success(status === 'confirmed' ? 'Booking accepted.' : 'Booking rejected.');
+      });
+
+    // ── §13 Consultations ────────────────────────────────────────────────────
+
+    builder
+      .addCase(fetchConsultations.pending,   setPending)
+      .addCase(fetchConsultations.rejected,  (state, action) => {
+        setRejected(state, action);
+        toast.error(action.payload);
+      })
+      .addCase(fetchConsultations.fulfilled, (state, action) => {
+        clearLoad(state, action);
+        state.consultations           = action.payload.consultations;
+        state.consultationsPagination = action.payload.pagination;
+        state.consultationsPricing    = action.payload.hospitalConsultationPricing;
       });
 
     // ── §6 Registration ──────────────────────────────────────────────────────
@@ -1130,6 +1218,10 @@ export const selectSelectedDoctor          = (s) => s.hospitalManager.selectedDo
 export const selectSearchResults           = (s) => s.hospitalManager.searchResults;
 export const selectDoctorStats             = (s) => s.hospitalManager.doctorStats;
 export const selectDoctorAvailability      = (s) => s.hospitalManager.doctorAvailability;
+export const selectRespondingBookingId     = (s) => s.hospitalManager.respondingBookingId;
+export const selectConsultations           = (s) => s.hospitalManager.consultations;
+export const selectConsultationsPagination = (s) => s.hospitalManager.consultationsPagination;
+export const selectConsultationsPricing    = (s) => s.hospitalManager.consultationsPricing;
 export const selectOnboarding              = (s) => s.hospitalManager.onboarding;
 export const selectNotifications           = (s) => s.hospitalManager.notifications;
 export const selectNotificationsPagination = (s) => s.hospitalManager.notificationsPagination;
