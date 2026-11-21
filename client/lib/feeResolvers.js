@@ -1,4 +1,4 @@
-import { IN_PERSON_ONLY_PLAN_TIERS } from "./constants";
+import { IN_PERSON_ONLY_PLAN_TIERS } from "./constants.js";
 
 /**
  * resolveConsultFee
