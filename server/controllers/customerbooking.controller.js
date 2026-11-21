@@ -2349,6 +2349,16 @@ export const postPatientTransport = asyncHandler(async (req, res) => {
         taxPercent: config?.tax?.transportGstPercent ?? 5,
       });
 
+      let appliedBookingCoupon = null;
+      if (couponCode) {
+        appliedBookingCoupon = await applyBookingCoupon({
+          couponCode,
+          userId: req.user._id,
+          fareBreakdown,
+        });
+        fareBreakdown.amountPaid = fareBreakdown.totalAmount;
+      }
+
       // FIX: wallet check BEFORE Booking.create.
       if (paymentMethod === "Wallet") {
         try {
@@ -2403,6 +2413,12 @@ export const postPatientTransport = asyncHandler(async (req, res) => {
         subscriptionUsagePending: [],
         confirmedSubscriptionUsage: [],
       });
+
+      if (appliedBookingCoupon) {
+        await PromotionCoupon.findByIdAndUpdate(appliedBookingCoupon._id, {
+          $inc: { 'usage.currentUses': 1 }
+        }).catch(() => null);
+      }
 
       if (
         addConsultation &&
@@ -2633,6 +2649,7 @@ export const postPhysiotherapist = asyncHandler(async (req, res) => {
         slotId,
         documents = [],
         paymentMethod = "Razorpay",
+        couponCode,
       } = req.body;
       if (!doctorId || !scheduledAt || !patientInfo)
         return res.status(400).json({
@@ -2676,6 +2693,16 @@ export const postPhysiotherapist = asyncHandler(async (req, res) => {
         taxPercent: config?.tax?.consultationGstPercent ?? 0,
       });
 
+      let appliedBookingCoupon = null;
+      if (couponCode) {
+        appliedBookingCoupon = await applyBookingCoupon({
+          couponCode,
+          userId: req.user._id,
+          fareBreakdown,
+        });
+        fareBreakdown.amountPaid = fareBreakdown.totalAmount;
+      }
+
       // FIX: wallet check BEFORE Booking.create.
       if (paymentMethod === "Wallet") {
         try {
@@ -2706,11 +2733,18 @@ export const postPhysiotherapist = asyncHandler(async (req, res) => {
         pricingSource: pricingSource === "doctor" ? "doctor" : "platform",
         paymentStatus: "unpaid",
         payments: [],
+        couponCode: couponCode || undefined,
         status: initialStatus,
         createdBy: req.user._id,
         subscriptionUsagePending: [],
         confirmedSubscriptionUsage: [],
       });
+
+      if (appliedBookingCoupon) {
+        await PromotionCoupon.findByIdAndUpdate(appliedBookingCoupon._id, {
+          $inc: { 'usage.currentUses': 1 }
+        }).catch(() => null);
+      }
 
       let razorpayOrder = null;
       let walletResult = null;
@@ -2794,6 +2828,7 @@ export const postFollowUp = asyncHandler(async (req, res) => {
       consultationType = "inPerson",
       slotId,
       paymentMethod = "Razorpay",
+      couponCode,
     } = req.body;
 
     if (!doctorId || !scheduledAt || !patientInfo)
@@ -2886,6 +2921,16 @@ export const postFollowUp = asyncHandler(async (req, res) => {
       taxPercent: config?.tax?.consultationGstPercent ?? 0,
     });
 
+    let appliedBookingCoupon = null;
+    if (couponCode) {
+      appliedBookingCoupon = await applyBookingCoupon({
+        couponCode,
+        userId: req.user._id,
+        fareBreakdown,
+      });
+      fareBreakdown.amountPaid = fareBreakdown.totalAmount;
+    }
+
     // FIX: wallet check BEFORE Booking.create.
     if (paymentMethod === "Wallet") {
       try {
@@ -2918,11 +2963,18 @@ export const postFollowUp = asyncHandler(async (req, res) => {
       pricingSource: "doctor",
       paymentStatus: "unpaid",
       payments: [],
+      couponCode: couponCode || undefined,
       status: initialStatus,
       createdBy: req.user._id,
       subscriptionUsagePending: [],
       confirmedSubscriptionUsage: [],
     });
+
+    if (appliedBookingCoupon) {
+      await PromotionCoupon.findByIdAndUpdate(appliedBookingCoupon._id, {
+        $inc: { 'usage.currentUses': 1 }
+      }).catch(() => null);
+    }
 
     let razorpayOrder = null;
     let walletResult = null;
@@ -3034,6 +3086,7 @@ export const postDiagnosticCenter = asyncHandler(async (req, res) => {
         patientInfo,
         reportDeliveryMode = "Digital (App)",
         paymentMethod = "Razorpay",
+        couponCode,
       } = req.body;
 
       if (
@@ -3121,6 +3174,16 @@ export const postDiagnosticCenter = asyncHandler(async (req, res) => {
         taxPercent: config?.tax?.diagnosticsGstPercent ?? 5,
       });
 
+      let appliedBookingCoupon = null;
+      if (couponCode) {
+        appliedBookingCoupon = await applyBookingCoupon({
+          couponCode,
+          userId: req.user._id,
+          fareBreakdown,
+        });
+        fareBreakdown.amountPaid = fareBreakdown.totalAmount;
+      }
+
       // FIX: wallet check BEFORE Booking.create.
       if (paymentMethod === "Wallet") {
         try {
@@ -3162,11 +3225,18 @@ export const postDiagnosticCenter = asyncHandler(async (req, res) => {
         pricingSource: "platform",
         paymentStatus: "unpaid",
         payments: [],
+        couponCode: couponCode || undefined,
         status: initialStatus,
         createdBy: req.user._id,
         subscriptionUsagePending: [],
         confirmedSubscriptionUsage: [],
       });
+
+      if (appliedBookingCoupon) {
+        await PromotionCoupon.findByIdAndUpdate(appliedBookingCoupon._id, {
+          $inc: { 'usage.currentUses': 1 }
+        }).catch(() => null);
+      }
 
       let razorpayOrder = null;
       let walletResult = null;
@@ -3442,12 +3512,19 @@ export const postDiagnosticHome = asyncHandler(async (req, res) => {
         pricingSource: "platform",
         paymentStatus: "unpaid",
         payments: [],
+        couponCode: couponCode || undefined,
         status: initialStatus,
         internalNotes: homeCollectionNote,
         createdBy: req.user._id,
         subscriptionUsagePending: [],
         confirmedSubscriptionUsage: [],
       });
+
+      if (appliedBookingCoupon) {
+        await PromotionCoupon.findByIdAndUpdate(appliedBookingCoupon._id, {
+          $inc: { 'usage.currentUses': 1 }
+        }).catch(() => null);
+      }
 
       let razorpayOrder = null;
       let walletResult = null;
@@ -3578,6 +3655,7 @@ export const postCareAssistant = asyncHandler(async (req, res) => {
         scheduledAt,
         durationHours = 4,
         paymentMethod = "Razorpay",
+        couponCode,
       } = req.body;
       if (!patientInfo || !patientLocation?.coordinates || !scheduledAt) {
         return res.status(400).json({
@@ -3609,6 +3687,16 @@ export const postCareAssistant = asyncHandler(async (req, res) => {
         diagnosticGst: 0,
         homeCollectionGst: 0,
       };
+
+      let appliedBookingCoupon = null;
+      if (couponCode) {
+        appliedBookingCoupon = await applyBookingCoupon({
+          couponCode,
+          userId: req.user._id,
+          fareBreakdown,
+        });
+        fareBreakdown.amountPaid = fareBreakdown.totalAmount;
+      }
 
       // FIX: wallet check BEFORE Booking.create.
       if (paymentMethod === "Wallet") {
@@ -3653,6 +3741,7 @@ export const postCareAssistant = asyncHandler(async (req, res) => {
           : "platform",
         paymentStatus: "unpaid",
         payments: [],
+        couponCode: couponCode || undefined,
         status: initialStatus,
 
         createdBy: req.user._id,
@@ -3660,6 +3749,12 @@ export const postCareAssistant = asyncHandler(async (req, res) => {
         subscriptionUsagePending: [],
         confirmedSubscriptionUsage: [],
       });
+
+      if (appliedBookingCoupon) {
+        await PromotionCoupon.findByIdAndUpdate(appliedBookingCoupon._id, {
+          $inc: { 'usage.currentUses': 1 }
+        }).catch(() => null);
+      }
 
       if (
         careResult.isCoveredBySubscription &&
