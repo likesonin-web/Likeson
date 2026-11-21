@@ -761,12 +761,18 @@ const BuyNowModal = ({
         }
 
         const r = await dispatch(placeDirectOrder(payload)).unwrap();
+        if (r.order?.billing?.totalPayable <= 0 || r.isFree) {
+          toast.success("Order placed successfully!");
+          onSuccess(r.order ?? r);
+          return;
+        }
+
         let payResp;
         try {
           payResp = await openRazorpayModal({
-            rzpKey: RZP_KEY_PUBLIC,
-            rzpOrderId: r.order.payment.razorpayOrderId,
-            amount: r.order.billing.totalPayable,
+            rzpKey: r.razorpayKey || RZP_KEY_PUBLIC,
+            rzpOrderId: r.order?.payment?.razorpayOrderId,
+            amount: r.order?.billing?.totalPayable,
             description: `${med.brandName} × ${quantity}`,
           });
         } catch (err) {

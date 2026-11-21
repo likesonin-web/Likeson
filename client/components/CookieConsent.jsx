@@ -391,7 +391,7 @@ export default function CookieConsentPage() {
               </p>
               <div className="flex items-center gap-4 mt-3">
                 <Link
-                  href="/privacy-policy"
+                  href="/privacy"
                   className="text-[11px] font-bold flex items-center gap-1 text-primary hover:underline"
                 >
                   <ExternalLink size={11} aria-hidden="true" />

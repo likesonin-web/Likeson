@@ -1425,7 +1425,7 @@ export default function SystemLogManagement() {
         className="flex flex-wrap items-center justify-between gap-[14px] mb-[28px]">
         <div>
           <div className="flex items-center gap-[6px] mb-[4px]">
-            <Link href="/admin" className="text-[12px] opacity-45 no-underline">Admin</Link>
+            <Link href="/admin/dashboard" className="text-[12px] opacity-45 no-underline">Admin</Link>
             <ChevronRight size={12} className="opacity-30" />
             <span className="text-[12px] font-bold text-primary">System Logs</span>
           </div>

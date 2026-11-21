@@ -1630,7 +1630,7 @@ export default function SystemLogManagement() {
         style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 28 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-            <Link href="/admin" style={{ fontSize: 12, opacity: 0.45, textDecoration: "none" }}>Admin</Link>
+            <Link href="/super-admin/dashboard" style={{ fontSize: 12, opacity: 0.45, textDecoration: "none" }}>Admin</Link>
             <ChevronRight size={12} style={{ opacity: 0.3 }} />
             <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary,#6366f1)" }}>System Logs</span>
           </div>

@@ -251,7 +251,7 @@ export default function UserManagement() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Link href="/admin/users/employees"
+          <Link href="/admin/employees"
             className="btn-secondary flex items-center gap-2 !px-4 !py-2.5">
             <Shield size={15} />Employees
           </Link>

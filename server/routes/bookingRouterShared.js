@@ -2217,7 +2217,12 @@ export const createRazorpayOrder = async (
     receipt: bookingCode,
     notes: { bookingCode, ...notes },
   });
-  return { orderId: order.id, amount: amountInRupees, currency: "INR" };
+  return {
+    orderId: order.id,
+    amount: amountInRupees,
+    currency: "INR",
+    key_id: process.env.RAZORPAY_KEY_ID,
+  };
 };
 
 export const verifyRazorpaySignature = (orderId, paymentId, signature) => {

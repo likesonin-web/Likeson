@@ -1541,8 +1541,8 @@ if (rideId)    { tasks.push(dispatch(fetchRideTracking({ rideId }))); tasks.push
     map.addListener('zoom_changed', () => { if (mountedRef.current) setMapZoom(map.getZoom()); });
   }, []);
 
-  const handleBack   = useCallback(() => { if (window.history?.length > 1) router.back(); else router.push('/bookings'); }, [router]);
-  const handleRate   = useCallback(() => router.push(bookingId ? `/bookings/${bookingId}/rate` : '/bookings'), [router, bookingId]);
+  const handleBack   = useCallback(() => { if (window.history?.length > 1) router.back(); else router.push('/my-bookings'); }, [router]);
+  const handleRate   = useCallback(() => router.push(bookingId ? `/my-bookings/${bookingId}` : '/my-bookings'), [router, bookingId]);
 
   const handleRecenter = useCallback(() => {
     setFollowDriver(true);

@@ -194,7 +194,7 @@ function useWalletOps() {
         const result = await dispatch(initializeWalletTopup({ amount })).unwrap();
         const { rzpOrder } = result;
         const options = {
-          key:         RAZORPAY_KEY_ID,
+          key:         result?.razorpayKey || rzpOrder?.razorpayKey || RAZORPAY_KEY_ID,
           amount:      rzpOrder.amount,
           currency:    rzpOrder.currency,
           name:        'Likeson Healthcare',

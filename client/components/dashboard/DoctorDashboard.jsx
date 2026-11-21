@@ -544,7 +544,7 @@ useEffect(() => {
             </button>
 
             {/* Notifications */}
-            <Link href="/doctor/notifications">
+            <Link href="/notifications">
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

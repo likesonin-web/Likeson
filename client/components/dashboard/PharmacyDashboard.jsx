@@ -387,7 +387,7 @@ const PharmacyDashboard = ({ children }) => {
                   <Pill size={16} className="text-primary-content" />
                 </div>
                 <div>
-                  <Link href="/pharmacy-store">
+                  <Link href="/pharmacy-store/dashboard">
                     <span className="font-black text-sm tracking-tight text-base-content">
                       LIKESON
                     </span>
@@ -633,7 +633,7 @@ const PharmacyDashboard = ({ children }) => {
 
           {/* Breadcrumb */}
           <nav className="mb-5 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-base-content/25">
-            <Link href="/pharmacy-store" className="hover:text-primary transition-colors">
+            <Link href="/pharmacy-store/dashboard" className="hover:text-primary transition-colors">
               Pharmacy
             </Link>
             <ChevronRight size={11} />

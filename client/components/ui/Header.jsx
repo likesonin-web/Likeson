@@ -317,7 +317,7 @@ const ROLE_BOTTOM_NAV = {
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Users", href: "/admin/users", icon: UserCog },
     { name: "Reports", href: "/admin/reports", icon: Activity },
-    { name: "Finances", href: "/admin/finance", icon: BadgeDollarSign },
+    { name: "Finances", href: "/super-admin/invoices", icon: BadgeDollarSign },
   ],
   admin: [
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -327,17 +327,17 @@ const ROLE_BOTTOM_NAV = {
   doctor: [
     { name: "Dashboard", href: "/doctor/dashboard", icon: LayoutDashboard },
     { name: "Appointments", href: "/doctor/appointments", icon: Calendar },
-    { name: "Patients", href: "/doctor/patients", icon: UserRound },
+    { name: "Patients", href: "/doctor/op-records", icon: UserRound },
   ],
   transportpartner: [
-    { name: "Dashboard", href: "/transport/dashboard", icon: LayoutDashboard },
-    { name: "Fleet", href: "/transport/fleet", icon: Truck },
-    { name: "Earnings", href: "/transport/earnings", icon: BadgeDollarSign },
+    { name: "Dashboard", href: "/transport-partner/dashboard", icon: LayoutDashboard },
+    { name: "Fleet", href: "/transport-partner/fleet/vehicles", icon: Truck },
+    { name: "Earnings", href: "/transport-partner/bank/settlement", icon: BadgeDollarSign },
   ],
   driver: [
     { name: "Dashboard", href: "/driver/dashboard", icon: LayoutDashboard },
-    { name: "Trips", href: "/driver/trips", icon: Navigation },
-    { name: "Earnings", href: "/driver/earnings", icon: BadgeDollarSign },
+    { name: "Trips", href: "/driver/bookings", icon: Navigation },
+    { name: "Earnings", href: "/driver/bank", icon: BadgeDollarSign },
   ],
   solodriverpartner: [
     { name: "Home", href: "/partner/solo/dashboard", icon: LayoutDashboard },
@@ -351,9 +351,9 @@ const ROLE_BOTTOM_NAV = {
     { name: "Profile", href: "/partner/solo/profile", icon: UserRound },
   ],
   pharmacy: [
-    { name: "Dashboard", href: "/pharmacy/dashboard", icon: LayoutDashboard },
-    { name: "Inventory", href: "/pharmacy/inventory", icon: Package },
-    { name: "Orders", href: "/pharmacy/orders", icon: ShoppingCart },
+    { name: "Dashboard", href: "/pharmacy-store/dashboard", icon: LayoutDashboard },
+    { name: "Inventory", href: "/pharmacy-store/inventory/all-stock", icon: Package },
+    { name: "Orders", href: "/pharmacy-store/orders", icon: ShoppingCart },
   ],
   "care assistant": [
     {
@@ -365,13 +365,9 @@ const ROLE_BOTTOM_NAV = {
     { name: "Schedule", href: "/care-assistant/schedule", icon: Calendar },
   ],
   finance: [
-    { name: "Dashboard", href: "/finance/dashboard", icon: LayoutDashboard },
-    {
-      name: "Transactions",
-      href: "/finance/transactions",
-      icon: BadgeDollarSign,
-    },
-    { name: "Reports", href: "/finance/reports", icon: Activity },
+    { name: "Dashboard", href: "/super-admin/invoices", icon: LayoutDashboard },
+    { name: "Orders", href: "/admin/orders", icon: Package },
+    { name: "Reports", href: "/admin/reports", icon: Activity },
   ],
   "lab partner": [
     {
@@ -380,12 +376,12 @@ const ROLE_BOTTOM_NAV = {
       icon: LayoutDashboard,
     },
     { name: "Tests", href: "/lab-partner/tests", icon: FlaskConical },
-    { name: "Reports", href: "/lab-partner/reports", icon: Activity },
+    { name: "Reports", href: "/lab-partner/bookings/reports", icon: Activity },
   ],
   hospital: [
-    { name: "Dashboard", href: "/hospital/dashboard", icon: LayoutDashboard },
-    { name: "Doctors", href: "/hospital/doctors", icon: UserRound },
-    { name: "Patients", href: "/hospital/patients", icon: HeartPulse },
+    { name: "Dashboard", href: "/hospital-manager/dashboard", icon: LayoutDashboard },
+    { name: "Doctors", href: "/hospital-manager/doctors", icon: UserRound },
+    { name: "Operations", href: "/hospital-manager/ops", icon: HeartPulse },
   ],
 };
 

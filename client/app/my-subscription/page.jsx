@@ -955,7 +955,8 @@ export default function MySubscriptionPage() {
   useEffect(() => {
     if (!checkoutToken?.orderId) return;
     (async () => {
-      if (!GATEWAY_KEY_ID) {
+      const activeGatewayKey = checkoutToken.key_id || checkoutToken.razorpayKey || GATEWAY_KEY_ID;
+      if (!activeGatewayKey) {
         alert("CRITICAL PAYMENT GATEWAY MISCONFIGURATION. ABORTING TRANSACTION.");
         dispatch(clearTrialOrder()); return;
       }
@@ -970,7 +971,7 @@ export default function MySubscriptionPage() {
 const structuralPaise  = Math.round(checkoutToken.amount * 100);
 
       const transactionalParams = {
-        key:         GATEWAY_KEY_ID,
+        key:         activeGatewayKey,
         amount:      structuralPaise,
         currency:    checkoutToken.currency || "INR",
         name:        "Likeson Unified Care Platform",

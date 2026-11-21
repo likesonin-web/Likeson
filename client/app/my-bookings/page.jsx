@@ -260,7 +260,7 @@ export default function BookingsPage() {
                 <span className="hidden sm:inline">Filters</span>
                 {hasFilters && <span className="badge badge-error badge-xs p-1" />}
               </button>
-              <Link href="/book" className="btn btn-primary btn-sm gap-2">
+              <Link href="/book-appointment" className="btn btn-primary btn-sm gap-2">
                 <ArrowUpRight size={14} />
                 <span className="hidden sm:inline">New Booking</span>
               </Link>

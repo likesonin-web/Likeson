@@ -312,9 +312,9 @@ const BannerItem = ({ data, theme, screenBucket, onInteraction }) => {
       case 'ExternalLink':  return data.externalUrl || '#';
       case 'InternalRoute': return data.targetId || '/';
       case 'Hospital':      return `/hospitals/${data.targetId}`;
-      case 'Product':       return `/medicines/${data.targetId}`;
-      case 'Category':      return `/categories/${data.targetId}`;
-      case 'Promotion':     return `/promotions/${data.targetId}`;
+      case 'Product':       return data.targetId ? `/pharmacy/buy-medicines/${data.targetId}` : '/pharmacy/buy-medicines';
+      case 'Category':      return '/pharmacy/buy-medicines';
+      case 'Promotion':     return '/subscriptions';
       default:              return data.targetId || '#';
     }
   };

@@ -51,6 +51,58 @@ import {
 import DoctorProfile from '../models/DoctorProfile.js';
 import User from '../models/User.js'; // Ensure User model is imported
 import PlatformPricingConfig from "../models/PlatformPricingConfig.js";
+import PromotionCoupon from "../models/PromotionCoupon.js";
+
+// Helper: Validate and apply coupon to booking fareBreakdown
+export const applyBookingCoupon = async ({ couponCode, userId, fareBreakdown, session = null }) => {
+  if (!couponCode || typeof couponCode !== 'string') return null;
+  const cleanCode = couponCode.trim().toUpperCase();
+  if (!cleanCode) return null;
+
+  try {
+    const query = PromotionCoupon.findOne({ code: cleanCode, isActive: true });
+    if (session) query.session(session);
+    const coupon = await query.lean();
+    if (!coupon) return null;
+
+    const now = new Date();
+    if (coupon.validity?.from && now < new Date(coupon.validity.from)) return null;
+    if (coupon.validity?.to && now > new Date(coupon.validity.to)) return null;
+    if (coupon.usage?.totalPlatformLimit != null && coupon.usage.currentUses >= coupon.usage.totalPlatformLimit) return null;
+
+    const userUseCount = await Booking.countDocuments({
+      customer: userId,
+      couponCode: cleanCode,
+      paymentStatus: { $in: ['paid', 'pending_cash'] },
+    }).session(session);
+
+    if (userUseCount >= (coupon.usage?.limitPerUser ?? 1)) return null;
+
+    const currentTotal = fareBreakdown.totalAmount || 0;
+    if (coupon.eligibility?.minOrderValue && currentTotal < coupon.eligibility.minOrderValue) return null;
+
+    let discount = 0;
+    if (coupon.benefit?.type === 'Percentage') {
+      discount = parseFloat(((currentTotal * coupon.benefit.value) / 100).toFixed(2));
+      if (coupon.benefit?.maxCap) discount = Math.min(discount, coupon.benefit.maxCap);
+    } else if (coupon.benefit?.type === 'Flat_Amount') {
+      discount = Math.min(coupon.benefit.value, currentTotal);
+    } else if (coupon.benefit?.type === 'Free_Ride' || coupon.benefit?.type === 'Free_Consultation') {
+      discount = currentTotal;
+    }
+
+    if (discount > 0) {
+      discount = Math.min(discount, currentTotal);
+      fareBreakdown.couponDiscount = parseFloat(discount.toFixed(2));
+      fareBreakdown.totalAmount = parseFloat(Math.max(0, currentTotal - discount).toFixed(2));
+      return coupon;
+    }
+    return null;
+  } catch (err) {
+    console.error('applyBookingCoupon error:', err);
+    return null;
+  }
+};
 import { provisionConsultationTokens } from "../services/agoraToken.js";
 import { createConsultation } from "../services/consultationService.js";
 import sendEmail from "../utils/sendEmail.js";
@@ -1266,6 +1318,16 @@ export const postFullCareRide = asyncHandler(async (req, res) => {
       ).toFixed(2);
       fareBreakdown.amountPaid = fareBreakdown.totalAmount;
 
+      let appliedBookingCoupon = null;
+      if (couponCode) {
+        appliedBookingCoupon = await applyBookingCoupon({
+          couponCode,
+          userId: req.user._id,
+          fareBreakdown,
+        });
+        fareBreakdown.amountPaid = fareBreakdown.totalAmount;
+      }
+
       // FIX: wallet check happens BEFORE Booking.create. No dangling
       // "unpaid" bookings created when the wallet can't cover it.
       if (paymentMethod === "Wallet") {
@@ -1327,6 +1389,12 @@ export const postFullCareRide = asyncHandler(async (req, res) => {
         subscriptionUsagePending: [],
         confirmedSubscriptionUsage: [],
       });
+
+      if (appliedBookingCoupon) {
+        await PromotionCoupon.findByIdAndUpdate(appliedBookingCoupon._id, {
+          $inc: { 'usage.currentUses': 1 }
+        }).catch(() => null);
+      }
 
       if (isCoveredBySubscription && subCheck.sub) {
         await queueSubscriptionUsage(
@@ -1688,6 +1756,15 @@ export const postDoctorConsultation = asyncHandler(async (req, res) => {
           pricingSource === "subscription" ? 0 : Math.round(gstRate * 100),
       });
 
+      let appliedBookingCoupon = null;
+      if (couponCode) {
+        appliedBookingCoupon = await applyBookingCoupon({
+          couponCode,
+          userId: req.user._id,
+          fareBreakdown,
+        });
+      }
+
       // FIX: wallet sufficiency check BEFORE Booking.create.
       if (paymentMethod === "Wallet") {
         try {
@@ -1731,6 +1808,12 @@ export const postDoctorConsultation = asyncHandler(async (req, res) => {
         subscriptionUsagePending: [],
         confirmedSubscriptionUsage: [],
       });
+
+      if (appliedBookingCoupon) {
+        await PromotionCoupon.findByIdAndUpdate(appliedBookingCoupon._id, {
+          $inc: { 'usage.currentUses': 1 }
+        }).catch(() => null);
+      }
 
       if (isCoveredBySubscription && subCheck.sub) {
         await queueSubscriptionUsage(
@@ -1939,6 +2022,15 @@ export const postDoctorOnline = asyncHandler(async (req, res) => {
         taxPercent: isCoveredBySubscription ? 0 : Math.round(gstRate * 100),
       });
 
+      let appliedBookingCoupon = null;
+      if (couponCode) {
+        appliedBookingCoupon = await applyBookingCoupon({
+          couponCode,
+          userId: req.user._id,
+          fareBreakdown,
+        });
+      }
+
       // FIX: wallet check BEFORE Booking.create.
       if (paymentMethod === "Wallet") {
         try {
@@ -1977,6 +2069,12 @@ export const postDoctorOnline = asyncHandler(async (req, res) => {
         subscriptionUsagePending: [],
         confirmedSubscriptionUsage: [],
       });
+
+      if (appliedBookingCoupon) {
+        await PromotionCoupon.findByIdAndUpdate(appliedBookingCoupon._id, {
+          $inc: { 'usage.currentUses': 1 }
+        }).catch(() => null);
+      }
 
       if (isCoveredBySubscription && subCheck.sub) {
         await queueSubscriptionUsage(
@@ -3281,6 +3379,16 @@ export const postDiagnosticHome = asyncHandler(async (req, res) => {
         totalGstManual
       ).toFixed(2);
       fareBreakdown.amountPaid = fareBreakdown.totalAmount;
+
+      let appliedBookingCoupon = null;
+      if (couponCode) {
+        appliedBookingCoupon = await applyBookingCoupon({
+          couponCode,
+          userId: req.user._id,
+          fareBreakdown,
+        });
+        fareBreakdown.amountPaid = fareBreakdown.totalAmount;
+      }
 
       // FIX: wallet check BEFORE Booking.create.
       if (paymentMethod === "Wallet") {

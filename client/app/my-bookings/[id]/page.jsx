@@ -2060,7 +2060,7 @@ export default function BookingDetailsPage() {
                   </div>
                   <ChevronRight size={13} className="text-base-content/30" />
                 </Link>
-                <Link href="/bookings/new" className="flex items-center justify-between gap-2 px-2 py-2 rounded-lg hover:bg-base-200 transition-colors group">
+                <Link href="/book-appointment" className="flex items-center justify-between gap-2 px-2 py-2 rounded-lg hover:bg-base-200 transition-colors group">
                   <div className="flex items-center gap-2">
                     <Activity size={13} className="text-primary" />
                     <span className="text-sm text-base-content/70 group-hover:text-base-content">New Booking</span>

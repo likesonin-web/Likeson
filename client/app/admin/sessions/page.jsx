@@ -314,7 +314,7 @@ export default function SessionManagement() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-[28px]">
         <div className="flex items-center gap-[6px] mb-[6px]">
-          <Link href="/admin" className="text-[12px] opacity-45 no-underline">Admin</Link>
+          <Link href="/admin/dashboard" className="text-[12px] opacity-45 no-underline">Admin</Link>
           <ChevronRight size={12} className="opacity-30" />
           <span className="text-[12px] font-bold text-primary">Session Management</span>
         </div>

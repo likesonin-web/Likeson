@@ -675,9 +675,9 @@ function DashboardContent({ dashboard, analytics, loading }) {
               {[
                 { label: "Add Test",     href: "/lab-partner/tests",     Icon: FlaskConical },
                 { label: "Add Package",  href: "/lab-partner/packages",  Icon: Package      },
-                { label: "View Reviews", href: "/lab-partner/reviews",   Icon: Star         },
+                { label: "Reports",      href: "/lab-partner/bookings/reports", Icon: Star },
                 { label: "Settings",     href: "/lab-partner/settings",  Icon: Settings     },
-                { label: "Analytics",    href: "/lab-partner/analytics/reviews", Icon: BarChart3 },
+                { label: "Bookings",     href: "/lab-partner/bookings",  Icon: BarChart3 },
               ].map((a, i) => (
                 <QuickAction key={a.href} {...a} index={i} />
               ))}
@@ -744,7 +744,7 @@ function DashboardContent({ dashboard, analytics, loading }) {
               <h3 className="text-sm font-black uppercase tracking-widest" style={{ color: "var(--base-content)" }}>
                 Rating Overview
               </h3>
-              <Link href="/lab-partner/analytics/reviews">
+              <Link href="/lab-partner/bookings/reports">
                 <span className="text-xs font-bold flex items-center gap-1" style={{ color: "var(--primary)" }}>
                   Full Analytics <ChevronRight size={12} />
                 </span>
@@ -814,7 +814,7 @@ function DashboardContent({ dashboard, analytics, loading }) {
               <h3 className="text-sm font-black uppercase tracking-widest" style={{ color: "var(--base-content)" }}>
                 Recent Reviews
               </h3>
-              <Link href="/lab-partner/reviews">
+              <Link href="/lab-partner/bookings">
                 <span className="text-xs font-bold flex items-center gap-1" style={{ color: "var(--primary)" }}>
                   See All <ChevronRight size={12} />
                 </span>

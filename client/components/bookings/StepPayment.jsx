@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Receipt, Percent, CreditCard, Coins, ShieldCheck } from "lucide-react";
 import { Field, Inp, SCard, FareRow } from "./atoms";
@@ -37,6 +37,7 @@ export function StepPayment({
   walletData,
   labDetail,
 }) {
+  const [couponStatus, setCouponStatus] = useState(null);
   const bt = BOOKING_TYPES.find((b) => b.value === form.bookingType);
 
   const consultResolved = bt?.needsDoctor
@@ -392,23 +393,45 @@ export function StepPayment({
       <SCard title="Coupon & Discounts" icon={Percent} accent="var(--success)">
         <Field
           label="Coupon Code (optional)"
-          note="Valid coupons applied at booking"
+          note="Valid coupons will be verified and deducted from your total"
         >
           <div className="flex gap-2">
             <Inp
               placeholder="e.g. CARE20 / FIRST50"
               value={form.couponCode || ""}
-              onChange={(e) => set("couponCode", e.target.value.toUpperCase())}
+              onChange={(e) => {
+                set("couponCode", e.target.value.toUpperCase());
+                setCouponStatus(null);
+              }}
               className="flex-1"
             />
             <button
               type="button"
-              className="px-3 py-2.5 rounded-xl border-2 border-primary text-primary font-black text-xs hover:bg-primary hover:text-primary-content transition-colors flex-shrink-0"
+              onClick={() => {
+                if (!form.couponCode?.trim()) {
+                  setCouponStatus({ type: "error", text: "Please enter a coupon code." });
+                  return;
+                }
+                setCouponStatus({
+                  type: "success",
+                  text: `Coupon "${form.couponCode.trim().toUpperCase()}" attached! Will be verified and discounted at booking.`,
+                });
+              }}
+              className="px-4 py-2.5 rounded-xl border-2 border-primary text-primary font-black text-xs hover:bg-primary hover:text-primary-content transition-colors flex-shrink-0"
               style={PP}
             >
               Apply
             </button>
           </div>
+          {couponStatus && (
+            <p
+              className={`text-xs mt-2 font-semibold ${
+                couponStatus.type === "success" ? "text-success" : "text-error"
+              }`}
+            >
+              {couponStatus.text}
+            </p>
+          )}
         </Field>
       </SCard>
 

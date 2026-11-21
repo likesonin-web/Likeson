@@ -1291,7 +1291,8 @@ const CheckoutModal = memo(function CheckoutModal({
 
   const openRazorpay = useCallback(
     async (order) => {
-      if (!RZP_KEY) {
+      const activeKey = order?.key_id || order?.razorpayKey || RZP_KEY;
+      if (!activeKey) {
         onToast("Payment gateway not configured. Contact support.", "error");
         return;
       }
@@ -1306,7 +1307,7 @@ const CheckoutModal = memo(function CheckoutModal({
 
       const amountInPaise = toRazorpayPaise(order.amount);
       const rzp = new window.Razorpay({
-        key: RZP_KEY,
+        key: activeKey,
         amount: amountInPaise,
         currency: order.currency || "INR",
         name: "Likeson Health",

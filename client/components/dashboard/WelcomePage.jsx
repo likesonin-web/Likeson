@@ -67,7 +67,7 @@ const WelcomePage = () => {
             <ArrowRight size={14} />
           </Link>
           <Link
-            href="/super-admin/settings/general"
+            href="/admin/settings"
             className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl border border-base-300 text-base-content/60 font-black text-[10px] uppercase tracking-widest hover:border-primary/50 hover:text-primary transition-all"
           >
             <Settings2 size={14} />

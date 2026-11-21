@@ -324,7 +324,7 @@ const BottomCTA = memo(() => (
           Talk to our care team — we&apos;ll guide you.
         </p>
       </div>
-      <Link href="/contact" aria-label="Contact the Likeson.in team">
+      <Link href="/support" aria-label="Contact the Likeson.in team">
         <motion.div
           whileHover={{ scale: 1.04, backgroundColor: "rgba(255,255,255,0.25)" }}
           whileTap={{ scale: 0.97 }}

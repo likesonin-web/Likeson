@@ -1916,12 +1916,19 @@ export const postOrderCheckout = asyncHandler(async (req, res) => {
 
       // ── Payment ──────────────────────────────────────────────────────────
       if (paymentMethod === 'Razorpay') {
-        const rzpOrder = await razorpay.orders.create({
-          amount:   Math.round(billing.totalPayable * 100),
-          currency: 'INR',
-          receipt:  order._id.toString(),
-        });
-        order.payment.razorpayOrderId = rzpOrder.id;
+        if (billing.totalPayable <= 0) {
+          await decrementStock(orderItems, storeId, session);
+          order.payment.status  = 'Paid';
+          order.payment.paidAt  = new Date();
+          order.delivery.status = 'Placed';
+        } else {
+          const rzpOrder = await razorpay.orders.create({
+            amount:   Math.round(billing.totalPayable * 100),
+            currency: 'INR',
+            receipt:  order._id.toString(),
+          });
+          order.payment.razorpayOrderId = rzpOrder.id;
+        }
       }
 
       if (paymentMethod === 'COD') {
@@ -1967,7 +1974,8 @@ export const postOrderCheckout = asyncHandler(async (req, res) => {
       userId: req.user._id, orderCount: createdOrders.length, paymentMethod, deliveryType: resolvedDeliveryType,
     });
 
-    if (paymentMethod !== 'Razorpay') {
+    const isFree = createdOrders.length > 0 && createdOrders.every((o) => (o.order.billing?.totalPayable ?? 0) <= 0);
+    if (paymentMethod !== 'Razorpay' || isFree) {
       for (const { order, storeDoc } of createdOrders) {
         const headerNote = order.billing.promoCode ? `Coupon applied — you saved!` : '';
         dispatchOrderConfirmationEmail(req.user._id, order, storeDoc.storeName, headerNote);
@@ -1976,6 +1984,7 @@ export const postOrderCheckout = asyncHandler(async (req, res) => {
 
     res.status(201).json({
       success:     true,
+      isFree,
       order:       createdOrders[0]?.order,
       orders:      createdOrders.map((o) => o.order),
       razorpayKey: RAZORPAY_KEY_ID,
@@ -2668,26 +2677,35 @@ export const postOrderDirect = asyncHandler(async (req, res) => {
       order.delivery.status = 'Confirmed';
     }
 
+    const isDirectFree = (billing.totalPayable ?? 0) <= 0;
     if (paymentMethod === 'Razorpay') {
-      const rzpOrder = await razorpay.orders.create({
-        amount:   Math.round(billing.totalPayable * 100),
-        currency: 'INR',
-        receipt:  order._id.toString(),
-      });
-      order.payment.razorpayOrderId = rzpOrder.id;
+      if (isDirectFree) {
+        await decrementStock([orderItem], storeIdStr, session);
+        order.payment.status  = 'Paid';
+        order.payment.paidAt  = new Date();
+        order.delivery.status = 'Confirmed';
+      } else {
+        const rzpOrder = await razorpay.orders.create({
+          amount:   Math.round(billing.totalPayable * 100),
+          currency: 'INR',
+          receipt:  order._id.toString(),
+        });
+        order.payment.razorpayOrderId = rzpOrder.id;
+      }
     }
 
     await order.save({ session });
     if (appliedCoupon) await commitCouponUsage(appliedCoupon._id, session);
     await session.commitTransaction();
 
-    if (paymentMethod !== 'Razorpay') {
+    if (paymentMethod !== 'Razorpay' || isDirectFree) {
       const headerNote = appliedCoupon ? `Coupon ${appliedCoupon.code} applied!` : '';
       dispatchOrderConfirmationEmail(req.user._id, order.toObject(), resolvedStore.storeName, headerNote);
     }
 
     res.status(201).json({
       success:           true,
+      isFree:            isDirectFree,
       order,
       razorpayKey:       RAZORPAY_KEY_ID,
       resolvedStoreName: resolvedStore.storeName,

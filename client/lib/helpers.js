@@ -86,13 +86,14 @@ export const openRazorpay = async ({
   onFailure,
   dispatch,
 }) => {
-  if (!RAZORPAY_KEY) {
+  const activeKey = (order?.key_id || order?.razorpayKey || RAZORPAY_KEY || "").trim();
+  if (!activeKey) {
     onFailure?.("Payment configuration missing. Contact support.");
     return;
   }
   if (
-    !RAZORPAY_KEY.startsWith("rzp_test_") &&
-    !RAZORPAY_KEY.startsWith("rzp_live_")
+    !activeKey.startsWith("rzp_test_") &&
+    !activeKey.startsWith("rzp_live_")
   ) {
     onFailure?.("Payment configuration error — invalid key. Contact support.");
     return;
@@ -104,7 +105,7 @@ export const openRazorpay = async ({
   }
 
   const options = {
-    key: RAZORPAY_KEY,
+    key: activeKey,
     amount: Math.round((order.amount || 0) * 100),
     currency: order.currency || "INR",
     name: "Likeson.in",

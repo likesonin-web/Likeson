@@ -1239,6 +1239,14 @@ export default function CartPage() {
       }
 
      if (paymentMethod === 'Razorpay') {
+        const payableAmt = result.order?.billing?.totalPayable ?? finalPayable;
+        if (payableAmt <= 0 || result.isFree) {
+          setIsProcessingPayment(false);
+          toast.success('Order placed successfully!');
+          goToStep('success');
+          return;
+        }
+
         let payResp;
         try {
           const loaded = await loadRazorpayScript();
@@ -1247,9 +1255,9 @@ export default function CartPage() {
           }
 
           payResp = await openRazorpayModal({
-            rzpKey: RAZORPAY_KEY,
+            rzpKey: result.razorpayKey || RAZORPAY_KEY,
             rzpOrderId: result.order?.payment?.razorpayOrderId,
-            amount: result.order?.billing?.totalPayable ?? finalPayable,
+            amount: payableAmt,
             prefill: { 
               name: address.fullName || 'Customer', 
               contact: address.phone || '9999999999' 

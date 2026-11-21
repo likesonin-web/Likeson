@@ -306,7 +306,7 @@ const SuperAdminDashboard = ({ children }) => {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                 >
-                  <Link href="/super-admin" className="flex flex-col group">
+                  <Link href="/super-admin/dashboard" className="flex flex-col group">
                     <span className="font-black text-xl tracking-tighter hover:text-primary transition-colors">
                       LIKESON<span className="text-secondary">.in</span>
                     </span>
@@ -412,7 +412,7 @@ const SuperAdminDashboard = ({ children }) => {
               <ThemeToggle />
 
               {/* Notifications */}
-              <Link href="/super-admin/notifications">
+              <Link href="/notifications">
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="relative">
                   <Button
                     variant="ghost"

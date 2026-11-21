@@ -235,7 +235,7 @@ export default function AboutPage() {
                 Explore Services <ArrowRight size={14} className="inline ml-1" />
               </span>
             </Link>
-            <Link href="/contact">
+            <Link href="/signup">
               <span className="btn-secondary text-[#fff]" style={{ borderColor: 'rgba(255,255,255,0.6)' }}>
                 Partner with Us
               </span>
@@ -382,12 +382,12 @@ export default function AboutPage() {
                 Join thousands of patients and partners building a healthier Vijayawada together.
               </p>
               <div className="flex flex-wrap gap-4 justify-center">
-                <Link href="/register">
+                <Link href="/signup">
                   <span className="btn-primary-cta bg-[#fff] text-primary">
                     Get Started Free
                   </span>
                 </Link>
-                <Link href="/legal/terms">
+                <Link href="/terms">
                   <span className="btn-secondary text-[#fff]" style={{ borderColor: 'rgba(255,255,255,0.5)' }}>
                     Read Our Terms
                   </span>

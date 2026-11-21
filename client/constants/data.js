@@ -165,7 +165,7 @@ export const SUPER_ADMIN_DASHBOARD_LINKS = [
       { name: "Announcements", href: "/super-admin/marquee",           icon: <Megaphone size={15} />         },
       { name: "Legal",         href: "/super-admin/legal",             icon: <Scale size={15} />             },
       { name: "FAQs",          href: "/super-admin/faq",               icon: <FileQuestion size={15} />      },
-      { name: "Notifications", href: "/super-admin/notifications",     icon: <Bell size={15} />              },
+      { name: "Notifications", href: "/notifications",                 icon: <Bell size={15} />              },
       { name: "Alerts",        href: "/super-admin/compliance/alerts", icon: <AlertTriangle size={15} />     },
       { name: "Activity Logs", href: "/super-admin/logs",              icon: <ScrollText size={15} />        },
     ],
@@ -176,7 +176,7 @@ export const SUPER_ADMIN_DASHBOARD_LINKS = [
     title: "Settings",
     icons: <Settings2 size={18}/>,
     links: [
-      { name: "General Settings",  href: "/super-admin/settings/general",      icon: <Globe2 size={15} />      },
+      { name: "General Settings",  href: "/admin/settings",                    icon: <Globe2 size={15} />      },
       { name: "Customer Support ",     href: "/support",                              icon: <MessageCircle size={15} />},
       { name: "Security Settings", href: "/super-admin/settings/security",     icon: <ShieldCheck size={15} /> },
       { name: "Integrations",      href: "/super-admin/settings/integrations", icon: <Terminal size={15} />    },

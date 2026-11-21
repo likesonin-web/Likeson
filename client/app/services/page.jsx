@@ -593,7 +593,7 @@ function CustomerHoverButton() {
       initial={{ y: 50, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay: 0.8 }}
-      onClick={() => router.push("/contact")}
+      onClick={() => router.push("/support")}
       className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-primary text-primary-content p-3.5 rounded-full shadow-2xl transition-all hover:pr-5 group cursor-pointer"
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}

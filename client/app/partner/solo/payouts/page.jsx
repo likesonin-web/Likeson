@@ -260,7 +260,7 @@ export default function Payouts() {
                 Add a verified bank account to receive payouts.
               </p>
             </div>
-            <a href="/bank-details" className="ml-auto shrink-0">
+            <a href="/partner/solo/bank" className="ml-auto shrink-0">
               <ArrowRight size={16} style={{ color: 'var(--warning)' }} />
             </a>
           </motion.div>

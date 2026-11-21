@@ -28,31 +28,31 @@ const ROLE_FOOTER_CONFIG = {
   doctor: {
     label: 'Doctor Portal',
     services: [
-      { name: 'My Consultations',   href: '/doctor/consultations' },
-      { name: 'Patient Records',    href: '/doctor/patients' },
+      { name: 'My Appointments',    href: '/doctor/appointments' },
+      { name: 'Patient Records',    href: '/doctor/op-records' },
       { name: 'Schedule',           href: '/doctor/schedule' },
-      { name: 'Earnings',           href: '/doctor/earnings' },
+      { name: 'Earnings & Fees',    href: '/doctor/finance/platform-fee' },
     ],
     company: [
       { name: 'About Likeson',      href: '/about' },
-      { name: 'Medical Guidelines', href: '/guidelines' },
+      { name: 'Medical Guidelines', href: '/terms' },
       { name: 'Privacy Policy',     href: '/privacy' },
       { name: 'Terms of Service',   href: '/terms' },
     ],
     support: [
-      { name: 'Help Centre',        href: '/help' },
-      { name: 'Raise a Ticket',     href: '/support/ticket' },
-      { name: 'Partner With Us',    href: '/partner' },
-      { name: 'Contact Support',    href: '/contact' },
+      { name: 'Help Centre',        href: '/support' },
+      { name: 'Raise a Ticket',     href: '/support' },
+      { name: 'Partner With Us',    href: '/signup' },
+      { name: 'Contact Support',    href: '/support' },
     ],
   },
   default: {
     label: 'Healthcare Platform',
     services: [
-      { name: 'Consultations',      href: '/consultations' },
-      { name: 'Diagnostics',        href: '/diagnostics' },
-      { name: 'Pharmacy',           href: '/pharmacy' },
-      { name: 'Transportation',     href: '/transport' },
+      { name: 'Consultations',      href: '/doctors' },
+      { name: 'Diagnostics',        href: '/labs' },
+      { name: 'Pharmacy',           href: '/pharmacy/buy-medicines' },
+      { name: 'Transportation',     href: '/book-appointment?type=full_care_ride' },
     ],
     company: [
       { name: 'About Us',           href: '/about' },
@@ -61,10 +61,10 @@ const ROLE_FOOTER_CONFIG = {
       { name: 'Terms of Service',   href: '/terms' },
     ],
     support: [
-      { name: 'Help Center',        href: '/help' },
-      { name: 'Partner with Us',    href: '/partner' },
-      { name: 'Health Blog',        href: '/blog' },
-      { name: 'Emergency Care',     href: '/emergency' },
+      { name: 'Help Center',        href: '/support' },
+      { name: 'Partner with Us',    href: '/signup' },
+      { name: 'About Platform',     href: '/about' },
+      { name: 'Emergency Care',     href: '/book-appointment?type=ambulance' },
     ],
   },
 };

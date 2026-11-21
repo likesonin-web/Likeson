@@ -103,20 +103,34 @@ const Skeleton = memo(() => (
 Skeleton.displayName = "Skeleton";
 
 const Fallback = memo(() => (
-  <section className="relative w-full min-h-screen flex items-center justify-center bg-base-100 overflow-hidden" aria-label="Content unavailable">
+  <section className="relative w-full min-h-screen flex items-center justify-center bg-base-100 overflow-hidden" aria-label="Healthcare Services">
     <Background />
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: EASE }}
-      className="relative z-10 text-center px-6 max-w-xl"
+      className="relative z-10 text-center px-6 max-w-xl flex flex-col items-center"
     >
       <h1 className="font-montserrat font-black tracking-tight mb-4 text-5xl md:text-6xl lg:text-7xl text-base-content leading-none">
-        Something <span className="text-gradient-primary">Great</span> Awaits
+        Healthcare <span className="text-gradient-primary">Reimagined</span>
       </h1>
-      <p className="font-poppins text-lg leading-relaxed text-base-content/60">
-        Check back soon for the latest updates and announcements.
+      <p className="font-poppins text-lg leading-relaxed text-base-content/60 mb-6">
+        Comprehensive medical transport, verified doctor consultations, doorstep lab tests, and 2-hour pharmacy delivery.
       </p>
+      <div className="flex flex-col sm:flex-row gap-4 justify-center w-full">
+        <Link
+          href="/book-appointment"
+          className="px-8 py-3.5 rounded-full font-poppins font-black text-sm uppercase tracking-wide bg-primary text-primary-content hover:brightness-110 shadow-lg transition-all"
+        >
+          Book Care Now
+        </Link>
+        <Link
+          href="#services"
+          className="px-8 py-3.5 rounded-full font-poppins font-bold text-sm uppercase tracking-wide border border-base-300 hover:bg-base-200 transition-all text-base-content"
+        >
+          Explore Services
+        </Link>
+      </div>
     </motion.div>
   </section>
 ));

@@ -536,7 +536,7 @@ export function StepReview({
           </a>{" "}
           and{" "}
           <a
-            href="/cancellation-policy"
+            href="/terms"
             className="underline hover:text-primary transition-colors"
           >
             Cancellation Policy

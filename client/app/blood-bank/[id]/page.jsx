@@ -353,7 +353,7 @@ function RequestModal({ bank, prefill, onClose }) {
   }
 
   const options = {
-    key:         RAZORPAY_KEY || razorpayOrder.razorpayKeyId,
+    key:         razorpayOrder.razorpayKeyId || RAZORPAY_KEY,
     amount:      Math.round((razorpayOrder.amount || 0) * 100),
     currency:    "INR",
     name:        bank.name,
@@ -832,7 +832,7 @@ export default function BloodBankDetails() {
             Blood bank not found
           </h2>
           <button
-            onClick={() => router.push("/blood-banks")}
+            onClick={() => router.push("/blood-bank")}
             className="btn btn-sm mt-4 border-red-300 text-red-600"
           >
             Back to listing
@@ -881,7 +881,7 @@ export default function BloodBankDetails() {
         <div className="container-custom max-w-5xl py-8 relative z-10">
           {/* Back */}
           <button
-            onClick={() => router.push("/blood-banks")}
+            onClick={() => router.push("/blood-bank")}
             className="flex items-center gap-2 text-white/70 text-xs hover:text-white mb-5 transition-colors"
           >
             <ArrowLeft size={13} /> Back to Blood Banks

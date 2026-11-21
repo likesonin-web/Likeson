@@ -286,9 +286,9 @@ export default function HeroDriver() {
                 Go to Dashboard
               </button>
             </Link>
-            <Link href="/driver/stats">
+            <Link href="/driver/bookings">
               <button className="btn btn-outline" style={{ gap: '6px', borderRadius: 'var(--r-field)', fontFamily: 'var(--font-family-poppins)', fontWeight: 700 }}>
-                View Stats
+                View Bookings
                 <ChevronRight size={14} strokeWidth={2.5} />
               </button>
             </Link>
@@ -473,7 +473,7 @@ export default function HeroDriver() {
                 {kycValid ? 'All Documents Valid' : 'KYC Pending Review'}
               </div>
               <Link
-                href="/driver/compliance"
+                href="/driver/kyc"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
