@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
@@ -106,4 +106,10 @@ const AuthSuccess = () => {
   );
 };
 
-export default AuthSuccess;
+export default function AuthSuccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-base-100 flex items-center justify-center"><Loader2 className="animate-spin text-primary" size={32} /></div>}>
+      <AuthSuccess />
+    </Suspense>
+  );
+}

@@ -20,7 +20,7 @@
  * cancelPrescription, verifyPrescription, fetchPrescriptionById
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -395,7 +395,7 @@ const PrintHeader = ({ rx }) => (
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function EPrescription() {
+function EPrescriptionContent() {
   const dispatch     = useDispatch();
   const router       = useRouter();
   const params       = useParams();
@@ -1189,3 +1189,11 @@ const VitalChip = ({ icon, label, value }) => (
     </div>
   </div>
 );
+
+export default function EPrescription() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-base-100 flex items-center justify-center p-8"><div className="skeleton w-full max-w-4xl h-96 rounded-3xl" /></div>}>
+      <EPrescriptionContent />
+    </Suspense>
+  );
+}

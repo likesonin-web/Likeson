@@ -129,15 +129,12 @@ const TrustRow = memo(({ priority, centred }) => (
     className={`pt-8 border-t border-base-300/60 flex flex-col sm:flex-row items-center gap-5 ${centred ? "justify-center" : "justify-center lg:justify-start"}`}
   >
     <div className="flex -space-x-3" aria-label="Over 1000 trusted users">
-      {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="w-10 h-10 rounded-full overflow-hidden border-2 border-base-100 shadow-sm relative bg-base-300">
-          <Image 
-            src={`https://i.pravatar.cc/80?u=trust${i}`} 
-            alt={`Trusted User ${i}`} 
-            width={40} 
-            height={40} 
-            className="object-cover w-full h-full" 
-          />
+      {["#2563EB", "#059669", "#7C3AED", "#DB2777"].map((bg, i) => (
+        <div key={i} className="w-10 h-10 rounded-full border-2 border-base-100 shadow-sm flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: bg }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
         </div>
       ))}
       <div className="w-10 h-10 rounded-full border-2 border-base-100 bg-base-content text-base-100 flex items-center justify-center text-[10px] font-black font-montserrat shadow-sm">
@@ -201,7 +198,8 @@ function PhoneStatusBar() {
   const [signal, setSignal] = useState(4);
 
   useEffect(() => {
-    const id = setInterval(() => setTime(format12Hour(new Date())), 1000);
+    // Update every minute instead of every second to avoid CPU churn on mobile
+    const id = setInterval(() => setTime(format12Hour(new Date())), 30000);
     return () => clearInterval(id);
   }, []);
 

@@ -12,13 +12,14 @@
  * the same URL must NOT auto-start GPS push (they have none to give).
  */
 
+import { Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import SocketProvider from '@/context/SocketProvider';
 import { selectToken, selectCurrentUser } from '@/store/slices/userSlice';
 import CareAssistantLiveTracking from './CareAssistantLiveTracking';
 
-export default function TrackPage() {
+function TrackPageContent() {
   // Param keys MUST match folder bracket names exactly: [bookingId], [rideId]
   const { bookingId, rideId } = useParams();
   const searchParams = useSearchParams();
@@ -42,5 +43,13 @@ export default function TrackPage() {
     >
       <CareAssistantLiveTracking rideId={rideId} bookingType={bookingType} />
     </SocketProvider>
+  );
+}
+
+export default function TrackPage() {
+  return (
+    <Suspense fallback={null}>
+      <TrackPageContent />
+    </Suspense>
   );
 }

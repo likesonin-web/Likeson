@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -152,7 +152,7 @@ const INIT = {
   estimatedDiagFee: 0,
 };
 
-export default function BookingSystem() {
+function BookingSystemContent() {
   const dispatch = useDispatch();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1522,5 +1522,13 @@ export default function BookingSystem() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function BookingSystem() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-base-100 flex items-center justify-center"><Loader2 className="animate-spin text-primary" size={32} /></div>}>
+      <BookingSystemContent />
+    </Suspense>
   );
 }

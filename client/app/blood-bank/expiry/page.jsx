@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -189,7 +189,7 @@ function RunAllModal({ open, count, loading, onConfirm, onClose }) {
 }
 
 /* ── Page ── */
-export default function ExpiryCheckPage() {
+function ExpiryCheckPageContent() {
   const dispatch     = useDispatch();
   const searchParams = useSearchParams();
   const { myInventory, loading } = useSelector(s => s.bloodBank);
@@ -492,5 +492,13 @@ export default function ExpiryCheckPage() {
         onClose={() => setShowRunAll(false)}
       />
     </>
+  );
+}
+
+export default function ExpiryCheckPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-base-100 flex items-center justify-center p-8"><div className="skeleton w-full max-w-4xl h-96 rounded-3xl" /></div>}>
+      <ExpiryCheckPageContent />
+    </Suspense>
   );
 }

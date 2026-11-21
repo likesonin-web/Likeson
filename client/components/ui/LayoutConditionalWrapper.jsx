@@ -2,18 +2,44 @@
 
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
+import dynamic from "next/dynamic";
 import Header from "./Header";
 import Footer from "./Footer";
-import LikesonSuperAdminDashboard from "@/components/dashboard/LikesonSuperAdminDashboard";
-import AdminDashboard from "@/app/admin/AdminDashboard";
-import PharmacyDashboard from '@/components/dashboard/PharmacyDashboard';
-import TransportPartnerDashboard from '@/components/dashboard/Transportpartnerdashboard';
-import Marquee from "@/components/Marquee";
-import HospitalMangerDashboard from "@/components/dashboard/HospitalMangerDashboard";
-import DoctorDashboard from '@/components/dashboard/DoctorDashboard';
-import { usePathname } from 'next/navigation';
-import BloodBankDashboard from "@/components/dashboard/BloodBankDashboard";
-import LabPartnerDashboard from "@/components/dashboard/LabPartnerDashboard";
+import { usePathname } from "next/navigation";
+
+// Dynamically import heavy dashboards so they are not included in public bundle
+const LikesonSuperAdminDashboard = dynamic(
+  () => import("@/components/dashboard/LikesonSuperAdminDashboard"),
+  { ssr: false }
+);
+const AdminDashboard = dynamic(
+  () => import("@/app/admin/AdminDashboard"),
+  { ssr: false }
+);
+const PharmacyDashboard = dynamic(
+  () => import("@/components/dashboard/PharmacyDashboard"),
+  { ssr: false }
+);
+const TransportPartnerDashboard = dynamic(
+  () => import("@/components/dashboard/Transportpartnerdashboard"),
+  { ssr: false }
+);
+const HospitalMangerDashboard = dynamic(
+  () => import("@/components/dashboard/HospitalMangerDashboard"),
+  { ssr: false }
+);
+const DoctorDashboard = dynamic(
+  () => import("@/components/dashboard/DoctorDashboard"),
+  { ssr: false }
+);
+const BloodBankDashboard = dynamic(
+  () => import("@/components/dashboard/BloodBankDashboard"),
+  { ssr: false }
+);
+const LabPartnerDashboard = dynamic(
+  () => import("@/components/dashboard/LabPartnerDashboard"),
+  { ssr: false }
+);
 
 export default function LayoutConditionalWrapper({ children }) {
   const { user } = useSelector((state) => state.user);
@@ -24,46 +50,44 @@ export default function LayoutConditionalWrapper({ children }) {
     setIsClient(true);
   }, []);
 
-  const isTrackingPage = pathname?.startsWith('/rides/') && pathname?.endsWith('/tracking');
+  const isTrackingPage = pathname?.startsWith("/rides/") && pathname?.endsWith("/tracking");
 
-  if (!isClient) {
-    return <div className="min-h-screen bg-base-100" />;
+  // Only render role dashboards on the client when user is authenticated with a staff/admin role
+  if (isClient && user?.role) {
+    if (user.role === "superadmin") {
+      return <LikesonSuperAdminDashboard>{children}</LikesonSuperAdminDashboard>;
+    }
+    if (user.role === "admin") {
+      return <AdminDashboard>{children}</AdminDashboard>;
+    }
+    if (user.role === "pharmacy") {
+      return <PharmacyDashboard>{children}</PharmacyDashboard>;
+    }
+    if (user.role === "transportpartner") {
+      return <TransportPartnerDashboard>{children}</TransportPartnerDashboard>;
+    }
+    if (user.role === "doctor") {
+      return <DoctorDashboard>{children}</DoctorDashboard>;
+    }
+    if (user.role === "labpartner") {
+      return <LabPartnerDashboard>{children}</LabPartnerDashboard>;
+    }
+    if (user.role === "hospital") {
+      return <HospitalMangerDashboard>{children}</HospitalMangerDashboard>;
+    }
+    if (user.role === "blood_bank") {
+      return <BloodBankDashboard>{children}</BloodBankDashboard>;
+    }
   }
 
-  if (user?.role === 'superadmin') {
-    return <LikesonSuperAdminDashboard>{children}</LikesonSuperAdminDashboard>;
-  }
-  if (user?.role === 'admin') {
-    return <AdminDashboard>{children}</AdminDashboard>;
-  }
-  if (user?.role === 'pharmacy') {
-    return <PharmacyDashboard>{children}</PharmacyDashboard>;
-  }
-  if (user?.role === 'transportpartner') {
-    return <TransportPartnerDashboard>{children}</TransportPartnerDashboard>;
-  }
-  if (user?.role === 'doctor') {
-    return <DoctorDashboard>{children}</DoctorDashboard>;
-  }
-  if (user?.role === 'labpartner') {
-    return <LabPartnerDashboard>{children}</LabPartnerDashboard>;
-  }
-  if (user?.role === 'hospital') {
-    return <HospitalMangerDashboard>{children}</HospitalMangerDashboard>;
-  }
-  if(user?.role === 'blood_bank'){
-    return <BloodBankDashboard>{children}</BloodBankDashboard>;
-  }
-
+  // Default SSR & public customer layout: immediate HTML, no blank screen
   return (
     <>
-      {/* FIX: Corrected boolean syntax to encapsulate the Marquee */}
-      {user && !isTrackingPage  }
       <Header />
       <main className="min-h-screen transition-all duration-300">
         {children}
       </main>
-      <Footer />
+      {!isTrackingPage && <Footer />}
     </>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -827,7 +827,7 @@ function UnitTableRow({ unit, onClick }) {
 
 /* ─── PAGE ─── */
 
-export default function BloodUnitsPage() {
+function BloodUnitsPageContent() {
   const dispatch = useDispatch();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1199,5 +1199,13 @@ export default function BloodUnitsPage() {
       <AddUnitModal open={showAdd} onClose={() => setShowAdd(false)} invId={currentInv?._id} />
       <UnitDetailDrawer unit={selectedUnit} invId={currentInv?._id} onClose={() => setSelectedUnit(null)} />
     </>
+  );
+}
+
+export default function BloodUnitsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-base-100 flex items-center justify-center p-8"><div className="skeleton w-full max-w-4xl h-96 rounded-3xl" /></div>}>
+      <BloodUnitsPageContent />
+    </Suspense>
   );
 }

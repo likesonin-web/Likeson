@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -177,7 +177,7 @@ function ResultSkeleton() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function SearchPage() {
+function SearchPageContent() {
   const dispatch = useDispatch();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -649,5 +649,13 @@ export default function SearchPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-base-100 flex items-center justify-center"><Loader2 className="animate-spin text-primary" size={32} /></div>}>
+      <SearchPageContent />
+    </Suspense>
   );
 }
