@@ -1086,10 +1086,4 @@ export const selectDeleteFailedBookingError   = (s) => s.booking.errors.deleteFa
 export const selectLoading = (k) => (s) => s.booking.loading[k] ?? false;
 export const selectError   = (k) => (s) => s.booking.errors[k]  ?? null;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RE-EXPORTS
-// ─────────────────────────────────────────────────────────────────────────────
-
-export { BOOKING_TYPES };
-
 export default bookingSlice.reducer;
