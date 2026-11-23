@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { addOrderNote, clearSuccess, clearError } from '@/store/slices/pharmacy/pharmacyStoreSlice';
 
-export default function AdminNotes({ order, onSuccess }) {
+function AdminNotesComponent({ order, onSuccess }) {
   const dispatch = useDispatch();
   const { loading, errors, success } = useSelector((s) => s.pharmacyStore);
 
@@ -170,4 +170,8 @@ export default function AdminNotes({ order, onSuccess }) {
       )}
     </div>
   );
+}
+
+export default function AdminNotesPage() {
+  return <AdminNotesComponent order={null} onSuccess={() => {}} />;
 }

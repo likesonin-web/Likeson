@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { processRefund, clearSuccess, clearError } from '@/store/slices/pharmacy/pharmacyStoreSlice';
 
-export default function ProcessRefund({ order, onSuccess }) {
+function ProcessRefundComponent({ order, onSuccess }) {
   const dispatch = useDispatch();
   const { loading, errors, success } = useSelector((s) => s.pharmacyStore);
 
@@ -213,4 +213,8 @@ export default function ProcessRefund({ order, onSuccess }) {
       )}
     </div>
   );
+}
+
+export default function ProcessRefundPage() {
+  return <ProcessRefundComponent order={null} onSuccess={() => {}} />;
 }

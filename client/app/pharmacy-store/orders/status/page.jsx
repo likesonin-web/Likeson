@@ -28,7 +28,7 @@ const TIMELINE_ORDER = [
   'Placed', 'Confirmed', 'Processing', 'Out-for-Delivery', 'Delivered',
 ];
 
-export default function UpdateStatus({ order, onSuccess }) {
+function UpdateStatusComponent({ order, onSuccess }) {
   const dispatch = useDispatch();
   const { loading, errors, success } = useSelector((s) => s.pharmacyStore);
 
@@ -233,4 +233,8 @@ export default function UpdateStatus({ order, onSuccess }) {
       )}
     </div>
   );
+}
+
+export default function UpdateStatusPage() {
+  return <UpdateStatusComponent order={null} onSuccess={() => {}} />;
 }

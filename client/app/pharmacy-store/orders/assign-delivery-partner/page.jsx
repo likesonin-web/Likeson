@@ -16,7 +16,7 @@ const MOCK_PARTNERS = [
   { id: '685a1c2e3d4f5a6b7c8d9e11', name: 'Kiran Rao', phone: '+91 9876543212', rating: 4.9, activeOrders: 2, area: 'One Town', isOnline: false },
 ];
 
-export default function AssignDeliveryPartner({ order, onSuccess }) {
+function AssignDeliveryPartnerComponent({ order, onSuccess }) {
   const dispatch = useDispatch();
   const { loading, errors, success } = useSelector((s) => s.pharmacyStore);
 
@@ -215,4 +215,8 @@ export default function AssignDeliveryPartner({ order, onSuccess }) {
       </motion.button>
     </div>
   );
+}
+
+export default function AssignDeliveryPartnerPage() {
+  return <AssignDeliveryPartnerComponent order={null} onSuccess={() => {}} />;
 }

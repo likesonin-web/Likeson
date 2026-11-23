@@ -13,7 +13,7 @@ import {
   sendStoreInvoice,
 } from '@/store/slices/pharmacy/pharmacyStoreSlice';
 
-export default function OrderInvoice({ order, onClose }) {
+function OrderInvoiceComponent({ order, onClose }) {
   const dispatch = useDispatch();
   const { currentOrderInvoiceHtml, loading, errors } = useSelector((s) => s.pharmacyStore);
   const iframeRef = useRef(null);
@@ -173,4 +173,8 @@ export default function OrderInvoice({ order, onClose }) {
       )}
     </div>
   );
+}
+
+export default function OrderInvoicePage() {
+  return <OrderInvoiceComponent order={null} onClose={() => {}} />;
 }

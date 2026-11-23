@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { acceptReturn, clearSuccess, clearError } from '@/store/slices/pharmacy/pharmacyStoreSlice';
 
-export default function AcceptReturn({ order, onSuccess }) {
+function AcceptReturnComponent({ order, onSuccess }) {
   const dispatch = useDispatch();
   const { loading, errors, success } = useSelector((s) => s.pharmacyStore);
 
@@ -182,4 +182,8 @@ export default function AcceptReturn({ order, onSuccess }) {
       </motion.button>
     </div>
   );
+}
+
+export default function AcceptReturnPage() {
+  return <AcceptReturnComponent order={null} onSuccess={() => {}} />;
 }

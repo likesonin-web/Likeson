@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -415,7 +416,8 @@ const FilterContent = ({ filters, updateFilters, resetFilters, activeFiltersCoun
 
 // ─── Main Page Component ───────────────────────────────────────────────────────
 
-export default function MedicinePage({ router }) {
+export default function MedicinePage() {
+  const router = useRouter();
   const dispatch = useDispatch();
 
   const medicines  = useSelector(selectMedicines);

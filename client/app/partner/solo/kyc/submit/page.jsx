@@ -992,7 +992,7 @@ function SuccessOverlay({ message, onClose }) {
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function KycVerificationPage({ defaultTab = 'status', onTabChange }) {
+function KycVerificationContent({ defaultTab = 'submit', onTabChange } = {}) {
   const dispatch  = useDispatch();
   const router    = useRouter();
 
@@ -1164,4 +1164,8 @@ export default function KycVerificationPage({ defaultTab = 'status', onTabChange
       </Container>
     </div>
   );
+}
+
+export default function KycVerificationPage() {
+  return <KycVerificationContent defaultTab="submit" />;
 }

@@ -26,7 +26,7 @@ const DELIVERY_TYPES = [
   },
 ];
 
-export default function ConfirmOrder({ order, onSuccess }) {
+function ConfirmOrderComponent({ order, onSuccess }) {
   const dispatch = useDispatch();
   const { loading, errors, success } = useSelector((s) => s.pharmacyStore);
 
@@ -223,4 +223,8 @@ export default function ConfirmOrder({ order, onSuccess }) {
       </motion.button>
     </div>
   );
+}
+
+export default function ConfirmOrderPage() {
+  return <ConfirmOrderComponent order={null} onSuccess={() => {}} />;
 }

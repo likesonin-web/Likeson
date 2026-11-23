@@ -13,7 +13,7 @@ import {
   clearError,
 } from '@/store/slices/pharmacy/pharmacyStoreSlice';
 
-export default function VerifyPrescription({ order, onSuccess }) {
+function VerifyPrescriptionComponent({ order, onSuccess }) {
   const dispatch = useDispatch();
   const { loading, errors, success } = useSelector((s) => s.pharmacyStore);
 
@@ -250,4 +250,8 @@ export default function VerifyPrescription({ order, onSuccess }) {
       </AnimatePresence>
     </div>
   );
+}
+
+export default function VerifyPrescriptionPage() {
+  return <VerifyPrescriptionComponent order={null} onSuccess={() => {}} />;
 }

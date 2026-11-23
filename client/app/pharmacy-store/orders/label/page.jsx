@@ -12,7 +12,7 @@ import {
   clearOrderDocuments,
 } from '@/store/slices/pharmacy/pharmacyStoreSlice';
 
-export default function DeliveryLabel({ order, onClose }) {
+function DeliveryLabelComponent({ order, onClose }) {
   const dispatch = useDispatch();
   const { currentOrderLabelHtml, loading, errors } = useSelector((s) => s.pharmacyStore);
   const iframeRef = useRef(null);
@@ -190,4 +190,8 @@ export default function DeliveryLabel({ order, onClose }) {
       )}
     </div>
   );
+}
+
+export default function DeliveryLabelPage() {
+  return <DeliveryLabelComponent order={null} onClose={() => {}} />;
 }
