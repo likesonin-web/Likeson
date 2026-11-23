@@ -52,7 +52,7 @@ import {
   selectError,
 } from '@/store/slices/soloDriverSlice';
 
-export const selectUser = (s) => s.user.user;
+const selectUser = (s) => s.user.user;
 
 // ── Animation variants ────────────────────────────────────────────────────────
 const fadeUp = {

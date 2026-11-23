@@ -46,7 +46,7 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTE CONSTANTS — single source of truth, import in Services.jsx too
 // ─────────────────────────────────────────────────────────────────────────────
-export const SERVICE_ROUTES = {
+const SERVICE_ROUTES = {
   fullCareRide:       "/services/full-care-ride",
   doctorConsultation: "/services/doctor-consultation",
   doctorOnline:       "/services/doctor-online",

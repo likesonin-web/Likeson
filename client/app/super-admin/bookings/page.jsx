@@ -111,7 +111,7 @@ const MAIN_TABS = ['bookings', 'rides_queue', 'analysis', 'sos', 'help'];
 const POLL_MS   = 30_000; // 30s auto-refresh for SOS
 
 // ── Export all thunks as named map for child panels ─────────────────────────
-export const ADMIN_THUNKS = {
+const ADMIN_THUNKS = {
   fetchAdminBookings,
   fetchAdminBookingStats,
   exportAdminBookings,

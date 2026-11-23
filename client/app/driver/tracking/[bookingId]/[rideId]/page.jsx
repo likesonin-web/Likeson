@@ -3,6 +3,7 @@
  
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import { useSocket } from '@/context/SocketProvider';
 import { useRideTracking } from '@/hooks/useRideTracking';
 import { useRideLiveMap } from '@/hooks/useRideLiveMap';
@@ -104,10 +105,7 @@ function EtaTimer({ etaMinutes, distanceKm, lastEtaUpdatedAt }) {
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * @param {{ rideId: string, bookingId: string, tpId?: string, role?: string }} props
- */
-export default function RideLiveTracking({ rideId, bookingId, tpId, role }) {
+function RideLiveTracking({ rideId, bookingId, tpId, role }) {
   const mapDivRef    = useRef(null);
   const mapRef       = useRef(null);
   const mapLoadedRef = useRef(false);
@@ -404,4 +402,11 @@ export default function RideLiveTracking({ rideId, bookingId, tpId, role }) {
       )}
     </div>
   );
+}
+
+export default function RideLiveTrackingPage() {
+  const params = useParams();
+  const rideId = params?.rideId;
+  const bookingId = params?.bookingId;
+  return <RideLiveTracking rideId={rideId} bookingId={bookingId} />;
 }
