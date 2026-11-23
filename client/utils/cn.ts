@@ -1,8 +1,10 @@
-// src/utils/cn.js
+// client/utils/cn.ts
 // Minimal className combiner — no new dependency needed (clsx-style, tiny).
 
-export function cn(...inputs) {
-  const out = [];
+export type ClassValue = string | number | boolean | undefined | null | { [key: string]: any } | ClassValue[];
+
+export function cn(...inputs: ClassValue[]): string {
+  const out: string[] = [];
   for (const input of inputs) {
     if (!input) continue;
     if (typeof input === 'string') {
@@ -12,9 +14,11 @@ export function cn(...inputs) {
       if (nested) out.push(nested);
     } else if (typeof input === 'object') {
       for (const key in input) {
-        if (input[key]) out.push(key);
+        if ((input as Record<string, any>)[key]) out.push(key);
       }
     }
   }
   return out.join(' ');
 }
+
+export default cn;

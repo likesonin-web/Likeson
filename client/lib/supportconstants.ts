@@ -43,6 +43,20 @@ export const SUPPORT_ROLES = {
   ADMIN: 'ADMIN',
 };
 
+export const ADMIN_ROLES = ['admin', 'superadmin'];
+export const PARTNER_ROLES = [
+  'hospital', 
+  'doctor', 
+  'blood_bank', 
+  'care_assistant', 
+  'pharmacy', 
+  'lab_partner', 
+  'driver', 
+  'solodriverpartner', 
+  'transportpartner'
+];
+export const CUSTOMER_ROLE = 'customer';
+
 // You can also export your notification types here to keep them centralized!
 export const SUPPORT_NOTIFICATION_TYPES = {
   CREATED: 'Support_Ticket_Created',

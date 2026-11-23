@@ -98,6 +98,34 @@ export class CallManager {
    *   onError(error: { code: string, message: string }): void
    * }
    */
+  _socket: any;
+  _userId: any;
+  _cb: any;
+  _iceConf: any;
+  _state: any;
+  _pc: any;
+  _localStream: any;
+  _remoteStream: any;
+  _conversationId: any;
+  _callType: any;
+  _targetUserId: any;
+  _messageId: any;
+  _callStartAt: any;
+  _ringtoneTimer: any;
+  _iceCandidateQueue: any[];
+  _onIncoming: any;
+  _onRinging: any;
+  _onOffer: any;
+  _onAnswered: any;
+  _onIce: any;
+  _onEnded: any;
+  _onDeclined: any;
+  _onMissed: any;
+  _onMediaToggle: any;
+  _onPeerDisconnected: any;
+  _onMissedWhileOffline: any;
+  [key: string]: any;
+
   constructor(socket, userId, cb = {}, iceConfig = null) {
     if (!socket) throw new Error('[CallManager] socket is required');
     if (!userId) throw new Error('[CallManager] userId is required');
@@ -135,7 +163,8 @@ export class CallManager {
    * @param {MediaStreamConstraints} [options.mediaConstraints] - Override default constraints
    * @returns {Promise<{ success: boolean, messageId?: string, error?: string }>}
    */
-  async initiateCall({ conversationId, callType = 'audio', targetUserIds = [], mediaConstraints } = {}) {
+  async initiateCall(options: any = {}) {
+    const { conversationId, callType = 'audio', targetUserIds = [], mediaConstraints } = options;
     if (!conversationId) throw new Error('[initiateCall] conversationId required');
     if (this._state !== CallState.IDLE) {
       return { success: false, error: 'Already in a call' };

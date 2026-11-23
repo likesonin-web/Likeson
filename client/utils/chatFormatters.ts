@@ -1,18 +1,18 @@
-// src/utils/chatFormatters.js
+// client/utils/chatFormatters.ts
 
-const isSameDay = (a, b) =>
+const isSameDay = (a: Date, b: Date): boolean =>
   a.getFullYear() === b.getFullYear() &&
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
 
 /** WhatsApp-style message timestamp: "10:42 AM" */
-export function formatMessageTime(dateInput) {
+export function formatMessageTime(dateInput: string | number | Date): string {
   const date = new Date(dateInput);
   return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
 /** Conversation list timestamp: today = time, yesterday = "Yesterday", else short date */
-export function formatConversationTimestamp(dateInput) {
+export function formatConversationTimestamp(dateInput?: string | number | Date | null): string {
   if (!dateInput) return '';
   const date = new Date(dateInput);
   const now = new Date();
@@ -22,13 +22,13 @@ export function formatConversationTimestamp(dateInput) {
   if (isSameDay(date, now)) return formatMessageTime(date);
   if (isSameDay(date, yesterday)) return 'Yesterday';
 
-  const diffDays = Math.floor((now - date) / 86400000);
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
   if (diffDays < 7) return date.toLocaleDateString(undefined, { weekday: 'short' });
   return date.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
 }
 
 /** Day divider label in message thread: "Today" / "Yesterday" / "12 June 2026" */
-export function formatDayDivider(dateInput) {
+export function formatDayDivider(dateInput: string | number | Date): string {
   const date = new Date(dateInput);
   const now = new Date();
   const yesterday = new Date(now);
@@ -40,7 +40,7 @@ export function formatDayDivider(dateInput) {
 }
 
 /** Last-seen text from a lastseen ISO date */
-export function formatLastSeen(dateInput) {
+export function formatLastSeen(dateInput?: string | number | Date | null): string {
   if (!dateInput) return 'Offline';
   const date = new Date(dateInput);
   const diffMinutes = Math.floor((Date.now() - date.getTime()) / 60000);
@@ -53,13 +53,13 @@ export function formatLastSeen(dateInput) {
 }
 
 /** Truncate a message preview for conversation list / notifications */
-export function truncatePreview(text, maxLength = 60) {
+export function truncatePreview(text?: string | null, maxLength = 60): string {
   if (!text) return '';
   return text.length > maxLength ? `${text.slice(0, maxLength).trim()}…` : text;
 }
 
 /** Human file size: 1048576 -> "1.0 MB" */
-export function formatFileSize(bytes) {
+export function formatFileSize(bytes?: number | null): string {
   if (!bytes && bytes !== 0) return '';
   const units = ['B', 'KB', 'MB', 'GB'];
   let value = bytes;
@@ -72,7 +72,7 @@ export function formatFileSize(bytes) {
 }
 
 /** mm:ss duration formatter for audio/video */
-export function formatDuration(seconds) {
+export function formatDuration(seconds?: number | null): string {
   if (!seconds && seconds !== 0) return '0:00';
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);

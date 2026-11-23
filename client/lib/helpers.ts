@@ -64,7 +64,7 @@ export const loadRazorpay = () =>
       resolve(false);
       return;
     }
-    if (window.Razorpay) {
+    if ((window as any).Razorpay) {
       resolve(true);
       return;
     }
@@ -117,7 +117,7 @@ export const openRazorpay = async ({
       try {
         if (dispatch && bookingId) {
           const verifyResult = await dispatch(
-            verifyRazorpayPayment({
+            (verifyRazorpayPayment as any)({
               bookingId,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
@@ -150,7 +150,7 @@ export const openRazorpay = async ({
     },
     modal: { ondismiss: () => onFailure?.("Payment cancelled by user") },
   };
-  const rz = new window.Razorpay(options);
+  const rz = new (window as any).Razorpay(options);
   rz.on("payment.failed", (r) =>
     onFailure?.(r.error?.description || "Payment failed"),
   );

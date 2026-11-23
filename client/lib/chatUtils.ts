@@ -32,11 +32,11 @@ export function getInitials(name = '') {
     .join('');
 }
 
-export function formatRelativeTime(dateStr) {
+export function formatRelativeTime(dateStr: string | number | Date) {
   if (!dateStr) return '';
   const d   = new Date(dateStr);
   const now  = new Date();
-  const diff = Math.floor((now - d) / 1000);
+  const diff = Math.floor((now.getTime() - d.getTime()) / 1000);
 
   if (diff < 60)   return 'now';
   if (diff < 3600) return `${Math.floor(diff / 60)}m`;
