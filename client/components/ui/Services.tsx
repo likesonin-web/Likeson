@@ -2,90 +2,141 @@
 
 import React, { useCallback, memo, useRef, useState, useEffect } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, Variants, Transition } from "framer-motion";
 import {
   Stethoscope, Ambulance, HeartHandshake, Pill,
   Microscope, Zap, Activity, CheckCircle2,
-  ArrowUpRight, ChevronRight, Sparkles,
+  ArrowUpRight, ChevronRight, Sparkles, LucideIcon
 } from "lucide-react";
 
+// --- TYPES & INTERFACES ---
+export interface ServiceTheme {
+  rgb: string;
+  hex: string;
+}
+
+export interface ServiceItem {
+  id: string;
+  title: string;
+  tagline: string;
+  description: string;
+  icon: LucideIcon;
+  href: string;
+  storyHref: string;
+  theme: ServiceTheme;
+  badge?: string;
+  features: string[];
+}
+
+export interface SpotlightCardProps {
+  service: ServiceItem;
+  index: number;
+}
+
 // --- CONSTANTS & CONFIGURATIONS ---
-const BOOK = (type) => `/book-appointment?type=${type}`;
+const BOOK = (type: string): string => `/book-appointment?type=${type}`;
 const HOW_IT_WORKS = "/how-it-works";
 
-// Extracted magic numbers for animations to ensure global consistency
+const ANIMATION_TRANSITION: Transition = {
+  duration: 0.55,
+  ease: [0.22, 1, 0.36, 1],
+};
+
 const ANIMATION = {
-  transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] },
+  transition: ANIMATION_TRANSITION,
   viewport: { once: true, margin: "-60px" }
 };
 
-const cardVariants = {
+const cardVariants: Variants = {
   hidden: { opacity: 0, y: 40 },
-  visible: (index) => ({
+  visible: (index: number) => ({
     opacity: 1,
     y: 0,
-    transition: { ...ANIMATION.transition, delay: index * 0.08 }
+    transition: {
+      ...ANIMATION_TRANSITION,
+      delay: index * 0.08,
+    }
   })
 };
 
-// Abstracted colors to CSS-friendly strings (easier to map to Tailwind or global CSS variables later)
-const SERVICES_DATA = [
+const SERVICES_DATA: ServiceItem[] = [
   {
-    id: "full_care_ride", title: "Full Care Ride",
+    id: "full_care_ride",
+    title: "Full Care Ride",
     tagline: "Door-to-door with a dedicated care assistant",
     description: "13-step care journey — verified assistant, GPS-tracked vehicle, medicines collected en route, safe return confirmed.",
-    icon: Ambulance, href: BOOK("full_care_ride"), storyHref: `${HOW_IT_WORKS}#full-care-ride`,
+    icon: Ambulance,
+    href: BOOK("full_care_ride"),
+    storyHref: `${HOW_IT_WORKS}#full-care-ride`,
     theme: { rgb: "249, 115, 22", hex: "#f97316" }, // Orange
     badge: "Most Popular",
     features: ["13-Step Care Journey", "Live GPS Tracking", "En-Route Pharmacy", "Safe Return Confirmed"],
   },
   {
-    id: "doctor_consultation", title: "Doctor Consultation",
+    id: "doctor_consultation",
+    title: "Doctor Consultation",
     tagline: "In-person visit at hospital or clinic",
     description: "Book board-certified specialists for in-person visits, home visits, or scheduled clinic appointments.",
-    icon: Stethoscope, href: BOOK("doctor_consultation"), storyHref: `${HOW_IT_WORKS}#doctor-consultation`,
+    icon: Stethoscope,
+    href: BOOK("doctor_consultation"),
+    storyHref: `${HOW_IT_WORKS}#doctor-consultation`,
     theme: { rgb: "14, 165, 233", hex: "#0ea5e9" }, // Sky
     features: ["Choose Hospital & Doctor", "In-Person & Home Visits", "Digital Prescriptions", "Follow-Up Tracking"],
   },
   {
-    id: "doctor_online", title: "Online Consultation",
+    id: "doctor_online",
+    title: "Online Consultation",
     tagline: "Video call with your doctor from anywhere",
     description: "Video or audio appointments — ideal for NRIs managing parents remotely, follow-ups, and chronic care.",
-    icon: Zap, href: BOOK("doctor_online"), storyHref: `${HOW_IT_WORKS}#doctor-online`,
+    icon: Zap,
+    href: BOOK("doctor_online"),
+    storyHref: `${HOW_IT_WORKS}#doctor-online`,
     theme: { rgb: "139, 92, 246", hex: "#8b5cf6" }, // Violet
     badge: "NRI Friendly",
     features: ["24/7 Video & Audio", "Upload Patient History", "Instant Confirmation", "NRI-Friendly Scheduling"],
   },
   {
-    id: "physiotherapist", title: "Physiotherapy",
+    id: "physiotherapist",
+    title: "Physiotherapy",
     tagline: "Clinic or home session by a certified therapist",
     description: "Post-surgical recovery, mobility support, chronic pain — certified physio sessions at clinic or your home.",
-    icon: Activity, href: BOOK("physiotherapist"), storyHref: `${HOW_IT_WORKS}#physiotherapist`,
+    icon: Activity,
+    href: BOOK("physiotherapist"),
+    storyHref: `${HOW_IT_WORKS}#physiotherapist`,
     theme: { rgb: "239, 68, 68", hex: "#ef4444" }, // Red
     features: ["Certified Physiotherapists", "Clinic or Home Visit", "Post-Surgery Recovery", "Auto Follow-Up Reminders"],
   },
   {
-    id: "care_assistant", title: "Care Assistant",
+    id: "care_assistant",
+    title: "Care Assistant",
     tagline: "Background-verified professional at your side",
     description: "Verified care assistants who escort patients, manage queues, handle billing — so no one faces a hospital alone.",
-    icon: HeartHandshake, href: BOOK("care_assistant"), storyHref: `${HOW_IT_WORKS}#care-assistant`,
+    icon: HeartHandshake,
+    href: BOOK("care_assistant"),
+    storyHref: `${HOW_IT_WORKS}#care-assistant`,
     theme: { rgb: "16, 185, 129", hex: "#10b981" }, // Emerald
     features: ["Queue Management", "Billing Assistance", "Elderly Companionship", "Medication Reminders"],
   },
   {
-    id: "diagnostic_home", title: "Home Diagnostics",
+    id: "diagnostic_home",
+    title: "Home Diagnostics",
     tagline: "Lab technician at your doorstep",
     description: "NABL-accredited lab tests with home sample collection. Digital reports delivered to your dashboard in 6-48 hrs.",
-    icon: Microscope, href: BOOK("diagnostic_home"), storyHref: `${HOW_IT_WORKS}#diagnostics`,
+    icon: Microscope,
+    href: BOOK("diagnostic_home"),
+    storyHref: `${HOW_IT_WORKS}#diagnostics`,
     theme: { rgb: "6, 182, 212", hex: "#06b6d4" }, // Cyan
     badge: "Home Visit",
     features: ["NABL Accredited Labs", "Home Sample Collection", "Reports in 6-48 hrs", "Full Body Packages"],
   },
   {
-    id: "pharmacy", title: "Pharmacy Delivery",
+    id: "pharmacy",
+    title: "Pharmacy Delivery",
     tagline: "Verified medicines, delivered fast",
     description: "Express delivery with cold-chain maintenance — including auto-refill plans for chronic patients.",
-    icon: Pill, href: BOOK("pharmacy"), storyHref: `${HOW_IT_WORKS}#pharmacy`,
+    icon: Pill,
+    href: BOOK("pharmacy"),
+    storyHref: `${HOW_IT_WORKS}#pharmacy`,
     theme: { rgb: "245, 158, 11", hex: "#f59e0b" }, // Amber
     features: ["2-Hour Express Delivery", "Cold-Chain Maintained", "Auto-Refill Chronic", "Prescription Digitization"],
   },
@@ -93,18 +144,18 @@ const SERVICES_DATA = [
 
 // --- COMPONENTS ---
 
-const SpotlightCard = memo(({ service, index }) => {
+const SpotlightCard: React.FC<SpotlightCardProps> = memo(({ service, index }) => {
   const Icon = service.icon;
-  const cardRef = useRef(null);
-  const requestRef = useRef(null);
-  const [hovered, setHovered] = useState(false);
+  const cardRef = useRef<HTMLLIElement>(null);
+  const requestRef = useRef<number | null>(null);
+  const [hovered, setHovered] = useState<boolean>(false);
 
   // 1. Performance: Throttled mouse move via requestAnimationFrame
-  const handleMouseMove = useCallback((e) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLLIElement>) => {
     const el = cardRef.current;
     if (!el) return;
 
-    if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    if (requestRef.current !== null) cancelAnimationFrame(requestRef.current);
 
     requestRef.current = requestAnimationFrame(() => {
       const rect = el.getBoundingClientRect();
@@ -118,7 +169,7 @@ const SpotlightCard = memo(({ service, index }) => {
   // Cleanup animation frame on unmount
   useEffect(() => {
     return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      if (requestRef.current !== null) cancelAnimationFrame(requestRef.current);
     };
   }, []);
 
@@ -146,7 +197,7 @@ const SpotlightCard = memo(({ service, index }) => {
       whileInView="visible"
       viewport={ANIMATION.viewport}
       animate={{ scale: hovered ? 1.015 : 1 }}
-      style={{ listStyle: "none", "--spot-x": "50%", "--spot-y": "50%" }}
+      style={{ listStyle: "none", "--spot-x": "50%", "--spot-y": "50%" } as React.CSSProperties}
       className="relative rounded-2xl will-change-transform group"
       aria-labelledby={`svc-title-${service.id}`}
     >
@@ -217,7 +268,7 @@ const SpotlightCard = memo(({ service, index }) => {
           </div>
 
           <div className="flex flex-wrap gap-2 mb-7 mt-auto">
-            {service.features.map((f) => (
+            {service.features.map((f: string) => (
               <span
                 key={f}
                 className="font-poppins inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all duration-300"
@@ -258,7 +309,7 @@ const SpotlightCard = memo(({ service, index }) => {
 });
 SpotlightCard.displayName = "SpotlightCard";
 
-const AmbientBG = memo(() => (
+const AmbientBG: React.FC = memo(() => (
   <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
     <div className="absolute top-[-15%] right-[-8%] w-[700px] h-[700px] rounded-full blur-[140px] bg-[#0ea5e9]/5" />
     <div className="absolute bottom-[-10%] left-[-8%] w-[600px] h-[600px] rounded-full blur-[120px] bg-[#10b981]/5" />
@@ -267,13 +318,13 @@ const AmbientBG = memo(() => (
 ));
 AmbientBG.displayName = "AmbientBG";
 
-const SectionHeader = memo(() => (
+const SectionHeader: React.FC = memo(() => (
   <motion.header
     className="max-w-3xl mb-20"
     initial={false}
     whileInView={{ opacity: 1, y: 0 }}
     viewport={ANIMATION.viewport}
-    transition={ANIMATION.transition}
+    transition={ANIMATION_TRANSITION}
   >
     <div className="flex items-center gap-3 mb-6">
       <div className="font-poppins flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-[0.15em] bg-[#0ea5e9]/10 border border-[#0ea5e9]/25 text-[#0ea5e9]">
@@ -306,13 +357,13 @@ const SectionHeader = memo(() => (
 ));
 SectionHeader.displayName = "SectionHeader";
 
-const BottomCTA = memo(() => (
+const BottomCTA: React.FC = memo(() => (
   <motion.div
     className="mt-20 relative rounded-3xl overflow-hidden"
     initial={false}
     whileInView={{ opacity: 1, y: 0 }}
     viewport={ANIMATION.viewport}
-    transition={ANIMATION.transition}
+    transition={ANIMATION_TRANSITION}
     style={{ backgroundImage: "var(--bg-gradient-primary)" }}
   >
     <div className="relative flex flex-col sm:flex-row items-center justify-between gap-6 px-8 py-10">
@@ -339,7 +390,7 @@ const BottomCTA = memo(() => (
 ));
 BottomCTA.displayName = "BottomCTA";
 
-const Services = memo(() => (
+const Services: React.FC = memo(() => (
   <section id="services" className="relative min-h-screen bg-base-100 text-base-content overflow-hidden" aria-labelledby="services-heading">
     <AmbientBG />
     <div className="relative z-10 container-custom py-24 lg:py-32">

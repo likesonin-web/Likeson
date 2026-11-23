@@ -6,44 +6,49 @@ import dynamic from "next/dynamic";
 import Header from "./Header";
 import Footer from "./Footer";
 import { usePathname } from "next/navigation";
+import { RootState } from "@/store";
+
+export interface LayoutConditionalWrapperProps {
+  children: React.ReactNode;
+}
 
 // Dynamically import heavy dashboards so they are not included in public bundle
-const LikesonSuperAdminDashboard = dynamic(
+const LikesonSuperAdminDashboard = dynamic<{ children: React.ReactNode }>(
   () => import("@/components/dashboard/LikesonSuperAdminDashboard"),
   { ssr: false }
 );
-const AdminDashboard = dynamic(
+const AdminDashboard = dynamic<{ children: React.ReactNode }>(
   () => import("@/app/admin/AdminDashboard"),
   { ssr: false }
 );
-const PharmacyDashboard = dynamic(
+const PharmacyDashboard = dynamic<{ children: React.ReactNode }>(
   () => import("@/components/dashboard/PharmacyDashboard"),
   { ssr: false }
 );
-const TransportPartnerDashboard = dynamic(
+const TransportPartnerDashboard = dynamic<{ children: React.ReactNode }>(
   () => import("@/components/dashboard/Transportpartnerdashboard"),
   { ssr: false }
 );
-const HospitalMangerDashboard = dynamic(
+const HospitalMangerDashboard = dynamic<{ children: React.ReactNode }>(
   () => import("@/components/dashboard/HospitalMangerDashboard"),
   { ssr: false }
 );
-const DoctorDashboard = dynamic(
+const DoctorDashboard = dynamic<{ children: React.ReactNode }>(
   () => import("@/components/dashboard/DoctorDashboard"),
   { ssr: false }
 );
-const BloodBankDashboard = dynamic(
+const BloodBankDashboard = dynamic<{ children: React.ReactNode }>(
   () => import("@/components/dashboard/BloodBankDashboard"),
   { ssr: false }
 );
-const LabPartnerDashboard = dynamic(
+const LabPartnerDashboard = dynamic<{ children: React.ReactNode }>(
   () => import("@/components/dashboard/LabPartnerDashboard"),
   { ssr: false }
 );
 
-export default function LayoutConditionalWrapper({ children }) {
-  const { user } = useSelector((state) => state.user);
-  const [isClient, setIsClient] = useState(false);
+export default function LayoutConditionalWrapper({ children }: LayoutConditionalWrapperProps): React.ReactElement {
+  const { user } = useSelector((state: RootState) => state.user);
+  const [isClient, setIsClient] = useState<boolean>(false);
   const pathname = usePathname();
 
   useEffect(() => {

@@ -39,6 +39,8 @@ import TransportPartner         from '../models/TransportPartner.js';
 import SoloDriverPartner        from '../models/SoloDriverPartner.js';
 import LabPartnerProfile        from '../models/LabPartnerProfile.js';
 import Hospital                 from '../models/Hospital.js';
+import PharmacyProfile          from '../models/PharmacyProfile.js';
+import BloodBank                from '../models/BloodBank.js';
 
 // ── Services ───────────────────────────────────────────────────────────────
 import { processBookingSettlement }          from '../services/settlementEngineService.js';
@@ -123,6 +125,8 @@ async function resolveProfileRef(userId, role) {
     case 'solodriverpartner':return (await SoloDriverPartner.findOne({ user: userId }).select('_id').lean())?._id;
     case 'transportpartner': return (await TransportPartner.findOne({ user: userId }).select('_id').lean())?._id;
     case 'lab_partner':      return (await LabPartnerProfile.findOne({ user: userId }).select('_id').lean())?._id;
+    case 'pharmacy':         return (await PharmacyProfile.findOne({ user: userId }).select('_id').lean())?._id;
+    case 'blood_bank':       return (await BloodBank.findOne({ user: userId }).select('_id').lean())?._id;
     default:                 return null;
   }
 }
@@ -204,6 +208,34 @@ export const getSettlementStatusByBookingId = asyncHandler(asyncRoute(async (req
 
 // GET '/wallets/me'
 export const getWalletsMe = asyncHandler(asyncRoute(async (req, res) => {
+    // If admin or finance staff checks wallet, return safe response
+    if (['admin', 'superadmin', 'finance'].includes(req.user.role)) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          wallet: {
+            walletId:          null,
+            partnerRole:       req.user.role,
+            currency:          'INR',
+            availableBalance:  0,
+            pendingBalance:    0,
+            withdrawalBalance: 0,
+            recoveryBalance:   0,
+            lifetimeEarned:    0,
+            lifetimeRecovered: 0,
+            lifetimeWithdrawn: 0,
+            walletStatus:      'active',
+            kycVerified:       true,
+            bankVerified:      true,
+            complianceHold:    false,
+            isWithdrawable:    false,
+            lastSettlementAt:  null,
+          },
+          outstandingLiability: 0,
+        },
+      });
+    }
+
     const userId = resolvePartnerUserId(req.user);
 
     let wallet = await PartnerWallet.findOne({ partner: userId });

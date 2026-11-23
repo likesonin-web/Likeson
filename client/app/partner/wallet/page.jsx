@@ -19,9 +19,11 @@
  */
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { selectUser } from '@/store/slices/userSlice';
 import {
   Wallet,
   ArrowDownToLine,
@@ -239,6 +241,8 @@ function StatCard({ icon: Icon, label, value, note, tone = 'primary' }) {
 
 export default function PartnerAccountingManagement() {
   const dispatch = useDispatch();
+  const router = useRouter();
+  const user = useSelector(selectUser);
 
   const [activeTab, setActiveTab] = useState('overview');
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
@@ -276,12 +280,21 @@ export default function PartnerAccountingManagement() {
   const [withdrawalPage, setWithdrawalPage] = useState(1);
   const [liabilityPage, setLiabilityPage] = useState(1);
 
-  // Initialization
+  // Initialization & Role guard
   useEffect(() => {
+    if (!user) return;
+    if (['admin', 'superadmin'].includes(user.role)) {
+      router.replace('/admin/dashboard');
+      return;
+    }
+    if (user.role === 'customer') {
+      router.replace('/wallet');
+      return;
+    }
     dispatch(fetchMyWallet());
     dispatch(fetchMyBankDetails());
     dispatch(fetchPartnerDashboard());
-  }, [dispatch]);
+  }, [dispatch, user, router]);
 
   // Tab data fetching
   useEffect(() => {

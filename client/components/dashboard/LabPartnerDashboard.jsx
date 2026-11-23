@@ -845,7 +845,7 @@ function DashboardContent({ dashboard, analytics, loading }) {
 /**
  * LabPartnerDashboard
  *
- * @param {React.ReactNode} [children]
+ * @param {{ children?: React.ReactNode }} props
  *   When provided, `children` renders as the main page content on
  *   the right side instead of the default DashboardContent.
  *   Use this in nested route layouts — e.g. wrap sub-pages with

@@ -28,6 +28,8 @@ export const PARTNER_TYPES = Object.freeze([
   'solodriverpartner',
   'transportpartner',
   'lab_partner',
+  'pharmacy',
+  'blood_bank',
 ]);
 
 export const WALLET_STATUSES = Object.freeze([

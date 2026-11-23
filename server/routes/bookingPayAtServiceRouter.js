@@ -18,7 +18,11 @@ const SERVICE_PARTNER_ROLES = [
   'blood_bank', 
   'care_assistant', 
   'pharmacy', 
-  'diagnostic', 
+  'diagnostic',
+  'lab_partner',
+  'driver',
+  'solodriverpartner',
+  'transportpartner',
   'admin', 
   'superadmin'
 ];

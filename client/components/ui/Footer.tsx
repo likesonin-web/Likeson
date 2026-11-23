@@ -6,9 +6,29 @@ import { usePathname } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { Mail, Phone, MapPin, ShieldCheck } from 'lucide-react';
 import { FaFacebook, FaTwitter, FaInstagram, FaLinkedin } from 'react-icons/fa6';
+import { RootState } from '@/store';
+
+// ── Types & Interfaces ────────────────────────────────────────────────────────
+export interface FooterLink {
+  name: string;
+  href: string;
+}
+
+export interface FooterSectionConfig {
+  label: string;
+  services: FooterLink[];
+  company: FooterLink[];
+  support: FooterLink[];
+}
+
+export interface SocialLink {
+  icon: React.ComponentType<{ size?: number; className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>;
+  href: string;
+  label: string;
+}
 
 // ── Role → data-theme mapping ─────────────────────────────────────────────────
-const ROLE_THEME_MAP = {
+const ROLE_THEME_MAP: Record<string, string | null> = {
   doctor:            'doctor',
   hospital:          'hospital',
   'care_assistant':  'care-assistant',
@@ -24,7 +44,7 @@ const ROLE_THEME_MAP = {
 };
 
 // ── Role-specific footer link sets (Kept Intact) ──────────────────────────────
-const ROLE_FOOTER_CONFIG = {
+const ROLE_FOOTER_CONFIG: Record<string, FooterSectionConfig> = {
   doctor: {
     label: 'Doctor Portal',
     services: [
@@ -69,7 +89,7 @@ const ROLE_FOOTER_CONFIG = {
   },
 };
 
-const SOCIAL_LINKS = [
+const SOCIAL_LINKS: SocialLink[] = [
   { icon: FaFacebook,  href: '#', label: 'Follow us on Facebook' },
   { icon: FaTwitter,   href: '#', label: 'Follow us on Twitter' },
   { icon: FaInstagram, href: '#', label: 'Follow us on Instagram' },
@@ -77,11 +97,11 @@ const SOCIAL_LINKS = [
 ];
 
 // ── Footer Component ───────────────────────────────────────────────────────────
-const Footer = () => {
+const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const pathname = usePathname() || '';
 
-  const user = useSelector((s) => s.user?.user) ?? null;
+  const user = useSelector((s: RootState) => s.user?.user) ?? null;
 
   const isHidden = useMemo(() => {
     return (

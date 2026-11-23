@@ -1,6 +1,23 @@
-// path: components/ui/Skeletons.jsx
+import React from 'react';
 
-export function TicketCardSkeleton() {
+export interface TicketListSkeletonProps {
+  count?: number;
+}
+
+export interface TableRowSkeletonProps {
+  cols?: number;
+}
+
+export interface TableSkeletonProps {
+  rows?: number;
+  cols?: number;
+}
+
+export interface ChatBubbleSkeletonProps {
+  align?: 'left' | 'right';
+}
+
+export function TicketCardSkeleton(): React.ReactElement {
   return (
     <div className="card p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -17,7 +34,7 @@ export function TicketCardSkeleton() {
   );
 }
 
-export function TicketListSkeleton({ count = 6 }) {
+export function TicketListSkeleton({ count = 6 }: TicketListSkeletonProps): React.ReactElement {
   return (
     <div className="grid-responsive">
       {Array.from({ length: count }).map((_, i) => <TicketCardSkeleton key={i} />)}
@@ -25,7 +42,7 @@ export function TicketListSkeleton({ count = 6 }) {
   );
 }
 
-export function TableRowSkeleton({ cols = 5 }) {
+export function TableRowSkeleton({ cols = 5 }: TableRowSkeletonProps): React.ReactElement {
   return (
     <tr>
       {Array.from({ length: cols }).map((_, i) => (
@@ -35,13 +52,13 @@ export function TableRowSkeleton({ cols = 5 }) {
   );
 }
 
-export function TableSkeleton({ rows = 6, cols = 5 }) {
+export function TableSkeleton({ rows = 6, cols = 5 }: TableSkeletonProps): React.ReactElement {
   return (
     <>{Array.from({ length: rows }).map((_, i) => <TableRowSkeleton key={i} cols={cols} />)}</>
   );
 }
 
-export function ChatBubbleSkeleton({ align = 'left' }) {
+export function ChatBubbleSkeleton({ align = 'left' }: ChatBubbleSkeletonProps): React.ReactElement {
   return (
     <div className={`flex ${align === 'right' ? 'justify-end' : 'justify-start'} mb-3`}>
       <div className="skeleton h-10 w-48 rounded-box" />
@@ -49,7 +66,7 @@ export function ChatBubbleSkeleton({ align = 'left' }) {
   );
 }
 
-export function StatCardSkeleton() {
+export function StatCardSkeleton(): React.ReactElement {
   return (
     <div className="stat-card space-y-3">
       <div className="skeleton h-8 w-20" />

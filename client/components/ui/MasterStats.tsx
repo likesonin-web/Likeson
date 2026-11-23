@@ -2,25 +2,37 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { motion, useInView, animate, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { Activity, MapPin, ShieldCheck, Star } from "lucide-react";
+import { Activity, MapPin, ShieldCheck, Star, LucideIcon } from "lucide-react";
 
-const MasterStats = () => {
-  const stats = [
-    { label: "Verified Doctors", val: 250, suffix: "+", sub: "Available Daily", icon: Activity },
-    { label: "Areas Covered", val: 42, suffix: "", sub: "Across Vijayawada", icon: MapPin },
-    { label: "Service Uptime", val: 99.9, suffix: "%", sub: "Always Online", icon: ShieldCheck },
-    { label: "Trust Score", val: 4.9, suffix: "/5", sub: "Patient Reviews", icon: Star },
-  ];
+export interface StatItem {
+  label: string;
+  val: number;
+  suffix: string;
+  sub: string;
+  icon: LucideIcon;
+}
 
+export interface StatCardProps {
+  stat: StatItem;
+  index: number;
+}
+
+const STATS: StatItem[] = [
+  { label: "Verified Doctors", val: 250, suffix: "+", sub: "Available Daily", icon: Activity },
+  { label: "Areas Covered", val: 42, suffix: "", sub: "Across Vijayawada", icon: MapPin },
+  { label: "Service Uptime", val: 99.9, suffix: "%", sub: "Always Online", icon: ShieldCheck },
+  { label: "Trust Score", val: 4.9, suffix: "/5", sub: "Patient Reviews", icon: Star },
+];
+
+const MasterStats: React.FC = () => {
   return (
-    <footer className=" pt-10 border-t border-base-200">
+    <footer className="pt-10 border-t border-base-200">
       <div className="relative group">
-        {/* Layered Ambient Glow - Multiple Blur Radii for Depth */}
+        {/* Layered Ambient Glow */}
         <div className="absolute -inset-10 bg-primary/5 rounded-[var(--r-box)] blur-[120px] opacity-50" />
         <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/20 rounded-[var(--r-box)] blur-xl opacity-0 group-hover:opacity-100 transition duration-1000" />
         
         <div className="relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-0 divide-x divide-y lg:divide-y-0 divide-base-200 bg-base-100/40 backdrop-blur-2xl rounded-[var(--r-box)] border border-base-300 overflow-hidden shadow-[0_30px_70px_rgba(0,0,0,0.15)]">
-          
           {/* Advanced Shimmer Sweep */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
             <motion.div 
@@ -31,7 +43,7 @@ const MasterStats = () => {
             />
           </div>
 
-          {stats.map((stat, i) => (
+          {STATS.map((stat, i) => (
             <StatCard key={i} stat={stat} index={i} />
           ))}
         </div>
@@ -40,10 +52,10 @@ const MasterStats = () => {
   );
 };
 
-const StatCard = ({ stat, index }) => {
-  const ref = useRef(null);
+const StatCard: React.FC<StatCardProps> = ({ stat, index }) => {
+  const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
-  const [displayVal, setDisplayVal] = useState("0");
+  const [displayVal, setDisplayVal] = useState<string>("0");
   
   // --- 3D Tilt Logic ---
   const x = useMotionValue(0);
@@ -53,7 +65,8 @@ const StatCard = ({ stat, index }) => {
   const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["10deg", "-10deg"]);
   const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-10deg", "10deg"]);
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     const width = rect.width;
     const height = rect.height;
@@ -74,8 +87,8 @@ const StatCard = ({ stat, index }) => {
     if (isInView) {
       const controls = animate(0, stat.val, {
         duration: 3,
-        ease: [0.19, 1, 0.22, 1], // Expo Out ease for ultra-smooth stop
-        onUpdate: (v) => setDisplayVal(v.toFixed(stat.val % 1 === 0 ? 0 : 1)),
+        ease: [0.19, 1, 0.22, 1],
+        onUpdate: (v: number) => setDisplayVal(v.toFixed(stat.val % 1 === 0 ? 0 : 1)),
       });
       return () => controls.stop();
     }

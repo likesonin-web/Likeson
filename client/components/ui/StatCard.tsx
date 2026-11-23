@@ -1,8 +1,26 @@
 'use client';
-// path: components/ui/StatCard.jsx
-import { motion } from 'framer-motion';
 
-export default function StatCard({ label, value, icon: Icon, trend, trendLabel, delay = 0 }) {
+import React from 'react';
+import { motion } from 'framer-motion';
+import { LucideIcon } from 'lucide-react';
+
+export interface StatCardProps {
+  label: string;
+  value: string | number;
+  icon?: LucideIcon | React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  trend?: number;
+  trendLabel?: string;
+  delay?: number;
+}
+
+export default function StatCard({
+  label,
+  value,
+  icon: Icon,
+  trend,
+  trendLabel,
+  delay = 0,
+}: StatCardProps) {
   const trendPositive = typeof trend === 'number' && trend >= 0;
 
   return (

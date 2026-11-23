@@ -607,6 +607,7 @@ function useHeaderData() {
 
   const roleLower = user?.role?.toLowerCase() || "customer";
   const isCustomer = !user?.role || roleLower === "customer";
+  const isAdmin = ["admin", "superadmin"].includes(roleLower);
   const isPartner = [
     "hospital",
     "doctor",
@@ -615,6 +616,7 @@ function useHeaderData() {
     "careassistant",
     "pharmacy",
     "diagnostic",
+    "lab_partner",
     "driver",
     "solodriverpartner",
     "transportpartner",
@@ -717,9 +719,10 @@ const WalletWidget = memo(function WalletWidget({
   isMobile = false,
   accent,
   isCustomer = true,
+  isAdmin = false,
 }) {
-  const href = isCustomer ? "/wallet" : "/partner/wallet";
-  const accentColor = isCustomer ? (accent ?? "var(--warning)") : "#10b981"; // Emerald Green for partners
+  const href = isCustomer ? "/wallet" : isAdmin ? "/admin/dashboard" : "/partner/wallet";
+  const accentColor = isCustomer ? (accent ?? "var(--warning)") : isAdmin ? "var(--warning)" : "#10b981"; // Emerald Green for partners
   const Icon = isCustomer ? WalletIcon : IndianRupee; // Different icon for partners
 
   return (
@@ -2284,6 +2287,7 @@ const Header = () => {
                       walletBalance={walletBalance}
                       accent={mood?.accent}
                       isCustomer={isCustomer}
+                      isAdmin={isAdmin}
                     />
                   </div>
 
@@ -2834,6 +2838,7 @@ const Header = () => {
                     isMobile
                     accent={mood?.accent}
                     isCustomer={isCustomer}
+                    isAdmin={isAdmin}
                   />
                 )}
 

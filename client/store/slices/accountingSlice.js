@@ -39,7 +39,9 @@ function createThunk(type, apiFn, opts = {}) {
       return body;
     } catch (err) {
       const message = extractErrorMessage(err, opts.errorMessage);
-      toast.error(message);
+      if (!opts.silent && err?.response?.status !== 403) {
+        toast.error(message);
+      }
       return rejectWithValue({ message, status: err?.response?.status ?? null });
     }
   });
@@ -80,7 +82,7 @@ export const fetchSettlementStatus = createThunk(
 export const fetchMyWallet = createThunk(
   `${SLICE_NAME}/wallet/fetchMine`,
   () => accountingService.getMyWallet(),
-  { errorMessage: 'Failed to load your wallet' }
+  { errorMessage: 'Failed to load your wallet', silent: true }
 );
 
 export const fetchPartnerWallet = createThunk(
@@ -120,7 +122,7 @@ export const updateWalletKycStatus = createThunk(
 export const fetchMyBankDetails = createThunk(
   `${SLICE_NAME}/wallet/bank/fetchMine`,
   () => accountingService.getMyBankDetails(),
-  { errorMessage: 'Failed to load bank accounts' }
+  { errorMessage: 'Failed to load bank accounts', silent: true }
 );
 
 export const addBankAccount = createThunk(
@@ -334,7 +336,7 @@ export const forceSettleBooking = createThunk(
 export const fetchPartnerDashboard = createThunk(
   `${SLICE_NAME}/reports/partnerDashboard`,
   () => accountingService.getPartnerDashboard(),
-  { errorMessage: 'Failed to load dashboard' }
+  { errorMessage: 'Failed to load dashboard', silent: true }
 );
 
 export const fetchPartnerEarnings = createThunk(
