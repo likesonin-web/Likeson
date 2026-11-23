@@ -518,14 +518,23 @@ const HomeHospitals = () => {
 
   const isNearbyMode =
     mode === "user" || mode === "nearby" || mode === "manual-near";
-  const hospitals = isNearbyMode ? nearbyHospitals : allHospitals;
-  const loading = isNearbyMode ? loadingNearby : loadingAll;
+  const hasNearbyResults = isNearbyMode && Array.isArray(nearbyHospitals) && nearbyHospitals.length > 0;
+  const isFallbackToAll = isNearbyMode && (!nearbyHospitals || nearbyHospitals.length === 0) && Array.isArray(allHospitals) && allHospitals.length > 0;
+  const hospitals = hasNearbyResults
+    ? nearbyHospitals
+    : (allHospitals?.length ? allHospitals : (nearbyHospitals ?? []));
+  const loading = isNearbyMode ? (loadingNearby && !allHospitals?.length) : loadingAll;
 
   // ── Initial fetch + react to header location changes ───────────────────────
   const savedLng = user?.location?.coordinates?.[0];
   const savedLat = user?.location?.coordinates?.[1];
 
   useEffect(() => {
+    // Always pre-load allHospitals as a reliable fallback
+    if (!allHospitals?.length && !loadingAll) {
+      dispatch(fetchAllHospitals({ limit: 12 }));
+    }
+
     // Don't override an active GPS / manual search the user picked on this page.
     if (mode === "nearby" || mode === "manual" || mode === "manual-near")
       return;
@@ -542,10 +551,9 @@ const HomeHospitals = () => {
       setLocationLabel(user.lastKnownAddress || "your saved location");
       return;
     }
-    if (!allHospitals?.length) dispatch(fetchAllHospitals({ limit: 12 }));
     setMode("all");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?._id, savedLat, savedLng]);
+  }, [user?._id, savedLat, savedLng, dispatch]);
 
   // ── GPS ───────────────────────────────────────────────────────────────────
   const handleUseGPS = useCallback(() => {
@@ -723,6 +731,25 @@ const HomeHospitals = () => {
           gpsError={gpsError}
         />
 
+        {/* ── Fallback Alert Banner when nearby yields no facilities ── */}
+        {isFallbackToAll && (
+          <div className="mb-6 mx-4 p-3 rounded-xl border border-warning/30 bg-warning/5 text-base-content flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <MapPin size={16} className="text-warning shrink-0" />
+              <span>
+                No partner hospitals found within 100 km of your location.{" "}
+                <strong className="text-warning font-bold">Showing verified partner hospitals nationwide.</strong>
+              </span>
+            </div>
+            <button
+              onClick={handleClear}
+              className="font-bold underline text-[11px] text-primary shrink-0 hover:opacity-80 transition-opacity"
+            >
+              Reset Location Filter
+            </button>
+          </div>
+        )}
+
         {/* ── Cards Carousel ── */}
         <div
           ref={scrollRef}
@@ -760,24 +787,82 @@ const HomeHospitals = () => {
               </Link>
             </>
           ) : (
-            /* Empty state */
-            <div className="flex flex-col items-center justify-center min-w-full py-24 text-base-content/40 gap-4">
-              <div className="w-16 h-16 rounded-[var(--r-box)] border border-base-300 bg-base-200 flex items-center justify-center">
-                <MapPin size={28} className="opacity-30" />
+            /* Rich Empty state explaining reason and offering 3 clear alternatives */
+            <div className="flex flex-col items-center justify-center min-w-full py-12 px-4 text-center">
+              <div className="w-16 h-16 rounded-2xl border border-base-300 bg-base-200/60 flex items-center justify-center mb-4 text-base-content/40 shadow-sm">
+                <Building2 size={30} className="text-primary/70" />
               </div>
-              <p className="text-sm font-poppins font-medium">
+              <h3 className="text-lg font-black text-base-content tracking-tight mb-2">
                 {isNearbyMode
-                  ? "No hospitals found within 100 km. Try a different area."
-                  : "No hospitals available right now."}
+                  ? "No Partner Hospitals Within 100 km Yet"
+                  : "Hospital Network Currently Updating"}
+              </h3>
+              <p className="text-xs text-base-content/60 max-w-md mb-6 leading-relaxed">
+                We haven&rsquo;t onboarded physical partner hospitals in this specific area yet, but you can access verified medical care right from home:
               </p>
-              {isNearbyMode && (
+
+              {/* 3 Useful Alternatives */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-2xl mb-6 text-left">
+                <Link
+                  href="/book-appointment?type=doctor_online"
+                  className="p-4 rounded-xl border border-base-300 bg-base-100 hover:border-primary/50 hover:bg-primary/5 transition-all group flex flex-col justify-between"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-3">
+                    <Zap size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-base-content group-hover:text-primary transition-colors flex items-center gap-1">
+                      Online Consultation <ArrowUpRight size={12} />
+                    </h4>
+                    <p className="text-[11px] text-base-content/50 mt-1">Video call with board-certified doctors in 15 mins.</p>
+                  </div>
+                </Link>
+
+                <Link
+                  href="/book-appointment?type=diagnostic_home"
+                  className="p-4 rounded-xl border border-base-300 bg-base-100 hover:border-cyan-500/50 hover:bg-cyan-500/5 transition-all group flex flex-col justify-between"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-cyan-500/10 text-cyan-600 flex items-center justify-center mb-3">
+                    <FlaskConical size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-base-content group-hover:text-cyan-600 transition-colors flex items-center gap-1">
+                      Home Lab Tests <ArrowUpRight size={12} />
+                    </h4>
+                    <p className="text-[11px] text-base-content/50 mt-1">Sample collection at your doorstep by NABL techs.</p>
+                  </div>
+                </Link>
+
+                <Link
+                  href="/book-appointment?type=patient_transport"
+                  className="p-4 rounded-xl border border-base-300 bg-base-100 hover:border-orange-500/50 hover:bg-orange-500/5 transition-all group flex flex-col justify-between"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-600 flex items-center justify-center mb-3">
+                    <Navigation size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-base-content group-hover:text-orange-600 transition-colors flex items-center gap-1">
+                      Patient Transport <ArrowUpRight size={12} />
+                    </h4>
+                    <p className="text-[11px] text-base-content/50 mt-1">Assisted door-to-door transit to major medical hubs.</p>
+                  </div>
+                </Link>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
                   onClick={handleClear}
-                  className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                  className="px-5 py-2.5 rounded-lg border border-base-300 bg-base-100 text-xs font-bold text-base-content hover:bg-base-200 transition-colors"
                 >
-                  Show all hospitals instead
+                  Reset Location &amp; Show All
                 </button>
-              )}
+                <Link
+                  href="/hospitals"
+                  className="px-5 py-2.5 rounded-lg bg-primary text-primary-content text-xs font-bold hover:bg-primary/90 transition-colors flex items-center gap-1.5"
+                >
+                  Browse Full Directory <ArrowUpRight size={14} />
+                </Link>
+              </div>
             </div>
           )}
         </div>

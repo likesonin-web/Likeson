@@ -21,7 +21,9 @@ const PARTNER_ROLES = [
   'care_assistant', 
   'pharmacy', 
   'diagnostic', 
-  'driver'
+  'driver',
+  'admin',
+  'superadmin'
 ];
 
 router.post('/settlement/process/:bookingId', protect, authorize(...ADMIN_ROLES), ctrl.postSettlementProcessByBookingId);

@@ -605,7 +605,20 @@ function useHeaderData() {
   const unreadCount = useSelector(selectUnreadCount) ?? 0;
   const cartItems = useSelector(selectCartItems) ?? [];
 
-  const isCustomer = !user?.role || user.role === "customer";
+  const roleLower = user?.role?.toLowerCase() || "customer";
+  const isCustomer = !user?.role || roleLower === "customer";
+  const isPartner = [
+    "hospital",
+    "doctor",
+    "blood_bank",
+    "care_assistant",
+    "careassistant",
+    "pharmacy",
+    "diagnostic",
+    "driver",
+    "solodriverpartner",
+    "transportpartner",
+  ].includes(roleLower);
 
   // Customer Wallet State
   const customerWalletBalance = useSelector(selectWalletBalance) ?? 0;
@@ -634,10 +647,10 @@ function useHeaderData() {
     // Fetch appropriate wallet based on role
     if (isCustomer) {
       dispatch(getWallet());
-    } else {
+    } else if (isPartner) {
       dispatch(fetchPartnerWallet());
     }
-  }, [token, dispatch, isCustomer]);
+  }, [token, dispatch, isCustomer, isPartner]);
 
   return { user, token, unreadCount, cartCount, walletBalance };
 }
